@@ -33,7 +33,7 @@ Alternatively, one can use `make check` to run all tests at once with
 ## Test Arguments
 
 The testing framework supports a few arguments for ease of testing, using
-SystmeVerilog's `+` notation to pass arguments to the main simulator:
+SystemVerilog's `+` notation to pass arguments to the main simulator:
 
  - `+filter=<text>`: Runs only tests that have `<text>` in their name
  - `+v`: Increases verbosity to enable linetracing
