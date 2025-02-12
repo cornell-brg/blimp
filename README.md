@@ -4,7 +4,8 @@ This is a proposed SystemVerilog test framework to be used within Blimp,
 as well as across BRG. It makes use of high-level SystemVerilog features
 to make testing easy and resemble other languages.
 
-Currently, an example GCD module is implemented as a proof-of-concept
+Currently, an example GCD module is implemented as a minimal
+proof-of-concept
 
 ## Running Tests
 
