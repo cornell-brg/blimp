@@ -35,6 +35,7 @@ Alternatively, one can use `make check` to run all tests at once with
 The testing framework supports a few arguments for ease of testing, using
 SystemVerilog's `+` notation to pass arguments to the main simulator:
 
+ - `+test-suite=<num>`: Runs only the test suite of the specified number
  - `+filter=<text>`: Runs only tests that have `<text>` in their name
  - `+v`: Increases verbosity to enable linetracing
  - `+dump-vcd=/path/to/file.vcd`: Dumps a VCD waveform to the specified
