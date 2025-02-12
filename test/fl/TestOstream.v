@@ -6,24 +6,23 @@
 `ifndef TEST_FL_TESTOSTREAM_V
 `define TEST_FL_TESTOSTREAM_V
 
+`include "intf/StreamIntf"
 `include "test/FLTestUtils.v"
 
 module TestOstream #(
-  parameter type t_msg        = logic[31:0],
-  parameter p_recv_intv_delay = 0
+  parameter type t_msg   = logic[31:0],
+  parameter      p_delay = 0
 )(
   input  logic clk,
   input  logic rst,
   
-  input  t_msg msg,
-  input  logic val,
-  output logic rdy
+  StreamIntf.istream dut
 );
 
   FLTestUtils t( .* );
 
   initial begin
-    rdy = 1'b0;
+    dut.rdy = 1'b0;
   end
 
   //----------------------------------------------------------------------
@@ -31,70 +30,62 @@ module TestOstream #(
   //----------------------------------------------------------------------
   // A function to receive a message across a stream interface
 
-  t_msg dut_msg, exp_msg;
+  t_msg dut_msg;
   logic msg_recv;
 
   // verilator lint_off BLKSEQ
   
   task recv (
-    input t_msg test_msg
+    input t_msg exp_msg
   );
 
-    rdy      = 1'b0;
+    dut.rdy  = 1'b0;
     msg_recv = 1'b0;
-    exp_msg  = test_msg;
     
     // Delay for the send interval
-    for( int i = 0; i < p_recv_intv_delay; i = i + 1 ) begin
+    for( int i = 0; i < p_delay; i = i + 1 ) begin
       @( posedge clk );
       #1;
     end
 
-    rdy = 1'b1;
+    dut.rdy = 1'b1;
 
     do begin
       #2
-      msg_recv = val;
-      dut_msg  = msg;
+      msg_recv = dut.val;
+      dut_msg  = dut.msg;
       @( posedge clk );
       #1;
     end while( !msg_recv );
 
     `CHECK_EQ( dut_msg, exp_msg );
 
-    rdy = 1'b0;
+    dut.rdy = 1'b0;
 
   endtask
 
   // verilator lint_on BLKSEQ
 
-  //----------------------------------------------------------------------
-  // Linetracing
-  //----------------------------------------------------------------------
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  // Tracing
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  // verilator lint_off UNUSEDSIGNAL
-  string trace;
-  // verilator lint_on UNUSEDSIGNAL
-
-  string test_trace;
+  string msg_str;
   int trace_len;
-  initial begin
-    test_trace = $sformatf("%x", msg);
-    trace_len = test_trace.len();
-  end
 
-  // verilator lint_off BLKSEQ
-  always_comb begin
-    if( val & rdy )
-      trace = $sformatf("%x", msg);
-    else if( rdy )
-      trace = {(trace_len){" "}};
-    else if( val )
+  function string trace();
+    msg_str = $sformatf( "%x", dut.msg );
+    trace_len = msg_str.len();
+
+    if( dut.val & dut.rdy )
+      trace = msg_str;
+    else if( !dut.val & dut.rdy )
+      trace = {trace_len{" "}};
+    else if( dut.val & !dut.rdy )
       trace = {{(trace_len-1){" "}}, "#"};
-    else
+    else // !dut.val & !dut.rdy
       trace = {{(trace_len-1){" "}}, "."};
-  end
-  // verilator lint_on BLKSEQ
+  endfunction
 
 endmodule
 

@@ -6,20 +6,20 @@
 `ifndef TEST_FL_TESTISTREAM_V
 `define TEST_FL_TESTISTREAM_V
 
+`include "intf/StreamIntf"
+
 module TestIstream #(
-  parameter type t_msg        = logic[31:0],
-  parameter p_send_intv_delay = 0
+  parameter type t_msg   = logic[31:0],
+  parameter      p_delay = 0
 )(
   input  logic clk,
   
-  output t_msg msg,
-  output logic val,
-  input  logic rdy
+  StreamIntf.ostream dut
 );
 
   initial begin
-    msg = 'x;
-    val = 1'b0;
+    dut.msg = 'x;
+    dut.val = 1'b0;
   end
   
   //----------------------------------------------------------------------
@@ -35,60 +35,53 @@ module TestIstream #(
     input t_msg dut_msg
   );
 
-    val      = 1'b0;
-    msg      = 'x;
+    dut.val  = 1'b0;
+    dut.msg  = 'x;
     msg_sent = 1'b0;
     
     // Delay for the send interval
-    for( int i = 0; i < p_send_intv_delay; i = i + 1 ) begin
+    for( int i = 0; i < p_delay; i = i + 1 ) begin
       @( posedge clk );
       #1;
     end
 
-    val = 1'b1;
-    msg = dut_msg;
+    dut.val = 1'b1;
+    dut.msg = dut_msg;
 
     do begin
       #2
-      msg_sent = rdy;
+      msg_sent = dut.rdy;
       @( posedge clk );
       #1;
     end while( !msg_sent );
 
-    val = 1'b0;
-    msg = 'x;
+    dut.val = 1'b0;
+    dut.msg = 'x;
 
   endtask
 
   // verilator lint_on BLKSEQ
 
-  //----------------------------------------------------------------------
-  // Linetracing
-  //----------------------------------------------------------------------
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  // Tracing
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  // verilator lint_off UNUSEDSIGNAL
-  string trace;
-  // verilator lint_on UNUSEDSIGNAL
-
-  string test_trace;
+  string msg_str;
   int trace_len;
-  initial begin
-    test_trace = $sformatf("%x", msg);
-    trace_len = test_trace.len();
-  end
 
-  // verilator lint_off BLKSEQ
-  always_comb begin
-    if( val & rdy )
-      trace = $sformatf("%x", msg);
-    else if( rdy )
-      trace = {(trace_len){" "}};
-    else if( val )
+  function string trace();
+    msg_str = $sformatf( "%x", dut.msg );
+    trace_len = msg_str.len();
+
+    if( dut.val & dut.rdy )
+      trace = msg_str;
+    else if( !dut.val & dut.rdy )
+      trace = {trace_len{" "}};
+    else if( dut.val & !dut.rdy )
       trace = {{(trace_len-1){" "}}, "#"};
-    else
+    else // !dut.val & !dut.rdy
       trace = {{(trace_len-1){" "}}, "."};
-  end
-  // verilator lint_on BLKSEQ
+  endfunction
 
 endmodule
 

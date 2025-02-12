@@ -25,13 +25,28 @@ module FLTestUtils
   logic failed = 0;
   // verilator lint_on UNUSEDSIGNAL
 
-  // This variable holds the +test-case command line argument indicating
-  // which test cases to run.
+  // ---------------------------------------------------------------------
+  // Filtering Utilities
+  // ---------------------------------------------------------------------
 
-  int n = 0;
+  // verilator lint_off UNUSEDSIGNAL
+  string filter;
+  logic filtered;
+  logic verbose;
+  // verilator lint_on UNUSEDSIGNAL
+
   initial begin
-    if ( !$value$plusargs( "test-case=%d", n ) )
-      n = 0;
+    if ( !$value$plusargs( "filter=%s", filter ) )
+      filtered = 1'b0;
+    else
+      filtered = 1'b1;
+  end
+
+  initial begin
+    if ($test$plusargs ("v"))
+      verbose = 1'b1;
+    else
+      verbose = 1'b0;
   end
 
   // Always call $urandom with this seed variable to ensure that random

@@ -90,36 +90,73 @@ module TestUtils
   output logic rst
 );
 
+  // ---------------------------------------------------------------------
+  // Clocking
+  // ---------------------------------------------------------------------
+  
   // verilator lint_off BLKSEQ
   initial clk = 1'b1;
   always #5 clk = ~clk;
   // verilator lint_on BLKSEQ
 
-  // Error count
+  // ---------------------------------------------------------------------
+  // Error Count
+  // ---------------------------------------------------------------------
 
   // verilator lint_off UNUSEDSIGNAL
   logic failed = 0;
   //verilator lint_on UNUSEDSIGNAL
 
-  // This variable holds the +test-case command line argument indicating
-  // which test cases to run.
+  // ---------------------------------------------------------------------
+  // Filtering Utilities
+  // ---------------------------------------------------------------------
 
-  int n = 0;
-  int c = 0;
+  // verilator lint_off UNUSEDSIGNAL
+  string filter;
+  logic filtered;
+  logic verbose;
+  // verilator lint_on UNUSEDSIGNAL
+
   initial begin
-
-    if ( !$value$plusargs( "test-case=%d", n ) )
-      n = 0;
-    if ( !$value$plusargs( "test-sub-case=%d", c ) )
-      c = 0;
-
+    if ( !$value$plusargs( "filter=%s", filter ) )
+      filtered = 1'b0;
+    else
+      filtered = 1'b1;
   end
+
+  initial begin
+    if ($test$plusargs ("v"))
+      verbose = 1'b1;
+    else
+      verbose = 1'b0;
+  end
+
+  function logic contains( input string test_name );
+    // Check that the test name contains the filter
+    int test_name_len;
+    int filter_len;
+
+    test_name_len = test_name.len();
+    filter_len    = filter.len();
+
+    for( int i = 0; i < test_name_len; i = i + 1 ) begin
+      if( test_name.substr(i, i + filter_len - 1) == filter )
+        return 1'b1;
+    end
+    return 1'b0;
+  endfunction
+
+  // ---------------------------------------------------------------------
+  // Random Seeding
+  // ---------------------------------------------------------------------
 
   // Seed random test cases
   int seed = 32'hdeadbeef;
   initial $urandom(seed);
 
+  // ---------------------------------------------------------------------
   // Cycle counter with timeout check
+  // ---------------------------------------------------------------------
 
   int cycles;
 
@@ -150,9 +187,24 @@ module TestUtils
   // test_case_begin
   //----------------------------------------------------------------------
 
+  // verilator lint_off UNUSEDSIGNAL
+  logic run_test;
+  logic test_running;
+  // verilator lint_on UNUSEDSIGNAL
+
+  initial run_test     = 1'b1;
+  initial test_running = 1'b0;
+
   task test_case_begin( string taskname );
+    if( filtered & !contains( taskname ) ) begin
+      run_test = 1'b0;
+      return;
+    end else begin
+      run_test = 1'b1;
+    end
+
     $write("\n    %s%s%s ", `BLUE, taskname, `RESET);
-    if ( t.n != 0 )
+    if ( verbose )
       $write("\n");
 
     seed = 32'hdeadbeef;
@@ -164,6 +216,24 @@ module TestUtils
     @( posedge clk );
     #1;
     rst = 0;
+    test_running = 1'b1;
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_end
+  //----------------------------------------------------------------------
+
+  task test_case_end();
+    test_running = 1'b0;
+  endtask
+
+  //----------------------------------------------------------------------
+  // trace
+  //----------------------------------------------------------------------
+
+  task trace( string msg_to_trace );
+    if( test_running & verbose )
+      $display( msg_to_trace );
   endtask
 
 endmodule
@@ -177,7 +247,7 @@ endmodule
 
 `define CHECK_EQ( __dut, __ref )                                        \
   if ( __ref !== ( __ref ^ __dut ^ __ref ) ) begin                      \
-    if ( t.n != 0 )                                                     \
+    if ( t.verbose )                                              \
       $display( "\n%sERROR%s (cycle=%0d): %s != %s (%b != %b)",         \
                 `RED, `RESET, t.cycles, `"__dut`", `"__ref`",           \
                 __dut, __ref );                                         \
@@ -187,7 +257,7 @@ endmodule
     TestStatus::test_fail();                                            \
   end                                                                   \
   else begin                                                            \
-    if ( t.n == 0 )                                                     \
+    if ( !t.verbose )                                              \
       $write( "%s.%s", `GREEN, `RESET );                                \
   end                                                                   \
   if (1)

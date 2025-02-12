@@ -8,26 +8,7 @@
 #-------------------------------------------------------------------------
 
 set(V_TEST_FILES
-  hw/common/test/Fifo_test.v
-  hw/common/test/PriorityEncoder_test.v
-  hw/common/test/RRArb_test.v
-  hw/decode_issue/test/DecodeBasic_arith_test.v
-  hw/decode_issue/test/ImmGen_test.v
-  hw/decode_issue/test/Regfile_test.v
-  hw/decode_issue/test/SeqNumCompare_test.v
-  hw/decode_issue/test/SeqNumGen_test.v
-  hw/execute/test/ALU_test.v
-  hw/execute/test/Multiplier_test.v
-  hw/fetch/test/Fetch_test.v
-  hw/top/test/BlimpBasic_test.v
-  hw/writeback_commit/test/WritebackBasic_test.v
-)
-
-set(RV32_ASM_FILES
-  test/asm/rv32/assemble32.cpp
-  test/asm/rv32/disassemble32.cpp
-  test/asm/rv32/inst32.cpp
-  test/asm/rv32/inst32_utils.cpp
+  hw/gcd/test/GcdUnit_test.v
 )
 
 #-------------------------------------------------------------------------
@@ -85,12 +66,6 @@ function(remove_extension VARNAME FILE_NAME)
 endfunction()
 
 #------------------------------------------------------------------------
-# RV32 ASM Library
-#------------------------------------------------------------------------
-
-add_library(RV32_ASM_LIB STATIC ${RV32_ASM_FILES})
-
-#------------------------------------------------------------------------
 # Add our targets
 #------------------------------------------------------------------------
 
@@ -103,7 +78,6 @@ foreach(V_TEST_FILE_REL_PATH ${V_TEST_FILES})
   remove_extension(V_TEST_BIN ${V_TEST_FILE})
 
   add_executable(${V_TEST_BIN} "${CMAKE_CURRENT_SOURCE_DIR}/test/sim.cpp")
-  target_link_libraries(${V_TEST_BIN} PRIVATE RV32_ASM_LIB) 
   set(CMAKE_VTESTS ${CMAKE_VTESTS} ${V_TEST_BIN})
 
   target_compile_definitions(${V_TEST_BIN} PRIVATE 
