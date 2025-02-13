@@ -152,13 +152,10 @@ module GcdUnitTestSuite #(
   logic [15:0] exp_gcd;
 
   function logic [15:0] gcd(
-    input logic [15:0] msg_a,
-    input logic [15:0] msg_b
+    input logic [15:0] a,
+    input logic [15:0] b
   );
-    logic [15:0] a, b, tmp;
-
-    a = msg_a;
-    b = msg_b;
+    logic [15:0] tmp;
 
     while( 1 ) begin
       if( a < b ) begin
