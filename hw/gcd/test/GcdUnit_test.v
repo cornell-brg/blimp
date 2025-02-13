@@ -170,7 +170,6 @@ module GcdUnitTestSuite #(
   endfunction
 
   task test_case_3_random();
-    exp_gcd = gcd(15, 5);
     t.test_case_begin( "test_case_3_random" );
     if( !t.run_test ) return;
 
