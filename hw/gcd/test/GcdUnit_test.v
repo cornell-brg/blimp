@@ -79,6 +79,7 @@ module GcdUnitTestSuite #(
 
   // verilator lint_off BLKSEQ
   always_ff @( posedge clk ) begin
+    #2;
     trace = "";
 
     trace = {trace, istream.trace()};
