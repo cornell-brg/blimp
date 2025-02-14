@@ -112,20 +112,23 @@ module TestUtils
   // ---------------------------------------------------------------------
 
   // verilator lint_off UNUSEDSIGNAL
-  string filter;
-  logic filtered;
+  string select;
+  logic select_active;
   logic verbose;
   // verilator lint_on UNUSEDSIGNAL
 
   initial begin
-    if ( !$value$plusargs( "filter=%s", filter ) )
-      filtered = 1'b0;
-    else
-      filtered = 1'b1;
+    select_active = 1'b0;
+    if ( $value$plusargs( "select=%s", select ) )
+      select_active = 1'b1;
+    else if ( $value$plusargs( "s=%s", select ) )
+      select_active = 1'b1;
   end
 
   initial begin
-    if ($test$plusargs ("v"))
+    if ( $test$plusargs ("verbose") )
+      verbose = 1'b1;
+    else if ( $test$plusargs ("v") )
       verbose = 1'b1;
     else
       verbose = 1'b0;
@@ -134,13 +137,13 @@ module TestUtils
   function logic contains( input string test_name );
     // Check that the test name contains the filter
     int test_name_len;
-    int filter_len;
+    int select_len;
 
     test_name_len = test_name.len();
-    filter_len    = filter.len();
+    select_len    = select.len();
 
     for( int i = 0; i < test_name_len; i = i + 1 ) begin
-      if( test_name.substr(i, i + filter_len - 1) == filter )
+      if( test_name.substr(i, i + select_len - 1) == select )
         return 1'b1;
     end
     return 1'b0;
@@ -196,7 +199,7 @@ module TestUtils
   initial test_running = 1'b0;
 
   task test_case_begin( string taskname );
-    if( filtered & !contains( taskname ) ) begin
+    if( select_active & !contains( taskname ) ) begin
       run_test = 1'b0;
       return;
     end else begin
