@@ -5,6 +5,7 @@
 
 `include "fpga/MemSubSys.v"
 `include "fpga/util/Synchronizer.v"
+`include "hw/top/BlimpV8.v"
 
 module DE2_115(
 
@@ -80,13 +81,6 @@ module DE2_115(
 
   MemIntf #( 8 ) imem();
   MemIntf #( 8 ) dmem();
-  
-  assign imem.req_val  = 1'b0;
-  assign imem.req_msg  = '0;
-  assign imem.resp_rdy = 1'b1;
-  assign dmem.req_val  = 1'b0;
-  assign dmem.req_msg  = '0;
-  assign dmem.resp_rdy = 1'b1;
 
   logic [3:0] VGA_R_HIGH;
   logic [3:0] VGA_G_HIGH;
@@ -143,5 +137,17 @@ module DE2_115(
   assign HEX0[0] = GPIO[0];
   assign HEX0[2] = GPIO[2];
   assign HEX0[3] = GPIO[3];
+
+  // ---------------------------------------------------------------------
+  // Instantiate BLIMP
+  // ---------------------------------------------------------------------
+
+  BlimpV8 blimp (
+	.clk        (clk_25m),
+	.rst        (rst_25m),
+	.inst_mem   (imem),
+	.data_mem   (dmem),
+	.inst_trace ()
+  );
 
 endmodule
