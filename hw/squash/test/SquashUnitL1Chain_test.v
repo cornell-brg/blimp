@@ -281,7 +281,9 @@ module SquashUnitL1ChainTestSuite #(
   logic                      exp_val;
 
   // Use a SeqAge to tell the intended target
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .commit (commit_notif),
     .*
   );

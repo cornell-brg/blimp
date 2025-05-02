@@ -215,7 +215,9 @@ module DecodeIssueUnitL5 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
 

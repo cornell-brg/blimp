@@ -45,7 +45,9 @@ module SeqNumGenL3 #(
   //----------------------------------------------------------------------
   // Need to keep track to know which to free on a squash
 
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
   

@@ -9,7 +9,9 @@
 
 `include "intf/CommitNotif.v"
 
-module SeqAge (
+module SeqAge #(
+  parameter p_seq_num_bits = 5
+)(
   input  logic clk,
   input  logic rst,
 
@@ -19,8 +21,6 @@ module SeqAge (
 
   CommitNotif.sub commit
 );
-
-  localparam p_seq_num_bits = commit.p_seq_num_bits;
 
   // Keep track of the oldest in-flight sequence number
   logic [p_seq_num_bits-1:0] oldest_seq_num;

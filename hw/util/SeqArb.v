@@ -45,7 +45,9 @@ module SeqArbHelper #(
   CommitNotif.sub commit
 );
 
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
 
