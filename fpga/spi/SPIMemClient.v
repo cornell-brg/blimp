@@ -93,7 +93,7 @@ module SPIMemClient #(
   always_comb begin
     next_state = curr_state;
     case( curr_state )
-      WAIT_ADDR: if( spi_push_en ) next_state = WAIT_ADDR;
+      WAIT_ADDR: if( spi_push_en ) next_state = WAIT_DATA;
       WAIT_DATA: begin
         if( spi_push_en ) begin
           if( addr == GO_ADDR )
