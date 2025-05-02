@@ -26,14 +26,14 @@ module RespRouter #(
     for( i = 0; i < p_num_route; i = i + 1 ) begin: ROUTE
       always_comb begin
         if( resp.msg.origin == 2'(i) ) begin
-          assign route[i].val = resp.val;
-          assign route_rdy[i] = route[i].rdy;
+          route[i].val = resp.val;
+          route_rdy[i] = route[i].rdy;
         end else begin
-          assign route[i].val = 1'b0;
-          assign route_rdy[i] = 1'b0;
+          route[i].val = 1'b0;
+          route_rdy[i] = 1'b0;
         end
 
-        assign route[i].msg = resp.msg;
+        route[i].msg = resp.msg;
       end
     end
   endgenerate
