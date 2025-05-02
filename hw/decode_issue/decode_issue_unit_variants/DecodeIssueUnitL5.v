@@ -284,9 +284,9 @@ module DecodeIssueUnitL5 #(
 
       always_comb begin
         if( decoder_op3_sel ) // Branch - need immediate
-          assign Ex[k].op3 = imm;
+          Ex[k].op3 = imm;
         else // Memory needs register data
-          assign Ex[k].op3 = rdata1;
+          Ex[k].op3 = rdata1;
       end
     end
   endgenerate
