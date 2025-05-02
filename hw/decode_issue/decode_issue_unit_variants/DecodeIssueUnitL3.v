@@ -181,11 +181,27 @@ module DecodeIssueUnitL3 #(
   // Route the instruction (set val/rdy for pipes) based on uop
   //----------------------------------------------------------------------
 
-  InstRouter #(p_num_pipes, p_pipe_subsets) inst_router (
-    .uop   (decoder_uop),
-    .val   (F_reg.val & !stall_pending & decoder_val),
-    .Ex    (Ex),
-    .xfer  (X_xfer)
+  logic [31:0] op1, op2;
+
+  InstRouter #(
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits),
+    .p_pipe_subsets   (p_pipe_subsets)
+  ) inst_router (
+    .uop        (decoder_uop),
+    .val        (F_reg.val & !stall_pending & decoder_val),
+    .Ex         (Ex),
+    .xfer       (X_xfer),
+    .ex_pc      (F_reg.pc),
+    .ex_op1     (op1),
+    .ex_op2     (op2),
+    .ex_uop     (decoder_uop),
+    .ex_waddr   (decoder_waddr),
+    .ex_seq_num (F_reg.seq_num),
+    .ex_preg    (alloc_preg),
+    .ex_ppreg   (alloc_ppreg),
+    .ex_op3     (rdata1)
   );
 
   assign F.rdy = (X_xfer & !stall_pending & decoder_val) | (!F_reg.val);
@@ -193,8 +209,6 @@ module DecodeIssueUnitL3 #(
   //----------------------------------------------------------------------
   // Pass remaining signals to pipes
   //----------------------------------------------------------------------
-  
-  logic [31:0] op1, op2;
 
   always_comb begin
     op1 = rdata0;
@@ -203,21 +217,6 @@ module DecodeIssueUnitL3 #(
     else
       op2 = rdata1;
   end
-
-  genvar k;
-  generate
-    for( k = 0; k < p_num_pipes; k = k + 1 ) begin: pipe_signals
-      assign Ex[k].pc           = F_reg.pc;
-      assign Ex[k].op1          = op1;
-      assign Ex[k].op2          = op2;
-      assign Ex[k].uop          = decoder_uop;
-      assign Ex[k].waddr        = decoder_waddr;
-      assign Ex[k].seq_num      = F_reg.seq_num;
-      assign Ex[k].preg         = alloc_preg;
-      assign Ex[k].ppreg        = alloc_ppreg;
-      assign Ex[k].op3          = rdata1;
-    end
-  endgenerate
 
   logic [p_seq_num_bits-1:0] unused_seq_num_bits;
   assign unused_seq_num_bits = complete.seq_num;

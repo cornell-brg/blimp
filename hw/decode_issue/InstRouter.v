@@ -87,11 +87,23 @@ endmodule
 
 module InstRouter #(
   parameter p_num_pipes                                = 3,
+  parameter p_phys_addr_bits                           = 6,
+  parameter p_seq_num_bits                             = 5,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1}
 ) (
   input rv_uop    uop,
   input  logic    val,
   output logic    xfer,
+
+  input  logic                 [31:0] ex_pc,
+  input  logic                 [31:0] ex_op1,
+  input  logic                 [31:0] ex_op2,
+  input  rv_uop                       ex_uop,
+  input  logic                  [4:0] ex_waddr,
+  input  logic   [p_seq_num_bits-1:0] ex_seq_num,
+  input  logic [p_phys_addr_bits-1:0] ex_preg,
+  input  logic [p_phys_addr_bits-1:0] ex_ppreg,
+  input  logic                 [31:0] ex_op3,
 
   D__XIntf.D_intf Ex [p_num_pipes-1:0]
 );
@@ -116,6 +128,15 @@ module InstRouter #(
       );
 
       assign xfer_vec[i] = Ex[i].val & Ex[i].rdy;
+      assign Ex[i].pc           = ex_pc;
+      assign Ex[i].op1          = ex_op1;
+      assign Ex[i].op2          = ex_op2;
+      assign Ex[i].uop          = ex_uop;
+      assign Ex[i].waddr        = ex_waddr;
+      assign Ex[i].seq_num      = ex_seq_num;
+      assign Ex[i].preg         = ex_preg;
+      assign Ex[i].ppreg        = ex_ppreg;
+      assign Ex[i].op3          = ex_op3;
     end
   endgenerate
 
