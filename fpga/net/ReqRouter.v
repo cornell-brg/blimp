@@ -26,6 +26,8 @@ module ReqRouter (
   always_comb begin
     memory.msg     = req.msg;
     peripheral.msg = req.msg;
+    memory.val     = 1'b0;
+    peripheral.val = 1'b0;
 
     if( req.msg.addr[31:28] == 4'hF ) begin
       // Send to the peripheral

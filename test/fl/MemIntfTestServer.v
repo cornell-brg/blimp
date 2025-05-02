@@ -123,22 +123,22 @@ module MemIntfTestServer #(
             curr_resp.data = mem[curr_req.addr];
           else
             curr_resp.data = 'x;
-          curr_resp.len  = curr_req.len;
+          curr_resp.strb  = curr_req.strb;
         end
         MEM_MSG_WRITE: begin
           _temp_write_data = mem[curr_req.addr];
-          if( ( curr_req.len & 4'b0001 ) > 0 )
+          if( ( curr_req.strb & 4'b0001 ) > 0 )
             _temp_write_data[7:0] = curr_req.data[7:0];
-          if( ( curr_req.len & 4'b0010 ) > 0 )
+          if( ( curr_req.strb & 4'b0010 ) > 0 )
             _temp_write_data[15:8] = curr_req.data[15:8];
-          if( ( curr_req.len & 4'b0100 ) > 0 )
+          if( ( curr_req.strb & 4'b0100 ) > 0 )
             _temp_write_data[23:16] = curr_req.data[23:16];
-          if( ( curr_req.len & 4'b1000 ) > 0 )
+          if( ( curr_req.strb & 4'b1000 ) > 0 )
             _temp_write_data[31:24] = curr_req.data[31:24];
 
           mem[curr_req.addr] = _temp_write_data;
           curr_resp.data = 'x;
-          curr_resp.len  = curr_req.len;
+          curr_resp.strb  = curr_req.strb;
         end
       endcase
 

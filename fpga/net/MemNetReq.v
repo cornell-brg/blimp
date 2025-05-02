@@ -22,7 +22,7 @@ interface MemNetReq #(
     logic [p_opaq_bits-1:0] opaque;
     logic [1:0]             origin;
     logic [31:0]            addr;
-    logic [3:0]             len;
+    logic [3:0]             strb;
     logic [31:0]            data;
   } mem_msg_t;
 

@@ -86,7 +86,7 @@ module FPGAMem #(
     logic [p_opaq_bits-1:0] opaque;
     logic [1:0]             origin;
     logic [31:0]            addr;
-    logic [3:0]             len;
+    logic [3:0]             strb;
     logic [31:0]            data;
   } pipe_msg_t;
 
@@ -109,7 +109,7 @@ module FPGAMem #(
         opaque: 'x,
         origin: 'x,
         addr:   'x,
-        len:    'x,
+        strb:   'x,
         data:   'x
       };
     else
@@ -121,7 +121,7 @@ module FPGAMem #(
         opaque: 'x,
         origin: 'x,
         addr:   'x,
-        len:    'x,
+        strb:   'x,
         data:   'x
       };
     else
@@ -139,7 +139,7 @@ module FPGAMem #(
         opaque: req.msg.opaque,
         origin: req.msg.origin,
         addr:   req.msg.addr,
-        len:    req.msg.len,
+        strb:   req.msg.strb,
         data:   req.msg.data
       };
     else if( rw_xfer )
@@ -149,7 +149,7 @@ module FPGAMem #(
         opaque: 'x,
         origin: 'x,
         addr:   'x,
-        len:    'x,
+        strb:   'x,
         data:   'x
       };
   end
@@ -163,7 +163,7 @@ module FPGAMem #(
         opaque: rw_msg.opaque,
         origin: rw_msg.origin,
         addr:   rw_msg.addr,
-        len:    rw_msg.len,
+        strb:   rw_msg.strb,
         data:   rdata
       };
     else if( resp_xfer )
@@ -173,7 +173,7 @@ module FPGAMem #(
         opaque: 'x,
         origin: 'x,
         addr:   'x,
-        len:    'x,
+        strb:   'x,
         data:   'x
       };
   end
@@ -183,7 +183,7 @@ module FPGAMem #(
   assign resp.msg.opaque = resp_msg.opaque;
   assign resp.msg.origin = resp_msg.origin;
   assign resp.msg.addr   = resp_msg.addr;
-  assign resp.msg.len    = resp_msg.len;
+  assign resp.msg.strb   = resp_msg.strb;
   assign resp.msg.data   = resp_msg.data;
 
   // ---------------------------------------------------------------------
@@ -198,10 +198,10 @@ module FPGAMem #(
   assign wdata1 = rw_msg.data[15: 8];
   assign wdata2 = rw_msg.data[23:16];
   assign wdata3 = rw_msg.data[31:24];
-  assign we0    = we & rw_msg.len[0];
-  assign we1    = we & rw_msg.len[1];
-  assign we2    = we & rw_msg.len[2];
-  assign we3    = we & rw_msg.len[3];
+  assign we0    = we & rw_msg.strb[0];
+  assign we1    = we & rw_msg.strb[1];
+  assign we2    = we & rw_msg.strb[2];
+  assign we3    = we & rw_msg.strb[3];
 
   logic [15:0] mem_addr;
   assign       mem_addr = rw_msg.addr[17:2]; // Don't include bytes

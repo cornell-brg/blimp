@@ -74,7 +74,7 @@ module FetchUnitL1 (
     mem.req_val        = 1'b1;
     mem.req_msg.op     = MEM_MSG_READ;
     mem.req_msg.opaque = '0;
-    mem.req_msg.len    = '0;
+    mem.req_msg.strb   = '0;
     mem.req_msg.data   = 'x;
   end
 
@@ -95,11 +95,11 @@ module FetchUnitL1 (
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   logic       unused_resp_op;
-  logic [3:0] unused_resp_len;
+  logic [3:0] unused_resp_strb;
 
   always_comb begin
-    unused_resp_op  = mem.resp_msg.op;
-    unused_resp_len = mem.resp_msg.len;
+    unused_resp_op   = mem.resp_msg.op;
+    unused_resp_strb = mem.resp_msg.strb;
   end
 
   //----------------------------------------------------------------------

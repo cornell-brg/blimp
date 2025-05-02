@@ -169,19 +169,19 @@ module LoadStoreUnitL7 #(
     endcase
   end
 
-  logic [3:0] base_len;
+  logic [3:0] base_strb;
 
   always_comb begin
     case( uop )
-      OP_LB:   base_len = 4'b0001;
-      OP_LH:   base_len = 4'b0011;
-      OP_LW:   base_len = 4'b1111;
-      OP_LBU:  base_len = 4'b0001;
-      OP_LHU:  base_len = 4'b0011;
-      OP_SB:   base_len = 4'b0001;
-      OP_SH:   base_len = 4'b0011;
-      OP_SW:   base_len = 4'b1111;
-      default: base_len = 'x;
+      OP_LB:   base_strb = 4'b0001;
+      OP_LH:   base_strb = 4'b0011;
+      OP_LW:   base_strb = 4'b1111;
+      OP_LBU:  base_strb = 4'b0001;
+      OP_LHU:  base_strb = 4'b0011;
+      OP_SB:   base_strb = 4'b0001;
+      OP_SH:   base_strb = 4'b0011;
+      OP_SW:   base_strb = 4'b1111;
+      default: base_strb = 'x;
     endcase
   end
 
@@ -193,7 +193,7 @@ module LoadStoreUnitL7 #(
   assign stage1_addr_offset  = addr[1:0];
 
   assign mem.req_msg.opaque = '0;
-  assign mem.req_msg.len    = base_len << stage1_addr_offset;
+  assign mem.req_msg.strb   = base_strb << stage1_addr_offset;
   assign mem.req_msg.addr   = aligned_addr;
   assign mem.req_val        = D_reg.val & stage2_rdy;
 
@@ -297,12 +297,12 @@ module LoadStoreUnitL7 #(
   t_op                    unused_resp_op;
   logic [p_opaq_bits-1:0] unused_resp_opaque;
   logic            [31:0] unused_resp_addr;
-  logic             [3:0] unused_resp_len;
+  logic             [3:0] unused_resp_strb;
 
   assign unused_resp_op     = mem.resp_msg.op;
   assign unused_resp_opaque = mem.resp_msg.opaque;
   assign unused_resp_addr   = mem.resp_msg.addr;
-  assign unused_resp_len    = mem.resp_msg.len;
+  assign unused_resp_strb   = mem.resp_msg.strb;
   assign W.wdata            = sext_data;
 
   assign W.pc               = stage2_reg.pc;

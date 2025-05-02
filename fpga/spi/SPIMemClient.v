@@ -140,15 +140,12 @@ module SPIMemClient #(
   // ---------------------------------------------------------------------
   // Memory request signsl
   // ---------------------------------------------------------------------
-  
-  logic [3:0] mem_req_len;
-  assign mem_req_len = 4'b1111;
 
   assign mem.req_val        = ( curr_state == WAIT_MEM );
   assign mem.req_msg.op     = MEM_MSG_WRITE;
   assign mem.req_msg.opaque = 'x;
   assign mem.req_msg.addr   = addr;
-  assign mem.req_msg.len    = mem_req_len;
+  assign mem.req_msg.strb   = 4'b1111;
   assign mem.req_msg.data   = data;
 
 endmodule

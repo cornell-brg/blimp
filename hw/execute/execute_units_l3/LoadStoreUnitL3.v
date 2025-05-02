@@ -163,7 +163,7 @@ module LoadStoreUnitL3 #(
   end
 
   assign mem.req_msg.opaque = '0;
-  assign mem.req_msg.len    = '1;
+  assign mem.req_msg.strb   = '1;
   assign mem.req_msg.addr   = addr;
   assign mem.req_msg.data   = D_reg.mem_data;
   assign mem.req_val        = D_reg.val & stage2_rdy;
@@ -226,12 +226,12 @@ module LoadStoreUnitL3 #(
   t_op                    unused_resp_op;
   logic [p_opaq_bits-1:0] unused_resp_opaque;
   logic            [31:0] unused_resp_addr;
-  logic             [3:0] unused_resp_len;
+  logic             [3:0] unused_resp_strb;
 
   assign unused_resp_op     = mem.resp_msg.op;
   assign unused_resp_opaque = mem.resp_msg.opaque;
   assign unused_resp_addr   = mem.resp_msg.addr;
-  assign unused_resp_len    = mem.resp_msg.len;
+  assign unused_resp_strb   = mem.resp_msg.strb;
   assign W.wdata            = mem.resp_msg.data;
 
   assign W.pc               = stage2_reg.pc;

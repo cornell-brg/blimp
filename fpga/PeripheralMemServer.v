@@ -154,7 +154,7 @@ module PeripheralMemServer #(
     logic [p_opaq_bits-1:0] opaque;
     logic [1:0]             origin;
     logic [31:0]            addr;
-    logic [3:0]             len;
+    logic [3:0]             strb;
     logic [31:0]            data;
   } peripheral_msg_t;
 
@@ -171,7 +171,7 @@ module PeripheralMemServer #(
         opaque: req.msg.opaque,
         origin: req.msg.origin,
         addr:   req.msg.addr,
-        len:    req.msg.len,
+        strb:   req.msg.strb,
         data:   req.msg.data
       };
   end
@@ -181,7 +181,7 @@ module PeripheralMemServer #(
   assign resp.msg.opaque = curr_msg.opaque;
   assign resp.msg.origin = curr_msg.origin;
   assign resp.msg.addr   = curr_msg.addr;
-  assign resp.msg.len    = curr_msg.len;
+  assign resp.msg.strb   = curr_msg.strb;
   assign resp.msg.data   = rdata;
 
   // ---------------------------------------------------------------------

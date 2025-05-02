@@ -74,7 +74,7 @@ module MemXBar #(
   assign imem_req.msg.op     = imem.req_msg.op;
   assign imem_req.msg.opaque = imem.req_msg.opaque;
   assign imem_req.msg.addr   = imem.req_msg.addr;
-  assign imem_req.msg.len    = imem.req_msg.len;
+  assign imem_req.msg.strb   = imem.req_msg.strb;
   assign imem_req.msg.data   = imem.req_msg.data;
   assign imem_req.msg.origin = 2'd0;
 
@@ -83,7 +83,7 @@ module MemXBar #(
   assign dmem_req.msg.op     = dmem.req_msg.op;
   assign dmem_req.msg.opaque = dmem.req_msg.opaque;
   assign dmem_req.msg.addr   = dmem.req_msg.addr;
-  assign dmem_req.msg.len    = dmem.req_msg.len;
+  assign dmem_req.msg.strb   = dmem.req_msg.strb;
   assign dmem_req.msg.data   = dmem.req_msg.data;
   assign dmem_req.msg.origin = 2'd1;
 
@@ -92,7 +92,7 @@ module MemXBar #(
   assign spi_req.msg.op     = spi.req_msg.op;
   assign spi_req.msg.opaque = spi.req_msg.opaque;
   assign spi_req.msg.addr   = spi.req_msg.addr;
-  assign spi_req.msg.len    = spi.req_msg.len;
+  assign spi_req.msg.strb   = spi.req_msg.strb;
   assign spi_req.msg.data   = spi.req_msg.data;
   assign spi_req.msg.origin = 2'd2;
 
@@ -101,7 +101,7 @@ module MemXBar #(
   assign imem.resp_msg.op        = imem_resp.msg.op;
   assign imem.resp_msg.opaque    = imem_resp.msg.opaque;
   assign imem.resp_msg.addr      = imem_resp.msg.addr;
-  assign imem.resp_msg.len       = imem_resp.msg.len;
+  assign imem.resp_msg.strb      = imem_resp.msg.strb;
   assign imem.resp_msg.data      = imem_resp.msg.data;
   assign unused_imem_resp_origin = imem_resp.msg.origin;
 
@@ -110,7 +110,7 @@ module MemXBar #(
   assign dmem.resp_msg.op        = dmem_resp.msg.op;
   assign dmem.resp_msg.opaque    = dmem_resp.msg.opaque;
   assign dmem.resp_msg.addr      = dmem_resp.msg.addr;
-  assign dmem.resp_msg.len       = dmem_resp.msg.len;
+  assign dmem.resp_msg.strb      = dmem_resp.msg.strb;
   assign dmem.resp_msg.data      = dmem_resp.msg.data;
   assign unused_dmem_resp_origin = dmem_resp.msg.origin;
 
@@ -119,7 +119,7 @@ module MemXBar #(
   assign spi.resp_msg.op        = spi_resp.msg.op;
   assign spi.resp_msg.opaque    = spi_resp.msg.opaque;
   assign spi.resp_msg.addr      = spi_resp.msg.addr;
-  assign spi.resp_msg.len       = spi_resp.msg.len;
+  assign spi.resp_msg.strb      = spi_resp.msg.strb;
   assign spi.resp_msg.data      = spi_resp.msg.data;
   assign unused_spi_resp_origin = spi_resp.msg.origin;
 

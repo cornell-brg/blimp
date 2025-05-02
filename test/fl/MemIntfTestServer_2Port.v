@@ -157,20 +157,20 @@ module MemIntfTestServer_2Port #(
             curr_resp[0].data = mem[curr_req[0].addr];
           else
             curr_resp[0].data = 'x;
-          curr_resp[0].len  = curr_req[0].len;
+          curr_resp[0].strb  = curr_req[0].strb;
         end
         MEM_MSG_WRITE: begin
           _temp_write_data[0] = mem[curr_req[0].addr];
-          if( ( curr_req[0].len & 4'b0001 ) > 0 )
+          if( ( curr_req[0].strb & 4'b0001 ) > 0 )
             _temp_write_data[0][7:0] = curr_req[0].data[7:0];
-          if( ( curr_req[0].len & 4'b0010 ) > 0 )
+          if( ( curr_req[0].strb & 4'b0010 ) > 0 )
             _temp_write_data[0][15:8] = curr_req[0].data[15:8];
-          if( ( curr_req[0].len & 4'b0100 ) > 0 )
+          if( ( curr_req[0].strb & 4'b0100 ) > 0 )
             _temp_write_data[0][23:16] = curr_req[0].data[23:16];
-          if( ( curr_req[0].len & 4'b1000 ) > 0 )
+          if( ( curr_req[0].strb & 4'b1000 ) > 0 )
             _temp_write_data[0][31:24] = curr_req[0].data[31:24];
 
-          if( curr_req[0].len == 4'b1111 ) begin
+          if( curr_req[0].strb == 4'b1111 ) begin
             if( try_fl_write(curr_req[0].addr, _temp_write_data[0]) );
             else
               mem[curr_req[0].addr] = _temp_write_data[0];
@@ -178,7 +178,7 @@ module MemIntfTestServer_2Port #(
             mem[curr_req[0].addr] = _temp_write_data[0];
           end
           curr_resp[0].data = 'x;
-          curr_resp[0].len  = curr_req[0].len;
+          curr_resp[0].strb  = curr_req[0].strb;
         end
       endcase
 
@@ -205,20 +205,20 @@ module MemIntfTestServer_2Port #(
             curr_resp[1].data = mem[curr_req[1].addr];
           else
             curr_resp[1].data = 'x;
-          curr_resp[1].len  = curr_req[1].len;
+          curr_resp[1].strb  = curr_req[1].strb;
         end
         MEM_MSG_WRITE: begin
           _temp_write_data[1] = mem[curr_req[1].addr];
-          if( ( curr_req[1].len & 4'b0001 ) > 0 )
+          if( ( curr_req[1].strb & 4'b0001 ) > 0 )
             _temp_write_data[1][7:0] = curr_req[1].data[7:0];
-          if( ( curr_req[1].len & 4'b0010 ) > 0 )
+          if( ( curr_req[1].strb & 4'b0010 ) > 0 )
             _temp_write_data[1][15:8] = curr_req[1].data[15:8];
-          if( ( curr_req[1].len & 4'b0100 ) > 0 )
+          if( ( curr_req[1].strb & 4'b0100 ) > 0 )
             _temp_write_data[1][23:16] = curr_req[1].data[23:16];
-          if( ( curr_req[1].len & 4'b1000 ) > 0 )
+          if( ( curr_req[1].strb & 4'b1000 ) > 0 )
             _temp_write_data[1][31:24] = curr_req[1].data[31:24];
 
-          if( curr_req[1].len == 4'b1111 ) begin
+          if( curr_req[1].strb == 4'b1111 ) begin
             if( try_fl_write(curr_req[1].addr, _temp_write_data[1]) );
             else
               mem[curr_req[1].addr] = _temp_write_data[1];
@@ -226,7 +226,7 @@ module MemIntfTestServer_2Port #(
             mem[curr_req[1].addr] = _temp_write_data[1];
           end
           curr_resp[0].data = 'x;
-          curr_resp[0].len  = curr_req[0].len;
+          curr_resp[0].strb  = curr_req[0].strb;
         end
       endcase
 

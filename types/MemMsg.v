@@ -7,8 +7,8 @@
 //  - opaque: Preserved bits (set the same for a request and corresponding
 //            response)
 //  - addr: The memory address to operate on. Must be word-aligned
-//  - len: A byte mask for which bytes are valid on a write (undefined for
-//         a read)
+//  - strb: A byte mask for which bytes are valid on a write (undefined for
+//          a read)
 //  - data:
 //     - Request: The data to write (undefined for a read)
 //     - Response: The data read (undefined for a write)
@@ -34,7 +34,7 @@ typedef enum logic {
     t_op                  op;       \
     logic [OPAQ_BITS-1:0] opaque;   \
     logic [31:0]          addr;     \
-    logic [3:0]           len;      \
+    logic [3:0]           strb;     \
     logic [31:0]          data;     \
   } `MEM_REQ( OPAQ_BITS )
 
@@ -46,7 +46,7 @@ typedef enum logic {
     t_op                  op;        \
     logic [OPAQ_BITS-1:0] opaque;    \
     logic [31:0]          addr;      \
-    logic [3:0]           len;       \
+    logic [3:0]           strb;      \
     logic [31:0]          data;      \
   } `MEM_RESP( OPAQ_BITS )
 
