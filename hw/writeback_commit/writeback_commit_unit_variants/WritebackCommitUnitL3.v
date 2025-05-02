@@ -73,7 +73,7 @@ module WritebackCommitUnitL3 #(
 
   CommitNotif #(
     .p_seq_num_bits   (p_seq_num_bits),
-    .p_phys_addr_bits (commit.p_phys_addr_bits)
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) arb_commit();
 
   SeqArb #(
