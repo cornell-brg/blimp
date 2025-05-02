@@ -38,10 +38,10 @@ module FPGAMem #(
   // ---------------------------------------------------------------------
 
   // Need 256KB in total
-  reg [7:0] mem_b0 [65535:0]  /* synthesis ramstyle = "no_rw_check, M10K" */;
-  reg [7:0] mem_b1 [65535:0]  /* synthesis ramstyle = "no_rw_check, M10K" */;
-  reg [7:0] mem_b2 [65535:0]  /* synthesis ramstyle = "no_rw_check, M10K" */;
-  reg [7:0] mem_b3 [65535:0]  /* synthesis ramstyle = "no_rw_check, M10K" */;
+  reg [7:0] mem_b0 [65535:0]  /* synthesis ramstyle = "no_rw_check, M9K" */;
+  reg [7:0] mem_b1 [65535:0]  /* synthesis ramstyle = "no_rw_check, M9K" */;
+  reg [7:0] mem_b2 [65535:0]  /* synthesis ramstyle = "no_rw_check, M9K" */;
+  reg [7:0] mem_b3 [65535:0]  /* synthesis ramstyle = "no_rw_check, M9K" */;
 
   logic [15:0] raddr, waddr;
   logic  [7:0] rdata0, rdata1, rdata2, rdata3;

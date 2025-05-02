@@ -1,0 +1,35 @@
+Info: Starting: Create block symbol file (.bsf)
+Info: qsys-generate C:\Users\aidan\OneDrive\Desktop\blimp\fpga\altera\clk_gen.qsys --block-symbol-file --output-directory=C:\Users\aidan\OneDrive\Desktop\blimp\fpga\altera\clk_gen --family="Cyclone IV E" --part=EP4CE115F29C7
+Progress: Loading altera/clk_gen.qsys
+Progress: Reading input file
+Progress: Adding altpll_0 [altpll 20.1]
+Progress: Parameterizing module altpll_0
+Progress: Adding clk_0 [clock_source 20.1]
+Progress: Parameterizing module clk_0
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Warning: clk_gen.altpll_0: altpll_0.pll_slave must be connected to an Avalon-MM master
+Info: qsys-generate succeeded.
+Info: Finished: Create block symbol file (.bsf)
+Info: 
+Info: Starting: Create HDL design files for synthesis
+Info: qsys-generate C:\Users\aidan\OneDrive\Desktop\blimp\fpga\altera\clk_gen.qsys --synthesis=VERILOG --output-directory=C:\Users\aidan\OneDrive\Desktop\blimp\fpga\altera\clk_gen\synthesis --family="Cyclone IV E" --part=EP4CE115F29C7
+Progress: Loading altera/clk_gen.qsys
+Progress: Reading input file
+Progress: Adding altpll_0 [altpll 20.1]
+Progress: Parameterizing module altpll_0
+Progress: Adding clk_0 [clock_source 20.1]
+Progress: Parameterizing module clk_0
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Warning: clk_gen.altpll_0: altpll_0.pll_slave must be connected to an Avalon-MM master
+Info: clk_gen: Generating clk_gen "clk_gen" for QUARTUS_SYNTH
+Info: altpll_0: "clk_gen" instantiated altpll "altpll_0"
+Info: rst_controller: "clk_gen" instantiated altera_reset_controller "rst_controller"
+Info: clk_gen: Done "clk_gen" with 3 modules, 5 files
+Info: qsys-generate succeeded.
+Info: Finished: Create HDL design files for synthesis
