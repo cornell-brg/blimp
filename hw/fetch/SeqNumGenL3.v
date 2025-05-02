@@ -45,11 +45,21 @@ module SeqNumGenL3 #(
   //----------------------------------------------------------------------
   // Need to keep track to know which to free on a squash
 
-  SeqAge #(
-    .p_seq_num_bits (p_seq_num_bits)
-  ) seq_age (
-    .*
-  );
+  logic [p_num_entries-1:0] is_older;
+
+  genvar i;
+  generate
+    for( i = 0; i < p_num_entries; i++ ) begin: SEQ_AGE
+      SeqAge #(
+        .p_seq_num_bits (p_seq_num_bits)
+      ) seq_age (
+        .seq_num_0 (squash.seq_num),
+        .seq_num_1 (p_seq_num_bits'(i)),
+        .is_older  (is_older[i]),
+        .*
+      );
+    end
+  endgenerate
   
   //----------------------------------------------------------------------
   // Sequence Number List
@@ -62,8 +72,6 @@ module SeqNumGenL3 #(
   logic seq_num_list [p_num_entries];
   logic [p_seq_num_bits-1:0] curr_head_ptr, curr_tail_ptr;
   logic is_alloc, is_free;
-
-  genvar i;
   
   generate
     for( i = 0; i < p_num_entries; i = i + 1 ) begin: SEQ_NUM
@@ -89,7 +97,7 @@ module SeqNumGenL3 #(
           // Squashing
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-          if( squash.val & seq_age.is_older( squash.seq_num, p_seq_num_bits'(i) ) )
+          if( squash.val & is_older[i] )
             // The corresponding instruction is squashed
             seq_num_list[i] <= FREE;
         end

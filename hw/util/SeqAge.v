@@ -19,7 +19,15 @@ module SeqAge #(
   // Commit Interface
   //----------------------------------------------------------------------
 
-  CommitNotif.sub commit
+  CommitNotif.sub commit,
+
+  //----------------------------------------------------------------------
+  // Age Tracking
+  //----------------------------------------------------------------------
+
+  input  logic [p_seq_num_bits-1:0] seq_num_0,
+  input  logic [p_seq_num_bits-1:0] seq_num_1,
+  output logic                      is_older
 );
 
   // Keep track of the oldest in-flight sequence number
@@ -58,14 +66,9 @@ module SeqAge #(
   //   // Oldest number is in-between -> wraparound
   //   return !( seq_num_0 < seq_num_1 );
 
-  function automatic logic is_older(
-    input [p_seq_num_bits-1:0] seq_num_0,
-    input [p_seq_num_bits-1:0] seq_num_1
-  );
-    return ( seq_num_0 < seq_num_1      ) ^ 
-           ( seq_num_0 < oldest_seq_num ) ^
-           ( seq_num_1 < oldest_seq_num );
-  endfunction
+  assign is_older =  ( seq_num_0 < seq_num_1      ) ^ 
+                     ( seq_num_0 < oldest_seq_num ) ^
+                     ( seq_num_1 < oldest_seq_num );
 
   //----------------------------------------------------------------------
   // Unused signals

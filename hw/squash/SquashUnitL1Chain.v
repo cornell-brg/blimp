@@ -39,16 +39,6 @@ module SquashUnitL1Chain #(
   localparam p_seq_num_bits = gnt.p_seq_num_bits;
 
   //----------------------------------------------------------------------
-  // Age logic
-  //----------------------------------------------------------------------
-
-  SeqAge #(
-    .p_seq_num_bits (p_seq_num_bits)
-  ) seq_age (
-    .*
-  );
-
-  //----------------------------------------------------------------------
   // Chain arbitration
   //----------------------------------------------------------------------
 
@@ -60,20 +50,30 @@ module SquashUnitL1Chain #(
   assign arb_target[0]  = arb[0].target;
   assign arb_val[0]     = arb[0].val;
 
-  genvar i;
-
   // Ignore linter error for using arb_seq_num/arb_val in
   // conditional logic before assignment, even though it's from a
   // previous iteration
 
+  genvar i;
+
   // verilator lint_off ALWCOMBORDER
   generate
     for( i = 1; i < p_num_arb; i = i + 1 ) begin: ARBITRATE
+      logic is_older;
+      SeqAge #(
+        .p_seq_num_bits (p_seq_num_bits)
+      ) seq_age (
+        .seq_num_0 (arb[i].seq_num),
+        .seq_num_1 (arb_seq_num[i - 1]),
+        .is_older  (is_older),
+        .*
+      );
+
       always_comb begin
         if( arb[i].val & 
             (
               !arb_val[i - 1] | 
-              seq_age.is_older( arb[i].seq_num, arb_seq_num[i - 1] )
+              is_older
             ) 
           ) begin
           arb_seq_num[i] = arb[i].seq_num;
@@ -93,6 +93,23 @@ module SquashUnitL1Chain #(
   assign gnt.seq_num = arb_seq_num[p_num_arb - 1];
   assign gnt.target  = arb_target [p_num_arb - 1];
   assign gnt.val     = arb_val    [p_num_arb - 1];
+
+  // Unused signals
+  logic        unused_clk;
+  logic        unused_rst;
+  logic [31:0] unused_commit_pc;
+  logic  [4:0] unused_commit_waddr;
+  logic [31:0] unused_commit_wdata;
+  logic        unused_commit_wen;
+  logic        unused_commit_val;
+
+  assign unused_clk          = clk;
+  assign unused_rst          = rst;
+  assign unused_commit_pc    = commit.pc;
+  assign unused_commit_waddr = commit.waddr;
+  assign unused_commit_wdata = commit.wdata;
+  assign unused_commit_wen   = commit.wen;
+  assign unused_commit_val   = commit.val;
 
   //----------------------------------------------------------------------
   // Linetracing

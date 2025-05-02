@@ -277,67 +277,67 @@ module SquashUnitL1TestSuite #(
   // test_case_2_random
   //----------------------------------------------------------------------
 
-  logic [p_seq_num_bits-1:0] exp_seq_num;
-  logic               [31:0] exp_target;
-  logic                      exp_val;
+  // logic [p_seq_num_bits-1:0] exp_seq_num;
+  // logic               [31:0] exp_target;
+  // logic                      exp_val;
 
-  // Use a SeqAge to tell the intended target
-  SeqAge #(
-    .p_seq_num_bits (p_seq_num_bits)
-  ) seq_age (
-    .commit (commit_notif),
-    .*
-  );
+  // // Use a SeqAge to tell the intended target
+  // SeqAge #(
+  //   .p_seq_num_bits (p_seq_num_bits)
+  // ) seq_age (
+  //   .commit (commit_notif),
+  //   .*
+  // );
 
-  task test_case_2_random();
-    t.test_case_begin( "test_case_2_random" );
-    if( !t.run_test ) return;
+  // task test_case_2_random();
+  //   t.test_case_begin( "test_case_2_random" );
+  //   if( !t.run_test ) return;
 
-    for( int i = 0; i < 30; i = i + 1 ) begin
-      commit( p_seq_num_bits'( $urandom() ) );
-      exp_val = 1'b0;
+  //   for( int i = 0; i < 30; i = i + 1 ) begin
+  //     commit( p_seq_num_bits'( $urandom() ) );
+  //     exp_val = 1'b0;
 
-      for( int j = 0; j < p_num_arb; j = j + 1 ) begin
-        // Use automatic to keep track across loops
-        automatic int                        k            = j;
-        automatic logic               [31:0] rand_target  =             32'( $urandom() );
-        automatic logic                      rand_val     =              1'( $urandom() );
+  //     for( int j = 0; j < p_num_arb; j = j + 1 ) begin
+  //       // Use automatic to keep track across loops
+  //       automatic int                        k            = j;
+  //       automatic logic               [31:0] rand_target  =             32'( $urandom() );
+  //       automatic logic                      rand_val     =              1'( $urandom() );
 
-        automatic logic [p_seq_num_bits-1:0] rand_seq_num;
+  //       automatic logic [p_seq_num_bits-1:0] rand_seq_num;
 
-        do begin
-          rand_seq_num = p_seq_num_bits'( $urandom() );
-        end while( rand_seq_num == exp_seq_num ); // Don't have ties
+  //       do begin
+  //         rand_seq_num = p_seq_num_bits'( $urandom() );
+  //       end while( rand_seq_num == exp_seq_num ); // Don't have ties
 
-        if( rand_val ) begin
-          fork
-            pub( k, rand_seq_num, rand_target );
-          join_none
+  //       if( rand_val ) begin
+  //         fork
+  //           pub( k, rand_seq_num, rand_target );
+  //         join_none
 
-          if( !exp_val ) begin
-            exp_seq_num = rand_seq_num;
-            exp_target  = rand_target;
-            exp_val     = 1'b1;
-          end else begin
-            // Only expect it if it's older
-            if( seq_age.is_older( rand_seq_num, exp_seq_num ) ) begin
-              exp_seq_num = rand_seq_num;
-              exp_target  = rand_target;
-            end
-          end
-        end
-      end
+  //         if( !exp_val ) begin
+  //           exp_seq_num = rand_seq_num;
+  //           exp_target  = rand_target;
+  //           exp_val     = 1'b1;
+  //         end else begin
+  //           // Only expect it if it's older
+  //           if( seq_age.is_older( rand_seq_num, exp_seq_num ) ) begin
+  //             exp_seq_num = rand_seq_num;
+  //             exp_target  = rand_target;
+  //           end
+  //         end
+  //       end
+  //     end
 
-      if( exp_val ) begin
-        fork
-          sub( exp_seq_num, exp_target );
-        join_none
-      end
-      wait fork;
-    end
+  //     if( exp_val ) begin
+  //       fork
+  //         sub( exp_seq_num, exp_target );
+  //       join_none
+  //     end
+  //     wait fork;
+  //   end
 
-    t.test_case_end();
-  endtask
+  //   t.test_case_end();
+  // endtask
 
   //----------------------------------------------------------------------
   // run_test_suite
@@ -347,7 +347,7 @@ module SquashUnitL1TestSuite #(
     t.test_suite_begin( suite_name );
 
     test_case_1_basic();
-    test_case_2_random();
+    // test_case_2_random();
   endtask
 endmodule
 

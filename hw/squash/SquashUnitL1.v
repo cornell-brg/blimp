@@ -48,16 +48,14 @@ module SquashUnitL1Helper #(
   CommitNotif.sub commit
 );
 
+  logic arb0_is_older;
   SeqAge #(
     .p_seq_num_bits (p_seq_num_bits)
   ) seq_age (
+    .seq_num_0 (arb0_seq_num),
+    .seq_num_1 (arb1_seq_num),
+    .is_older  (arb0_is_older),
     .*
-  );
-
-  logic arb0_is_older;
-  assign arb0_is_older = seq_age.is_older(
-    arb0_seq_num,
-    arb1_seq_num
   );
 
   always_comb begin

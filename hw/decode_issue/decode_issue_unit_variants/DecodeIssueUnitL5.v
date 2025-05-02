@@ -215,14 +215,18 @@ module DecodeIssueUnitL5 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
+  logic is_older;
+  
   SeqAge #(
     .p_seq_num_bits (p_seq_num_bits)
   ) seq_age (
+    .seq_num_0 (squash_sub.seq_num),
+    .seq_num_1 (F_reg.seq_num),
     .*
   );
 
   assign should_squash = squash_sub.val & 
-                         seq_age.is_older( squash_sub.seq_num, F_reg.seq_num );
+                         is_older;
 
   //----------------------------------------------------------------------
   // Route the instruction (set val/rdy for pipes) based on uop

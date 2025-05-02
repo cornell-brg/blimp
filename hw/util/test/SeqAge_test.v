@@ -39,10 +39,17 @@ module SeqAgeTestSuite #(
     .p_seq_num_bits (p_seq_num_bits)
   ) commit_notif();
 
+  logic [p_seq_num_bits-1:0] dut_seq_num_0;
+  logic [p_seq_num_bits-1:0] dut_seq_num_1;
+  logic                      dut_is_older;
+
   SeqAge #(
     .p_seq_num_bits (p_seq_num_bits)
   ) dut(
-    .commit (commit_notif),
+    .commit    (commit_notif),
+    .seq_num_0 (dut_seq_num_0),
+    .seq_num_1 (dut_seq_num_1),
+    .is_older  (dut_is_older),
     .*
   );
 
@@ -106,17 +113,16 @@ module SeqAgeTestSuite #(
   // write the inputs #1 after the rising edge, and check the outputs #1
   // before the next rising edge.
 
-  logic dut_is_older;
-
   task check (
     input logic [p_seq_num_bits-1:0] seq_num_0,
     input logic [p_seq_num_bits-1:0] seq_num_1,
     input logic                      is_older
   );
     if ( !t.failed ) begin
+      dut_seq_num_0 = seq_num_0;
+      dut_seq_num_1 = seq_num_1;
+
       #8;
-      
-      dut_is_older = dut.is_older( seq_num_0, seq_num_1 );
 
       if ( t.verbose ) begin
         $display( "%3d: (%h) %h %h > %b", t.cycles,
