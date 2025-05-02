@@ -52,7 +52,8 @@ module SquashUnitL1TestSuite #(
   ) commit_notif ();
 
   SquashUnitL1 #(
-    .p_num_arb (p_num_arb)
+    .p_num_arb      (p_num_arb),
+    .p_seq_num_bits (p_seq_num_bits)
   ) dut (
     .arb    (squash_arb),
     .gnt    (squash_gnt),

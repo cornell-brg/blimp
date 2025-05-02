@@ -62,7 +62,8 @@ module LoadStoreUnitL7TestSuite #(
   ) mem_intf();
 
   LoadStoreUnitL7 #(
-    .p_opaq_bits (p_opaq_bits)
+    .p_seq_num_bits (p_seq_num_bits),
+    .p_opaq_bits    (p_opaq_bits)
   ) dut (
     .D   (D__X_intf),
     .W   (X__W_intf),

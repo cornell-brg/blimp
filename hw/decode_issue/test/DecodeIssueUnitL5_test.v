@@ -82,6 +82,7 @@ module DecodeIssueUnitL5TestSuite #(
   ) squash_sub_notif();
 
   DecodeIssueUnitL5 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets  (p_pipe_subsets)

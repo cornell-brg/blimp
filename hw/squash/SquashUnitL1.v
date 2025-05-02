@@ -93,7 +93,8 @@ endmodule
 //------------------------------------------------------------------------
 
 module SquashUnitL1 #(
-  parameter p_num_arb = 2
+  parameter p_num_arb      = 2,
+  parameter p_seq_num_bits = 5
 ) (
   input  logic clk,
   input  logic rst,
@@ -116,8 +117,6 @@ module SquashUnitL1 #(
 
   CommitNotif.sub commit
 );
-
-  localparam p_seq_num_bits = gnt.p_seq_num_bits;
 
   // Binary tree
   localparam p_num_levels = $clog2( p_num_arb );

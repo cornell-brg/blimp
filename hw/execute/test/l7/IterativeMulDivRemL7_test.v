@@ -49,7 +49,9 @@ module IterativeMulDivRemL7TestSuite #(
     .p_seq_num_bits (p_seq_num_bits)
   ) X__W_intf();
 
-  IterativeMulDivRemL7 dut (
+  IterativeMulDivRemL7 #(
+    .p_seq_num_bits   (p_seq_num_bits)
+  ) dut (
     .D (D__X_intf),
     .W (X__W_intf),
     .*

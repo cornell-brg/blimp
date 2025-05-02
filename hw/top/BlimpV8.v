@@ -151,6 +151,7 @@ module BlimpV8 #(
                             OP_BGEU_VEC;
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (2)
   ) FU (
     .mem    (inst_mem),
@@ -161,6 +162,7 @@ module BlimpV8 #(
   );
 
   DecodeIssueUnitL5 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets ({
@@ -179,26 +181,38 @@ module BlimpV8 #(
     .*
   );
 
-  ALUL6 ALU_XU (
+  ALUL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) ALU_XU (
     .D (d__x_intfs[0]),
     .W (buffer_intf),
     .*
   );
 
-  ExQueue #(1) alu_buf (
+  ExQueue #(
+    .p_depth          (1),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) alu_buf (
     .in  (buffer_intf),
     .out (x__w_intfs[0]),
     .*
   );
 
-  IterativeMulDivRemL7 MUL_DIV_REM_XU (
+  IterativeMulDivRemL7 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) MUL_DIV_REM_XU (
     .D (d__x_intfs[1]),
     .W (x__w_intfs[1]),
     .*
   );
 
   LoadStoreUnitL7 #(
-    .p_opaq_bits (p_opaq_bits)
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits),
+    .p_opaq_bits      (p_opaq_bits)
   ) MEM_XU (
     .D   (d__x_intfs[2]),
     .W   (x__w_intfs[2]),
@@ -206,7 +220,10 @@ module BlimpV8 #(
     .*
   );
 
-  ControlFlowUnitL6 CTRL_XU (
+  ControlFlowUnitL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) CTRL_XU (
     .D      (d__x_intfs[3]),
     .W      (x__w_intfs[3]),
     .squash (squash_arb_notif[1]),
@@ -214,7 +231,9 @@ module BlimpV8 #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
@@ -223,7 +242,8 @@ module BlimpV8 #(
   );
 
   SquashUnitL1 #(
-    .p_num_arb (2)
+    .p_num_arb      (2),
+    .p_seq_num_bits (p_seq_num_bits)
   ) SU (
     .arb    (squash_arb_notif),
     .gnt    (squash_gnt_notif),

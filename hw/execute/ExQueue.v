@@ -10,7 +10,9 @@
 `include "hw/common/Fifo.v"
 
 module ExQueue #(
-  parameter p_depth = 8
+  parameter p_depth          = 8,
+  parameter p_seq_num_bits   = 5,
+  parameter p_phys_addr_bits = 6
 )(
   input  logic clk,
   input  logic rst,
@@ -18,9 +20,6 @@ module ExQueue #(
   X__WIntf.W_intf in,
   X__WIntf.X_intf out
 );
-
-  localparam p_seq_num_bits   = in.p_seq_num_bits;
-  localparam p_phys_addr_bits = in.p_phys_addr_bits;
 
   //----------------------------------------------------------------------
   // Define message type, connect to interfaces

@@ -66,6 +66,7 @@ module FetchUnitL3TestSuite #(
   ) squash_notif();
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (p_max_in_flight)
   ) dut (
     .mem    (mem_intf),

@@ -58,7 +58,9 @@ module WritebackCommitUnitL3TestSuite #(
   ) commit_notif();
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) dut (
     .Ex        (X__W_intfs),
     .complete  (complete_notif),

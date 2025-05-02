@@ -151,6 +151,7 @@ module BlimpVdemo #(
                             OP_BGEU_VEC;
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (2)
   ) FU (
     .mem    (inst_mem),
@@ -166,6 +167,7 @@ module BlimpVdemo #(
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   DecodeIssueUnitL5 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets ({
@@ -185,7 +187,10 @@ module BlimpVdemo #(
     .*
   );
 
-  ALUL6 ALU_XU (
+  ALUL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) ALU_XU (
     .D (d__x_intfs[0]),
     .W (x__w_intfs[0]),
     .*
@@ -204,14 +209,19 @@ module BlimpVdemo #(
   // (IterativeMultiplierL2), and connect it to the [5] interfaces
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  IterativeMulDivRemL7 MULH_DIV_REM_XU (
+  IterativeMulDivRemL7 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) MULH_DIV_REM_XU (
     .D (d__x_intfs[2]),
     .W (x__w_intfs[2]),
     .*
   );
 
   LoadStoreUnitL7 #(
-    .p_opaq_bits (p_opaq_bits)
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits),
+    .p_opaq_bits      (p_opaq_bits)
   ) MEM_XU (
     .D   (d__x_intfs[3]),
     .W   (x__w_intfs[3]),
@@ -219,7 +229,10 @@ module BlimpVdemo #(
     .*
   );
 
-  ControlFlowUnitL6 CTRL_XU (
+  ControlFlowUnitL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) CTRL_XU (
     .D      (d__x_intfs[4]),
     .W      (x__w_intfs[4]),
     .squash (squash_arb_notif[1]),
@@ -227,7 +240,9 @@ module BlimpVdemo #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
@@ -236,7 +251,8 @@ module BlimpVdemo #(
   );
 
   SquashUnitL1 #(
-    .p_num_arb (2)
+    .p_num_arb      (2),
+    .p_seq_num_bits (p_seq_num_bits)
   ) SU (
     .arb    (squash_arb_notif),
     .gnt    (squash_gnt_notif),

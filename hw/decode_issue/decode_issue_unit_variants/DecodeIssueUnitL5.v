@@ -25,6 +25,7 @@
 import ISA::*;
 
 module DecodeIssueUnitL5 #(
+  parameter p_seq_num_bits                             = 5,
   parameter p_num_pipes                                = 1,
   parameter p_num_phys_regs                            = 36,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1}
@@ -64,7 +65,6 @@ module DecodeIssueUnitL5 #(
   SquashNotif.sub squash_sub
 );
 
-  localparam p_seq_num_bits   = F.p_seq_num_bits;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
   
   //----------------------------------------------------------------------

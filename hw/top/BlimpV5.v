@@ -101,6 +101,7 @@ module BlimpV5 #(
   //----------------------------------------------------------------------
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (32)
   ) FU (
     .mem    (inst_mem),
@@ -158,7 +159,9 @@ module BlimpV5 #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),

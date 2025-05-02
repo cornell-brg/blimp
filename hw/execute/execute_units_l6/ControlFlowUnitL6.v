@@ -14,7 +14,10 @@
 
 import UArch::*;
 
-module ControlFlowUnitL6 (
+module ControlFlowUnitL6 #(
+  parameter p_seq_num_bits   = 5,
+  parameter p_phys_addr_bits = 6
+)(
   input  logic clk,
   input  logic rst,
 
@@ -36,9 +39,6 @@ module ControlFlowUnitL6 (
 
   SquashNotif.pub squash
 );
-
-  localparam p_seq_num_bits   = D.p_seq_num_bits;
-  localparam p_phys_addr_bits = D.p_phys_addr_bits;
   
   //----------------------------------------------------------------------
   // Register inputs

@@ -51,7 +51,8 @@ module ExQueueTestSuite #(
   ) out_intf();
 
   ExQueue #(
-    .p_depth (p_depth)
+    .p_seq_num_bits (p_seq_num_bits),
+    .p_depth        (p_depth)
   ) dut (
     .in  (in_intf),
     .out (out_intf),

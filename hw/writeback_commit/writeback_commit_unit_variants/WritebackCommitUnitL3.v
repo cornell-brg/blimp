@@ -14,7 +14,9 @@
 `include "intf/X__WIntf.v"
 
 module WritebackCommitUnitL3 #(
-  parameter p_num_pipes = 1
+  parameter p_num_pipes      = 1,
+  parameter p_seq_num_bits   = 5,
+  parameter p_phys_addr_bits = 6
 )(
   input  logic clk,
   input  logic rst,
@@ -37,9 +39,6 @@ module WritebackCommitUnitL3 #(
 
   CommitNotif.pub   commit
 );
-
-  localparam p_seq_num_bits   = complete.p_seq_num_bits;
-  localparam p_phys_addr_bits = complete.p_phys_addr_bits;
 
   //----------------------------------------------------------------------
   // Select which pipe to get from

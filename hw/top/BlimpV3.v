@@ -122,7 +122,9 @@ module BlimpV3 #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),

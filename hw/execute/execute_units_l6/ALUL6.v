@@ -12,7 +12,10 @@
 
 import UArch::*;
 
-module ALUL6 (
+module ALUL6 #(
+  parameter p_seq_num_bits   = 5,
+  parameter p_phys_addr_bits = 6
+)(
   input  logic clk,
   input  logic rst,
 
@@ -28,9 +31,6 @@ module ALUL6 (
 
   X__WIntf.X_intf W
 );
-
-  localparam p_seq_num_bits   = D.p_seq_num_bits;
-  localparam p_phys_addr_bits = D.p_phys_addr_bits;
   
   //----------------------------------------------------------------------
   // Register inputs

@@ -105,6 +105,7 @@ module BlimpV6 #(
   //----------------------------------------------------------------------
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (32)
   ) FU (
     .mem    (inst_mem),
@@ -115,6 +116,7 @@ module BlimpV6 #(
   );
 
   DecodeIssueUnitL5 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets ({
@@ -164,7 +166,9 @@ module BlimpV6 #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
@@ -173,7 +177,8 @@ module BlimpV6 #(
   );
 
   SquashUnitL1 #(
-    .p_num_arb (2)
+    .p_num_arb      (2),
+    .p_seq_num_bits (p_seq_num_bits)
   ) SU (
     .arb    (squash_arb_notif),
     .gnt    (squash_gnt_notif),

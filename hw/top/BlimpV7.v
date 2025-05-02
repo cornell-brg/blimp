@@ -138,6 +138,7 @@ module BlimpV7 #(
                             OP_BGEU_VEC;
 
   FetchUnitL3 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_max_in_flight (2)
   ) FU (
     .mem    (inst_mem),
@@ -148,6 +149,7 @@ module BlimpV7 #(
   );
 
   DecodeIssueUnitL5 #(
+    .p_seq_num_bits  (p_seq_num_bits),
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets ({
@@ -166,13 +168,20 @@ module BlimpV7 #(
     .*
   );
 
-  ALUL6 ALU_XU (
+  ALUL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) ALU_XU (
     .D (d__x_intfs[0]),
     .W (buffer_intf),
     .*
   );
 
-  ExQueue #(1) alu_buf (
+  ExQueue #(
+    .p_depth          (1),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) alu_buf (
     .in  (buffer_intf),
     .out (x__w_intfs[0]),
     .*
@@ -195,7 +204,10 @@ module BlimpV7 #(
     .*
   );
 
-  ControlFlowUnitL6 CTRL_XU (
+  ControlFlowUnitL6 #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) CTRL_XU (
     .D      (d__x_intfs[3]),
     .W      (x__w_intfs[3]),
     .squash (squash_arb_notif[1]),
@@ -203,7 +215,9 @@ module BlimpV7 #(
   );
 
   WritebackCommitUnitL3 #(
-    .p_num_pipes (p_num_pipes)
+    .p_num_pipes      (p_num_pipes),
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
@@ -212,7 +226,8 @@ module BlimpV7 #(
   );
 
   SquashUnitL1 #(
-    .p_num_arb (2)
+    .p_num_arb      (2),
+    .p_seq_num_bits (p_seq_num_bits)
   ) SU (
     .arb    (squash_arb_notif),
     .gnt    (squash_gnt_notif),

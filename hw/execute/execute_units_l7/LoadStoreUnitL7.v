@@ -14,7 +14,9 @@
 import UArch::*;
 
 module LoadStoreUnitL7 #(
-  parameter p_opaq_bits = 8
+  parameter p_seq_num_bits   = 5,
+  parameter p_phys_addr_bits = 6,
+  parameter p_opaq_bits      = 8
 )(
   input  logic clk,
   input  logic rst,
@@ -37,9 +39,6 @@ module LoadStoreUnitL7 #(
 
   MemIntf.client  mem
 );
-
-  localparam p_seq_num_bits   = D.p_seq_num_bits;
-  localparam p_phys_addr_bits = D.p_phys_addr_bits;
   
   //----------------------------------------------------------------------
   // Types
