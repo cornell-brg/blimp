@@ -109,6 +109,7 @@ module DecodeIssueUnitL5 #(
 
   logic       decoder_val;
   rv_uop      decoder_uop;
+  logic [4:0] decoder_raddr [2];
   logic [4:0] decoder_raddr0;
   logic [4:0] decoder_raddr1;
   logic [4:0] decoder_waddr;
@@ -117,6 +118,9 @@ module DecodeIssueUnitL5 #(
   logic       decoder_op2_sel;
   logic [1:0] decoder_jal;
   logic       decoder_op3_sel;
+
+  assign decoder_raddr[0] = decoder_raddr0;
+  assign decoder_raddr[1] = decoder_raddr1;
   
   InstDecoder decoder (
     .val     (decoder_val),
@@ -132,12 +136,14 @@ module DecodeIssueUnitL5 #(
     .op3_sel (decoder_op3_sel)
   );
 
-  logic [31:0] rdata0, rdata1;
-
   logic [p_phys_addr_bits-1:0] alloc_preg, alloc_ppreg;
   logic                        alloc_rdy;
   logic [p_phys_addr_bits-1:0] lookup_preg    [2];
   logic                        lookup_pending [2];
+  logic                        lookup_en      [2];
+
+  assign lookup_en[0] = 1'b1;
+  assign lookup_en[1] = 1'b1;
 
   RenameTable #(
     .p_num_phys_regs (p_num_phys_regs)
@@ -151,14 +157,21 @@ module DecodeIssueUnitL5 #(
     .alloc_en       (alloc_rdy & decoder_wen & X_xfer & !should_squash),
     .alloc_rdy      (alloc_rdy),
 
-    .lookup_areg    ({decoder_raddr1, decoder_raddr0}),
+    .lookup_areg    (decoder_raddr),
     .lookup_preg    (lookup_preg),
     .lookup_pending (lookup_pending),
-    .lookup_en      ({1'b1, 1'b1}),
+    .lookup_en      (lookup_en),
 
     .complete       (complete),
     .commit         (commit)
   );
+
+  logic [31:0] rdata [2];
+  logic [31:0] rdata0;
+  logic [31:0] rdata1;
+
+  assign rdata0 = rdata[0];
+  assign rdata1 = rdata[1];
 
   Regfile #(
     .p_entry_bits (32),
@@ -167,7 +180,7 @@ module DecodeIssueUnitL5 #(
     .clk                (clk),
     .rst                (rst),
     .raddr              (lookup_preg),
-    .rdata              ({rdata1, rdata0}),
+    .rdata              (rdata),
     .waddr              (complete.preg),
     .wdata              (complete.wdata),
     .wen                (complete.wen & complete.val)
