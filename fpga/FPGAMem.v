@@ -203,12 +203,12 @@ module FPGAMem #(
   assign we2    = we & rw_msg.len[2];
   assign we3    = we & rw_msg.len[3];
 
-  logic [15:0] addr;
-  assign       addr = rw_msg.addr[17:2]; // Don't include bytes
+  logic [15:0] mem_addr;
+  assign       mem_addr = rw_msg.addr[17:2]; // Don't include bytes
 
   // Same address for read and write
-  assign raddr = addr;
-  assign waddr = addr;
+  assign raddr = mem_addr;
+  assign waddr = mem_addr;
 
   // ---------------------------------------------------------------------
   // Control Signals

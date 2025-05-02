@@ -209,7 +209,7 @@ module PeripheralMemServer #(
 
   always_comb begin
     case( curr_msg.addr )
-      STDOUT:  op_done = 1'b1;
+      STDOUT:  op_done = !ps2_ascii_val;
       STDIN:   op_done = !key_buf_empty;
       default: op_done = 1'b1;
     endcase
@@ -219,9 +219,15 @@ module PeripheralMemServer #(
   // Operate on peripherals as appropriate
   // ---------------------------------------------------------------------
 
-  assign vga_ascii     = curr_msg.data[7:0];
-  assign vga_ascii_val = ( next_state == RESP )
-                       & ( curr_msg.addr == STDOUT );
+  always_comb begin
+    if( ps2_ascii_val )
+      vga_ascii = ps2_ascii;
+    else
+      vga_ascii = curr_msg.data[7:0];
+  end
+  assign vga_ascii_val = ( ( next_state == RESP )
+                         & ( curr_msg.addr == STDOUT ) )
+                         | ps2_ascii_val;
 
   assign key_buf_pop = ( next_state == RESP )
                      & ( curr_msg.addr == STDIN );
