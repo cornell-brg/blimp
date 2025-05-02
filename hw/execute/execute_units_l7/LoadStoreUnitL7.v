@@ -48,13 +48,13 @@ module LoadStoreUnitL7 #(
     logic                        val;
     logic                 [31:0] pc;
     logic   [p_seq_num_bits-1:0] seq_num;
-    logic                 [31:0] op1;
-    logic                 [31:0] op2;
+    logic                 [31:0] msg_op1;
+    logic                 [31:0] msg_op2;
     logic                  [4:0] waddr;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
     logic                 [31:0] mem_data;
-    rv_uop                       uop;
+    rv_uop                       msg_uop;
   } D_input;
 
   typedef struct packed {
@@ -92,13 +92,13 @@ module LoadStoreUnitL7 #(
         val:      1'b0, 
         pc:       'x,
         seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
+        msg_op1:  'x, 
+        msg_op2:  'x,
         waddr:    'x,
         preg:     'x,
         ppreg:    'x,
         mem_data: 'x,
-        uop:      'x
+        msg_uop:  'x
       };
     else
       D_reg <= D_reg_next;
@@ -113,26 +113,26 @@ module LoadStoreUnitL7 #(
         val:      1'b1, 
         pc:       D.pc,
         seq_num:  D.seq_num,
-        op1:      D.op1, 
-        op2:      D.op2,
+        msg_op1:  D.op1, 
+        msg_op2:  D.op2,
         waddr:    D.waddr,
         preg:     D.preg,
         ppreg:    D.ppreg,
         mem_data: D.op3.mem_data,
-        uop:      D.uop
+        msg_uop:  D.uop
       };
     else if ( stage2_xfer )
       D_reg_next = '{ 
         val:      1'b0, 
         pc:       'x,
         seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
+        msg_op1:  'x, 
+        msg_op2:  'x,
         waddr:    'x,
         preg:     'x,
         ppreg:    'x,
         mem_data: 'x,
-        uop:      'x
+        msg_uop:  'x
       };
     else
       D_reg_next = D_reg;
@@ -145,14 +145,14 @@ module LoadStoreUnitL7 #(
   //----------------------------------------------------------------------
   
   logic [31:0] op1, op2;
-  assign op1 = D_reg.op1;
-  assign op2 = D_reg.op2;
+  assign op1 = D_reg.msg_op1;
+  assign op2 = D_reg.msg_op2;
 
   logic [31:0] addr;
   assign addr = op1 + op2;
 
   rv_uop uop;
-  assign uop = D_reg.uop;
+  assign uop = D_reg.msg_uop;
 
   always_comb begin
     case( uop )

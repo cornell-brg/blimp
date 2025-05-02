@@ -40,10 +40,10 @@ module ALUL6 #(
     logic                        val;
     logic                 [31:0] pc;
     logic   [p_seq_num_bits-1:0] seq_num;
-    logic                 [31:0] op1;
-    logic                 [31:0] op2;
+    logic                 [31:0] msg_op1;
+    logic                 [31:0] msg_op2;
     logic                  [4:0] waddr;
-    rv_uop                       uop;
+    rv_uop                       msg_uop;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
   } D_input;
@@ -71,10 +71,10 @@ module ALUL6 #(
         val:     1'b1, 
         pc:      D.pc,
         seq_num: D.seq_num,
-        op1:     D.op1, 
-        op2:     D.op2,
+        msg_op1: D.op1, 
+        msg_op2: D.op2,
         waddr:   D.waddr,
-        uop:     D.uop,
+        msg_uop: D.uop,
         preg:    D.preg,
         ppreg:   D.ppreg
       };
@@ -91,11 +91,11 @@ module ALUL6 #(
   //----------------------------------------------------------------------
   
   logic [31:0] op1, op2;
-  assign op1 = D_reg.op1;
-  assign op2 = D_reg.op2;
+  assign op1 = D_reg.msg_op1;
+  assign op2 = D_reg.msg_op2;
 
   rv_uop uop;
-  assign uop = D_reg.uop;
+  assign uop = D_reg.msg_uop;
 
   always_comb begin
     case( uop )
@@ -149,7 +149,7 @@ module ALUL6 #(
   function string trace( int trace_level );
     if( W.val & W.rdy ) begin
       if( trace_level > 0 )
-        trace = $sformatf("%h: %11s:%h:%h:%h:%h", W.seq_num, D_reg.uop.name(), 
+        trace = $sformatf("%h: %11s:%h:%h:%h:%h", W.seq_num, uop.name(), 
                           W.waddr, op1, op2, W.wdata );
       else
         trace = $sformatf("%h", W.seq_num);
