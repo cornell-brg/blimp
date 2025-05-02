@@ -64,7 +64,7 @@ module LoadStoreUnitL7 #(
     logic                  [4:0] waddr;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
-    rv_uop                       uop;
+    rv_uop                       msg_uop;
     logic                  [1:0] offset;
   } stage2_msg;
   
@@ -211,7 +211,7 @@ module LoadStoreUnitL7 #(
   assign stage1_output.pc      = D_reg.pc;
   assign stage1_output.seq_num = D_reg.seq_num;
   assign stage1_output.waddr   = D_reg.waddr;
-  assign stage1_output.uop     = uop;
+  assign stage1_output.msg_uop = uop;
   assign stage1_output.offset  = stage1_addr_offset;
   assign stage1_output.preg    = D_reg.preg;
   assign stage1_output.ppreg   = D_reg.ppreg;
@@ -233,7 +233,7 @@ module LoadStoreUnitL7 #(
         waddr:   'x,
         preg:    'x,
         ppreg:   'x,
-        uop:     'x,
+        msg_uop: 'x,
         offset:  'x
       };
     else
@@ -253,7 +253,7 @@ module LoadStoreUnitL7 #(
         waddr:   'x,
         preg:    'x,
         ppreg:   'x,
-        uop:     'x,
+        msg_uop: 'x,
         offset:  'x
       };
     else
@@ -276,7 +276,7 @@ module LoadStoreUnitL7 #(
   end
 
   always_comb begin
-    case( stage2_reg.uop )
+    case( stage2_reg.msg_uop )
       OP_LB:   sext_data = { {24{base_data[7] }}, base_data[7:0]  };
       OP_LH:   sext_data = { {16{base_data[15]}}, base_data[15:0] };
       OP_LW:   sext_data = base_data;
@@ -311,7 +311,7 @@ module LoadStoreUnitL7 #(
   assign W.ppreg            = stage2_reg.ppreg;
 
   always_comb begin
-    case( stage2_reg.uop )
+    case( stage2_reg.msg_uop )
       OP_LB:   W.wen = 1'b1;
       OP_LH:   W.wen = 1'b1;
       OP_LW:   W.wen = 1'b1;
@@ -369,7 +369,7 @@ module LoadStoreUnitL7 #(
     if( W.val & W.rdy ) begin
       if( trace_level > 0 )
         trace = {trace, $sformatf("%11s:%h:%h:%h",
-                      stage2_reg.uop.name(),
+                      stage2_reg.msg_uop.name(),
                       stage2_reg.seq_num, mem.resp_msg.addr, W.wdata )};
       else
         trace = {trace, $sformatf("%h", stage2_reg.seq_num)};
