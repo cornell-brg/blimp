@@ -46,8 +46,8 @@ module Fifo
       rptr <= '0;
       wptr <= '0;
     end else begin
-      if( push ) wptr <= wptr + 1;
-      if( pop  ) rptr <= rptr + 1;
+      if( push ) wptr <= wptr + {(p_addr_bits + 1){1'b1}};
+      if( pop  ) rptr <= rptr + {(p_addr_bits + 1){1'b1}};
     end
   end
 
