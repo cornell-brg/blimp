@@ -65,11 +65,11 @@ module BlimpV2 #(
     .p_seq_num_bits (p_seq_num_bits)
   ) commit_notif();
 
-  assign inst_trace_notif.pc    = commit_notif.pc;
-  assign inst_trace_notif.waddr = commit_notif.waddr;
-  assign inst_trace_notif.wdata = commit_notif.wdata;
-  assign inst_trace_notif.wen   = commit_notif.wen;
-  assign inst_trace_notif.val   = commit_notif.val;
+  assign inst_trace.pc    = commit_notif.pc;
+  assign inst_trace.waddr = commit_notif.waddr;
+  assign inst_trace.wdata = commit_notif.wdata;
+  assign inst_trace.wen   = commit_notif.wen;
+  assign inst_trace.val   = commit_notif.val;
 
   //----------------------------------------------------------------------
   // Units

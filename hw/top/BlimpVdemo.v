@@ -96,11 +96,11 @@ module BlimpVdemo #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) commit_notif();
 
-  assign inst_trace_notif.pc    = commit_notif.pc;
-  assign inst_trace_notif.waddr = commit_notif.waddr;
-  assign inst_trace_notif.wdata = commit_notif.wdata;
-  assign inst_trace_notif.wen   = commit_notif.wen;
-  assign inst_trace_notif.val   = commit_notif.val;
+  assign inst_trace.pc    = commit_notif.pc;
+  assign inst_trace.waddr = commit_notif.waddr;
+  assign inst_trace.wdata = commit_notif.wdata;
+  assign inst_trace.wen   = commit_notif.wen;
+  assign inst_trace.val   = commit_notif.val;
 
   logic [4:0] unused_complete_waddr;
   assign unused_complete_waddr = complete_notif.waddr;
