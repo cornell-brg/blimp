@@ -250,7 +250,7 @@ module DecodeIssueUnitL4 #(
       assign Ex[k].seq_num      = F_reg.seq_num;
       assign Ex[k].preg         = alloc_preg;
       assign Ex[k].ppreg        = alloc_ppreg;
-      assign Ex[k].op3.mem_data = rdata1;
+      assign Ex[k].op3          = rdata1;
     end
   endgenerate
 

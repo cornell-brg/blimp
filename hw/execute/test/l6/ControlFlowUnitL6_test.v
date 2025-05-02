@@ -83,7 +83,7 @@ module ControlFlowUnitL6TestSuite #(
   assign D__X_intf.seq_num        = d__x_msg.seq_num;
   assign D__X_intf.op1            = d__x_msg.op1;
   assign D__X_intf.op2            = d__x_msg.op2;
-  assign D__X_intf.op3.branch_imm = d__x_msg.imm;
+  assign D__X_intf.op3            = d__x_msg.imm;
   assign D__X_intf.waddr          = d__x_msg.waddr;
   assign D__X_intf.uop            = d__x_msg.uop;
 

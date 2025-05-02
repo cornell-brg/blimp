@@ -108,7 +108,7 @@ module LoadStoreUnitL3TestSuite #(
   assign D__X_intf.op2          = d__x_msg.op2;
   assign D__X_intf.waddr        = d__x_msg.waddr;
   assign D__X_intf.uop          = d__x_msg.uop;
-  assign D__X_intf.op3.mem_data = d__x_msg.mem_data;
+  assign D__X_intf.op3          = d__x_msg.mem_data;
 
   assign D__X_intf.preg    = 'x;
   assign D__X_intf.ppreg   = 'x;

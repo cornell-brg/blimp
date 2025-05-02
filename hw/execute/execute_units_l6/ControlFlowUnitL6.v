@@ -82,7 +82,7 @@ module ControlFlowUnitL6 #(
         seq_num: D.seq_num,
         op1:     D.op1,
         op2:     D.op2,
-        imm:     D.op3.branch_imm,
+        imm:     D.op3,
         waddr:   D.waddr,
         uop:     D.uop,
         preg:    D.preg,

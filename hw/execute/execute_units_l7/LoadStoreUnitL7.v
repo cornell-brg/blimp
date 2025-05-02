@@ -118,7 +118,7 @@ module LoadStoreUnitL7 #(
         waddr:    D.waddr,
         preg:     D.preg,
         ppreg:    D.ppreg,
-        mem_data: D.op3.mem_data,
+        mem_data: D.op3,
         msg_uop:  D.uop
       };
     else if ( stage2_xfer )
