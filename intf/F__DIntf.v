@@ -48,7 +48,7 @@ interface F__DIntf
     output rdy,
     
     // v2
-    output seq_num
+    input  seq_num
   );
 
 endinterface
