@@ -34,6 +34,7 @@ module RRArbTestSuite #(
   // Instantiate design under test
   //----------------------------------------------------------------------
 
+  logic               dut_en;
   logic [p_width-1:0] dut_req;
   logic [p_width-1:0] dut_gnt;
 
@@ -42,6 +43,7 @@ module RRArbTestSuite #(
   ) DUT (
     .clk (clk),
     .rst (rst),
+    .en  (dut_en),
     .req (dut_req),
     .gnt (dut_gnt)
   );
@@ -54,17 +56,19 @@ module RRArbTestSuite #(
   // before the next rising edge.
 
   task check (
+    input logic               en,
     input logic [p_width-1:0] req,
     input logic [p_width-1:0] gnt
   );
     if ( !t.failed ) begin
       dut_req = req;
+      dut_en  = en;
 
       #8;
 
       if ( t.verbose ) begin
-        $display( "%3d: %b > %b", t.cycles,
-                  dut_req, dut_gnt );
+        $display( "%3d: %b %b > %b", t.cycles,
+                  dut_en, dut_req, dut_gnt );
       end
 
       `CHECK_EQ( dut_gnt, gnt );
@@ -82,13 +86,13 @@ module RRArbTestSuite #(
     t.test_case_begin( "test_case_1_basic" );
     if( !t.run_test ) return;
 
-    //     in                    out
-    check( p_width'('b0000), p_width'('b0000) );
-    check( p_width'('b0001), p_width'('b0001) );
-    check( p_width'('b0010), p_width'('b0010) );
-    check( p_width'('b0011), p_width'('b0001) );
+    //     en in                    out
+    check( 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, p_width'('b0010), p_width'('b0010) );
+    check( 1, p_width'('b0011), p_width'('b0001) );
     if( p_width > 1 )
-      check( p_width'('b0011), p_width'('b0010) );
+      check( 1, p_width'('b0011), p_width'('b0010) );
 
     t.test_case_end();
   endtask
@@ -101,13 +105,13 @@ module RRArbTestSuite #(
     t.test_case_begin( "test_case_2_no_grant" );
     if( !t.run_test ) return;
 
-    //     in                    out
-    check( p_width'('b0000), p_width'('b0000) );
-    check( p_width'('b0000), p_width'('b0000) );
-    check( p_width'('b0001), p_width'('b0001) );
-    check( p_width'('b0001), p_width'('b0001) );
-    check( p_width'('b0000), p_width'('b0000) );
-    check( p_width'('b0000), p_width'('b0000) );
+    //     en in                    out
+    check( 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_width'('b0000), p_width'('b0000) );
 
     t.test_case_end();
   endtask
@@ -120,31 +124,31 @@ module RRArbTestSuite #(
     t.test_case_begin( "test_case_3_oscillate" );
     if( !t.run_test ) return;
 
-    //     in                    out
-    check( p_width'('b0000), p_width'('b0000) );
-    check( p_width'('b0001), p_width'('b0001) );
+    //     en in                    out
+    check( 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_width'('b0001), p_width'('b0001) );
 
-    check( p_width'('b0011), p_width'('b0010) );
-    check( p_width'('b0011), p_width'('b0001) );
+    check( 1, p_width'('b0011), p_width'('b0010) );
+    check( 1, p_width'('b0011), p_width'('b0001) );
 
-    check( p_width'('b0111), p_width'('b0010) );
-    check( p_width'('b0111), p_width'('b0100) );
-    check( p_width'('b0111), p_width'('b0001) );
+    check( 1, p_width'('b0111), p_width'('b0010) );
+    check( 1, p_width'('b0111), p_width'('b0100) );
+    check( 1, p_width'('b0111), p_width'('b0001) );
 
-    check( p_width'('b1111), p_width'('b0010) );
-    check( p_width'('b1111), p_width'('b0100) );
-    check( p_width'('b1111), p_width'('b1000) );
-    check( p_width'('b1111), p_width'('b0001) );
+    check( 1, p_width'('b1111), p_width'('b0010) );
+    check( 1, p_width'('b1111), p_width'('b0100) );
+    check( 1, p_width'('b1111), p_width'('b1000) );
+    check( 1, p_width'('b1111), p_width'('b0001) );
 
-    check( p_width'('b1110), p_width'('b0010) );
-    check( p_width'('b1110), p_width'('b0100) );
-    check( p_width'('b1110), p_width'('b1000) );
+    check( 1, p_width'('b1110), p_width'('b0010) );
+    check( 1, p_width'('b1110), p_width'('b0100) );
+    check( 1, p_width'('b1110), p_width'('b1000) );
 
-    check( p_width'('b1100), p_width'('b0100) );
-    check( p_width'('b1100), p_width'('b1000) );
+    check( 1, p_width'('b1100), p_width'('b0100) );
+    check( 1, p_width'('b1100), p_width'('b1000) );
 
-    check( p_width'('b1000), p_width'('b1000) );
-    check( p_width'('b1000), p_width'('b1000) );
+    check( 1, p_width'('b1000), p_width'('b1000) );
+    check( 1, p_width'('b1000), p_width'('b1000) );
 
     t.test_case_end();
   endtask
@@ -154,6 +158,7 @@ module RRArbTestSuite #(
   //----------------------------------------------------------------------
 
   logic [p_width-1:0] rand_req;
+  logic               rand_en;
   logic [p_width-1:0] exp_gnt;
   int prev_gnt_idx, curr_gnt_idx, granted;
 
@@ -164,6 +169,7 @@ module RRArbTestSuite #(
 
     for( int i = 0; i < 20; i = i + 1 ) begin
       rand_req = p_width'( $urandom() );
+      rand_en  = 1'( $urandom() );
       granted  = 0;
       
       // Check for next highest priority
@@ -188,13 +194,15 @@ module RRArbTestSuite #(
 
       if( granted == 1 ) begin
         exp_gnt = 1 << curr_gnt_idx;
-        prev_gnt_idx = curr_gnt_idx;
+        if( rand_en )
+          prev_gnt_idx = curr_gnt_idx;
       end else begin
         exp_gnt = '0;
-        prev_gnt_idx = p_width;
+        if( rand_en )
+          prev_gnt_idx = p_width;
       end
 
-      check( rand_req, exp_gnt );
+      check( rand_en, rand_req, exp_gnt );
     end
 
     t.test_case_end();

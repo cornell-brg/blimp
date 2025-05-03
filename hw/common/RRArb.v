@@ -15,6 +15,7 @@ module RRArb #(
 )(
   input  logic               clk,
   input  logic               rst,
+  input  logic               en,
 
   input  logic [p_width-1:0] req,
   output logic [p_width-1:0] gnt
@@ -27,10 +28,11 @@ module RRArb #(
     //--------------------------------------------------------------------
 
     if( p_width == 1 ) begin
-      logic unused_clk, unused_rst;
+      logic unused_clk, unused_rst, unused_en;
       assign gnt = req;
       assign unused_clk = clk;
       assign unused_rst = rst;
+      assign unused_en  = en;
     end else begin
 
       //------------------------------------------------------------------
@@ -41,8 +43,8 @@ module RRArb #(
       logic [p_width-1:0] req_hph_filter;
       
       always_ff @( posedge clk ) begin
-        if( rst ) req_hph_filter <= '0;
-        else      req_hph_filter <= thermo_gnt << 1;
+        if( rst )     req_hph_filter <= '0;
+        else if( en ) req_hph_filter <= thermo_gnt << 1;
       end
 
       //------------------------------------------------------------------

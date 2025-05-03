@@ -152,7 +152,7 @@ module BlimpV8 #(
 
   FetchUnitL3 #(
     .p_seq_num_bits  (p_seq_num_bits),
-    .p_max_in_flight (2)
+    .p_max_in_flight (8)
   ) FU (
     .mem    (inst_mem),
     .D      (f__d_intf),

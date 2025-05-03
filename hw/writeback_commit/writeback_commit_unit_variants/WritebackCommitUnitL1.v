@@ -78,6 +78,7 @@ module WritebackCommitUnitL1 #(
   RRArb #(p_num_pipes) ex_arb (
     .clk (clk),
     .rst (rst),
+    .en  (1'b1),
     .req (Ex_val_packed),
     .gnt (Ex_gnt_packed)
   );

@@ -21,6 +21,7 @@
 
 `include "fpga/net/MemNetReq.v"
 `include "fpga/net/MemNetResp.v"
+`include "hw/common/Fifo.v"
 
 module FPGAMem #(
   parameter p_opaq_bits = 8
@@ -77,6 +78,40 @@ module FPGAMem #(
   end
 
   // ---------------------------------------------------------------------
+  // Use a FIFO to decouple incoming messages
+  // ---------------------------------------------------------------------
+
+  typedef struct packed {
+    t_op                    op;
+    logic [p_opaq_bits-1:0] opaque;
+    logic [1:0]             origin;
+    logic [31:0]            addr;
+    logic [3:0]             strb;
+    logic [31:0]            data;
+  } fifo_msg_t;
+
+  logic fifo_push, fifo_pop, fifo_empty, fifo_full;
+  fifo_msg_t fifo_wdata, fifo_rdata;
+
+  Fifo #(
+    .p_entry_bits (71 + p_opaq_bits),
+    .p_depth      (4)
+  ) req_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (fifo_push),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_wdata),
+    .rdata (fifo_rdata)
+  );
+
+  assign fifo_push  = req.val;
+  assign req.rdy    = !fifo_full;
+  assign fifo_wdata = req.msg;
+
+  // ---------------------------------------------------------------------
   // Pipeline
   // ---------------------------------------------------------------------
 
@@ -94,10 +129,9 @@ module FPGAMem #(
   logic      rw_val, rw_rdy;
 
   logic  req_xfer, rw_xfer, resp_xfer;
-  assign req_xfer  = req.val & req.rdy;
+  assign req_xfer  = !fifo_empty & fifo_pop;
   assign rw_xfer   = rw_val & rw_rdy;
   assign resp_xfer = resp.val & resp.rdy;
-
 
   // verilator lint_off ENUMVALUE
   pipe_msg_t rw_msg_next, resp_msg_next;
@@ -135,12 +169,12 @@ module FPGAMem #(
     if( req_xfer )
       rw_msg_next = '{
         val: 1'b1,
-        op:     req.msg.op,
-        opaque: req.msg.opaque,
-        origin: req.msg.origin,
-        addr:   req.msg.addr,
-        strb:   req.msg.strb,
-        data:   req.msg.data
+        op:     fifo_rdata.op,
+        opaque: fifo_rdata.opaque,
+        origin: fifo_rdata.origin,
+        addr:   fifo_rdata.addr,
+        strb:   fifo_rdata.strb,
+        data:   fifo_rdata.data
       };
     else if( rw_xfer )
       rw_msg_next = '{ 
@@ -215,11 +249,12 @@ module FPGAMem #(
   // ---------------------------------------------------------------------
 
   assign resp.val = resp_msg.val;
-
   assign rw_val = rw_msg.val;
+
+  // Break combinational loop - currently inserts a bubble
   assign rw_rdy = ( resp_msg.val & resp_xfer ) | !resp_msg.val;
 
-  assign req.rdy = ( rw_msg.val & rw_xfer ) | !rw_msg.val;
+  assign fifo_pop = (( rw_msg.val & rw_xfer ) | !rw_msg.val) & !fifo_empty;
 endmodule
 
 `endif // FPGA_FPGAMEM_V

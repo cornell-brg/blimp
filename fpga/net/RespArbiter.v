@@ -36,6 +36,7 @@ module RespArbiter #(
   RRArb #( p_num_arb ) rr_arb (
     .clk (clk),
     .rst (rst),
+    .en  (gnt.rdy),
     .req (rr_req),
     .gnt (rr_gnt)
   );
@@ -50,11 +51,11 @@ module RespArbiter #(
 
   generate
     for( i = 0; i < p_num_arb; i++ ) begin: PACK_RDY
-      assign arb[i].rdy = arb_rdy[i];
+      assign arb[i].rdy = arb_rdy[i] & gnt.rdy;
     end
   endgenerate
 
-  assign arb_rdy = rr_gnt & {(p_num_arb){gnt.rdy}};
+  assign arb_rdy = rr_gnt;
 
   // ---------------------------------------------------------------------
   // Pass message based on gnt
