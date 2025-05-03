@@ -240,11 +240,13 @@ module WritebackCommitUnitL3 #(
   assign commit.wen   = rob_output.wen;
   assign commit.ppreg = rob_output.ppreg;
 
-  assign arb_commit.pc    = rob_output.pc;
-  assign arb_commit.waddr = rob_output.waddr;
-  assign arb_commit.wdata = rob_output.wdata;
-  assign arb_commit.wen   = rob_output.wen;
-  assign arb_commit.ppreg = rob_output.ppreg;
+  assign arb_commit.val     = commit.val;
+  assign arb_commit.pc      = commit.pc;
+  assign arb_commit.seq_num = commit.seq_num;
+  assign arb_commit.waddr   = commit.waddr;
+  assign arb_commit.wdata   = commit.wdata;
+  assign arb_commit.wen     = commit.wen;
+  assign arb_commit.ppreg   = commit.ppreg;
 
   //----------------------------------------------------------------------
   // Linetracing
