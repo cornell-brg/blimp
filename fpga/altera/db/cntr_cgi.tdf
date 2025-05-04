@@ -1,4 +1,4 @@
---lpm_counter CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone IV E" lpm_modulus=1 lpm_port_updown="PORT_CONNECTIVITY" lpm_width=1 clk_en clock q sclr CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48
+--lpm_counter CBX_DECLARE_ALL_CONNECTED_PORTS="OFF" DEVICE_FAMILY="Cyclone IV E" lpm_modulus=13 lpm_port_updown="PORT_CONNECTIVITY" lpm_width=4 clock q sclr CARRY_CHAIN="MANUAL" CARRY_CHAIN_LENGTH=48
 --VERSION_BEGIN 23.1 cbx_cycloneii 2023:11:29:19:36:39:SC cbx_lpm_add_sub 2023:11:29:19:36:39:SC cbx_lpm_compare 2023:11:29:19:36:39:SC cbx_lpm_counter 2023:11:29:19:36:39:SC cbx_lpm_decode 2023:11:29:19:36:39:SC cbx_mgl 2023:11:29:19:36:47:SC cbx_nadder 2023:11:29:19:36:39:SC cbx_stratix 2023:11:29:19:36:39:SC cbx_stratixii 2023:11:29:19:36:39:SC  VERSION_END
 
 
@@ -21,15 +21,14 @@
 FUNCTION cycloneive_lcell_comb (cin, dataa, datab, datac, datad)
 WITH ( DONT_TOUCH, LUT_MASK, SUM_LUTC_INPUT)
 RETURNS ( combout, cout);
-FUNCTION cmpr_ngc (dataa[0..0], datab[0..0])
+FUNCTION cmpr_qgc (dataa[3..0], datab[3..0])
 RETURNS ( aeb);
 
---synthesis_resources = lut 1 reg 1 
-SUBDESIGN cntr_23j
+--synthesis_resources = lut 4 reg 4 
+SUBDESIGN cntr_cgi
 ( 
-	clk_en	:	input;
 	clock	:	input;
-	q[0..0]	:	output;
+	q[3..0]	:	output;
 	sclr	:	input;
 ) 
 VARIABLE 
@@ -38,46 +37,63 @@ VARIABLE
 			LUT_MASK = "5A90",
 			SUM_LUTC_INPUT = "cin"
 		);
-	counter_reg_bit[0..0] : dffeas;
-	cmpr1 : cmpr_ngc;
+	counter_comb_bita1 : cycloneive_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita2 : cycloneive_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_comb_bita3 : cycloneive_lcell_comb
+		WITH (
+			LUT_MASK = "5A90",
+			SUM_LUTC_INPUT = "cin"
+		);
+	counter_reg_bit[3..0] : dffeas;
+	cmpr1 : cmpr_qgc;
 	aclr_actual	: WIRE;
+	clk_en	: NODE;
 	cnt_en	: NODE;
 	compare_result	: WIRE;
 	cout_actual	: WIRE;
-	data[0..0]	: NODE;
+	data[3..0]	: NODE;
 	external_cin	: WIRE;
-	modulus_bus[0..0]	: WIRE;
+	modulus_bus[3..0]	: WIRE;
 	modulus_trigger	: WIRE;
-	s_val[0..0]	: WIRE;
-	safe_q[0..0]	: WIRE;
+	s_val[3..0]	: WIRE;
+	safe_q[3..0]	: WIRE;
 	sload	: NODE;
 	sset	: NODE;
 	time_to_clear	: WIRE;
 	updown_dir	: WIRE;
 
 BEGIN 
-	counter_comb_bita[0..0].cin = ( external_cin);
-	counter_comb_bita[0..0].dataa = ( counter_reg_bit[0..0].q);
-	counter_comb_bita[0..0].datab = ( updown_dir);
-	counter_comb_bita[0..0].datad = ( B"1");
+	counter_comb_bita[3..0].cin = ( counter_comb_bita[2..0].cout, external_cin);
+	counter_comb_bita[3..0].dataa = ( counter_reg_bit[3..0].q);
+	counter_comb_bita[3..0].datab = ( updown_dir, updown_dir, updown_dir, updown_dir);
+	counter_comb_bita[3..0].datad = ( B"1", B"1", B"1", B"1");
 	counter_reg_bit[].asdata = ((! sclr) & ((sset & s_val[]) # ((! sset) & ((sload & data[]) # (((! sload) & modulus_bus[]) & (! updown_dir))))));
 	counter_reg_bit[].clk = clock;
 	counter_reg_bit[].clrn = (! aclr_actual);
-	counter_reg_bit[].d = ( counter_comb_bita[0].combout);
+	counter_reg_bit[].d = ( counter_comb_bita[3..0].combout);
 	counter_reg_bit[].ena = (clk_en & (((sclr # sset) # sload) # cnt_en));
 	counter_reg_bit[].sload = (((sclr # sset) # sload) # modulus_trigger);
 	cmpr1.dataa[] = safe_q[];
 	cmpr1.datab[] = modulus_bus[];
 	aclr_actual = B"0";
+	clk_en = VCC;
 	cnt_en = VCC;
 	compare_result = cmpr1.aeb;
-	cout_actual = (counter_comb_bita[0].cout # (time_to_clear & updown_dir));
+	cout_actual = (counter_comb_bita[3].cout # (time_to_clear & updown_dir));
 	data[] = GND;
 	external_cin = B"1";
-	modulus_bus[] = B"0";
+	modulus_bus[] = B"1100";
 	modulus_trigger = cout_actual;
 	q[] = safe_q[];
-	s_val[] = B"1";
+	s_val[] = B"1111";
 	safe_q[] = counter_reg_bit[].q;
 	sload = GND;
 	sset = GND;

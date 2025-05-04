@@ -1,8 +1,8 @@
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_TOOL_NAME "Qsys"
-set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_TOOL_VERSION "20.1"
+set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_TOOL_VERSION "23.1"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_TOOL_ENV "Qsys"
 set_global_assignment -library "clk_gen" -name SOPCINFO_FILE [file join $::quartus(qip_path) "../../../clk_gen.sopcinfo"]
-set_global_assignment -entity "clk_gen" -library "clk_gen" -name SLD_INFO "QSYS_NAME clk_gen HAS_SOPCINFO 1 GENERATION_ID 1746225366"
+set_global_assignment -entity "clk_gen" -library "clk_gen" -name SLD_INFO "QSYS_NAME clk_gen HAS_SOPCINFO 1 GENERATION_ID 1746335138"
 set_global_assignment -library "clk_gen" -name SLD_FILE [file join $::quartus(qip_path) "clk_gen.debuginfo"]
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_TARGETED_DEVICE_FAMILY "Cyclone IV E"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_GENERATED_DEVICE_FAMILY "{Cyclone IV E}"
@@ -14,7 +14,7 @@ set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_DI
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_REPORT_HIERARCHY "On"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_INTERNAL "Off"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_VERSION "MS4w"
-set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MTc0NjIyNTM2Ng==::QXV0byBHRU5FUkFUSU9OX0lE"
+set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_PARAMETER "QVVUT19HRU5FUkFUSU9OX0lE::MTc0NjMzNTEzOA==::QXV0byBHRU5FUkFUSU9OX0lE"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfRkFNSUxZ::Q3ljbG9uZSBJViBF::QXV0byBERVZJQ0VfRkFNSUxZ"
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0U=::RVA0Q0UxMTVGMjlDNw==::QXV0byBERVZJQ0U="
 set_global_assignment -entity "clk_gen" -library "clk_gen" -name IP_COMPONENT_PARAMETER "QVVUT19ERVZJQ0VfU1BFRURHUkFERQ==::Nw==::QXV0byBERVZJQ0VfU1BFRURHUkFERQ=="
@@ -26,7 +26,7 @@ set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_INTERNAL "Off"
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_AUTHOR "QWx0ZXJhIENvcnBvcmF0aW9u"
-set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_VERSION "MjAuMQ=="
+set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_VERSION "MjMuMQ=="
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_DESCRIPTION "Rm9yIHN5c3RlbXMgd2l0aCBtdWx0aXBsZSByZXNldCBpbnB1dHMsIHRoZSBNZXJsaW4gUmVzZXQgQ29udHJvbGxlciBPUnMgYWxsIHJlc2V0IGlucHV0cyBhbmQgZ2VuZXJhdGVzIGEgc2luZ2xlIHJlc2V0IG91dHB1dC4="
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_PARAMETER "TlVNX1JFU0VUX0lOUFVUUw==::MQ==::TnVtYmVyIG9mIGlucHV0cw=="
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_COMPONENT_PARAMETER "T1VUUFVUX1JFU0VUX1NZTkNfRURHRVM=::ZGVhc3NlcnQ=::T3V0cHV0IFJlc2V0IFN5bmNocm9ub3VzIEVkZ2Vz"
@@ -58,7 +58,7 @@ set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COM
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_REPORT_HIERARCHY "Off"
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_INTERNAL "Off"
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_AUTHOR "SW50ZWwgQ29ycG9yYXRpb24="
-set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_VERSION "MjAuMQ=="
+set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_VERSION "MjMuMQ=="
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_DESCRIPTION "QXZhbG9uLWNvbXBhdGlibGUgSW50ZWwgUExMIG1vZHVsZS4gRm9yIFN0cmF0aXggViBhbmQgbmV3ZXIgZmFtaWxpZXMsIHVzZSBJbnRlbCBGUEdBIFBMTCBJUA=="
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_PARAMETER "SElEREVOX0NVU1RPTV9FTEFCT1JBVElPTg==::YWx0cGxsX2F2YWxvbl9lbGFib3JhdGlvbg==::SElEREVOX0NVU1RPTV9FTEFCT1JBVElPTg=="
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_COMPONENT_PARAMETER "SElEREVOX0NVU1RPTV9QT1NUX0VESVQ=::YWx0cGxsX2F2YWxvbl9wb3N0X2VkaXQ=::SElEREVOX0NVU1RPTV9QT1NUX0VESVQ="
@@ -136,8 +136,8 @@ set_global_assignment -library "clk_gen" -name SDC_FILE [file join $::quartus(qi
 set_global_assignment -library "clk_gen" -name VERILOG_FILE [file join $::quartus(qip_path) "submodules/clk_gen_altpll_0.v"]
 
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_TOOL_NAME "altera_reset_controller"
-set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_TOOL_VERSION "20.1"
+set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_TOOL_VERSION "23.1"
 set_global_assignment -entity "altera_reset_controller" -library "clk_gen" -name IP_TOOL_ENV "Qsys"
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_TOOL_NAME "altpll"
-set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_TOOL_VERSION "20.1"
+set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_TOOL_VERSION "23.1"
 set_global_assignment -entity "clk_gen_altpll_0" -library "clk_gen" -name IP_TOOL_ENV "Qsys"
