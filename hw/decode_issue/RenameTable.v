@@ -154,10 +154,31 @@ module RenameTable #(
     end
   endgenerate
 
-  assign alloc_preg  = ( alloc_areg != 0 ) ? preg_alloc_mask.or()
-                                           : 0;
-  assign alloc_ppreg = ( alloc_areg != 0 ) ? rename_table[alloc_areg].preg
-                                           : 0;
+  always_comb begin
+    alloc_preg = 0;
+    for( int j = 1; j < p_num_phys_regs; j = j + 1 ) begin
+      alloc_preg |= preg_alloc_mask[j];
+    end
+  end
+
+  // Avoid direct indexing of unpacked array
+  logic [p_phys_addr_bits-1:0] alloc_ppreg_sel [31:1];
+  generate
+    for( i = 1; i < 32; i = i + 1 ) begin: ALLOC_PPREG_SEL
+      always_comb begin
+        if( alloc_areg == 5'(i) )
+          alloc_ppreg_sel[i] = rename_table[i].preg;
+        else
+          alloc_ppreg_sel[i] = '0;
+      end
+    end
+  endgenerate
+  always_comb begin
+    alloc_ppreg = 0;
+    for( int j = 1; j < 32; j = j + 1 ) begin
+      alloc_ppreg |= alloc_ppreg_sel[j];
+    end
+  end
   
   // Only allocate when we have an entry to give
   assign alloc_rdy = |preg_alloc_sel_in;
@@ -170,27 +191,62 @@ module RenameTable #(
   assign unused_lookup_en[0] = lookup_en[0];
   assign unused_lookup_en[1] = lookup_en[1];
 
+  logic [4:0] lookup_areg0, lookup_areg1;
+  assign lookup_areg0 = lookup_areg[0];
+  assign lookup_areg1 = lookup_areg[1];
+
+  rt_entry_t rename_lookup_0 [31:1];
+  rt_entry_t rename_lookup_1 [31:1];
+
+  generate
+    for( i = 1; i < 32; i = i + 1 ) begin: RENAME_LOOKUP
+      always_comb begin
+        if( lookup_areg0 == 5'(i) )
+          rename_lookup_0[i] = rename_table[i];
+        else
+          rename_lookup_0[i] = '0;
+
+        if( lookup_areg1 == 5'(i) )
+          rename_lookup_1[i] = rename_table[i];
+        else
+          rename_lookup_1[i] = '0;
+      end
+    end
+  endgenerate
+
+  rt_entry_t selected_lookup_0;
+  rt_entry_t selected_lookup_1;
+
+  always_comb begin
+    selected_lookup_0 = 0;
+    selected_lookup_1 = 0;
+    for( int j = 1; j < 32; j = j + 1 ) begin
+      selected_lookup_0 |= rename_lookup_0[j];
+      selected_lookup_1 |= rename_lookup_1[j];
+    end
+  end
+
   always_comb begin
     if( lookup_areg[0] == '0 ) begin
       lookup_preg[0]    = '0;
       lookup_pending[0] = 0;
     end else begin
-      lookup_preg[0]    = rename_table[lookup_areg[0]].preg;
+      lookup_preg[0]    = selected_lookup_0.preg;
       if( complete_preg == lookup_preg[0] )
         lookup_pending[0] = 1'b0; // Bypass
       else
-        lookup_pending[0] = rename_table[lookup_areg[0]].pending;
+        lookup_pending[0] = selected_lookup_0.pending;
     end
 
     if( lookup_areg[1] == '0 ) begin
       lookup_preg[1]    = '0;
       lookup_pending[1] = 0;
     end else begin
-      lookup_preg[1]    = rename_table[lookup_areg[1]].preg;
+      lookup_preg[1]    = selected_lookup_1.preg;
       if( complete_preg == lookup_preg[1] )
         lookup_pending[1] = 1'b0; // Bypass
       else
-        lookup_pending[1] = rename_table[lookup_areg[1]].pending;
+        lookup_pending[1] = selected_lookup_1.pending;
     end
   end
 
