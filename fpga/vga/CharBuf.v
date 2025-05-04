@@ -224,6 +224,8 @@ module CharBuf #(
       clr_row           = 1'b1;
       clr_row_idx       = next_cursor_y;
     end
+    if( next_shift_offset == ($clog2(p_num_rows))'(p_num_rows) )
+      next_shift_offset = 'd0;
   end
 
   //----------------------------------------------------------------------
