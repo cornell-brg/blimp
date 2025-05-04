@@ -109,7 +109,7 @@ module DecodeIssueUnitL5 #(
 
   logic       decoder_val;
   rv_uop      decoder_uop;
-  logic [4:0] decoder_raddr [2];
+  logic [4:0] decoder_raddr [1:0];
   logic [4:0] decoder_raddr0;
   logic [4:0] decoder_raddr1;
   logic [4:0] decoder_waddr;
@@ -138,9 +138,9 @@ module DecodeIssueUnitL5 #(
 
   logic [p_phys_addr_bits-1:0] alloc_preg, alloc_ppreg;
   logic                        alloc_rdy;
-  logic [p_phys_addr_bits-1:0] lookup_preg    [2];
-  logic                        lookup_pending [2];
-  logic                        lookup_en      [2];
+  logic [p_phys_addr_bits-1:0] lookup_preg    [1:0];
+  logic                        lookup_pending [1:0];
+  logic                        lookup_en      [1:0];
 
   assign lookup_en[0] = 1'b1;
   assign lookup_en[1] = 1'b1;
@@ -166,7 +166,7 @@ module DecodeIssueUnitL5 #(
     .commit         (commit)
   );
 
-  logic [31:0] rdata [2];
+  logic [31:0] rdata [1:0];
   logic [31:0] rdata0;
   logic [31:0] rdata1;
 

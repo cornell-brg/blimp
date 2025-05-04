@@ -32,10 +32,10 @@ module RenameTable #(
   // Lookup
   // ---------------------------------------------------------------------
 
-  input  logic                  [4:0] lookup_areg    [2],
-  output logic [p_phys_addr_bits-1:0] lookup_preg    [2],
-  output logic                        lookup_pending [2],
-  input  logic                        lookup_en      [2],
+  input  logic                  [4:0] lookup_areg    [1:0],
+  output logic [p_phys_addr_bits-1:0] lookup_preg    [1:0],
+  output logic                        lookup_pending [1:0],
+  input  logic                        lookup_en      [1:0],
 
   // ---------------------------------------------------------------------
   // Complete (clear pending)
@@ -159,6 +159,8 @@ module RenameTable #(
     for( int j = 1; j < p_num_phys_regs; j = j + 1 ) begin
       alloc_preg |= preg_alloc_mask[j];
     end
+    if( alloc_areg == '0 )
+      alloc_preg = '0;
   end
 
   // Avoid direct indexing of unpacked array
@@ -178,6 +180,8 @@ module RenameTable #(
     for( int j = 1; j < 32; j = j + 1 ) begin
       alloc_ppreg |= alloc_ppreg_sel[j];
     end
+    if( alloc_areg == '0 )
+      alloc_ppreg = '0;
   end
   
   // Only allocate when we have an entry to give

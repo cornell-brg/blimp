@@ -17,8 +17,8 @@ module Regfile #(
   // Read Interface
   //----------------------------------------------------------------------
 
-  input  logic [$clog2(p_num_regs)-1:0] raddr   [2],
-  output logic [      p_entry_bits-1:0] rdata   [2],
+  input  logic [$clog2(p_num_regs)-1:0] raddr   [1:0],
+  output logic [      p_entry_bits-1:0] rdata   [1:0],
 
   //----------------------------------------------------------------------
   // Write Interface
