@@ -17,8 +17,8 @@ module Regfile #(
   // Read Interface
   //----------------------------------------------------------------------
 
-  input  logic [$clog2(p_num_regs)-1:0] raddr   [1:0],
-  output logic [      p_entry_bits-1:0] rdata   [1:0],
+  input  logic [$clog2(p_num_regs)-1:0] raddr   [2],
+  output logic [      p_entry_bits-1:0] rdata   [2],
 
   //----------------------------------------------------------------------
   // Write Interface
@@ -39,7 +39,7 @@ module Regfile #(
   // Read Interface
   //----------------------------------------------------------------------
 
-  logic forward_write [1:0];
+  logic forward_write [2];
   always_comb begin
     forward_write[0] = wen & ( raddr[0] == waddr );
     forward_write[1] = wen & ( raddr[1] == waddr );
