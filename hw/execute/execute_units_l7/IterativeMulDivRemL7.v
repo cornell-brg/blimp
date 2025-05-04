@@ -125,7 +125,7 @@ module IterativeMulDivRemStepL7 (
     if( ( b[63:32] == 'hffffffff ) & ( a[31:0] == 'h80000000) ) begin
       case( uop )
         OP_DIV: begin
-          next_result = {32'b0, 'h80000000};
+          next_result = {32'b0, 32'h80000000};
           done        = 1'b1;
         end
         OP_REM: begin
