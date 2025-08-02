@@ -45,5 +45,10 @@ overall framework, and how users can use and/or modify implementations.
 
    fpga/peripherals
    fpga/network
-   fpga/quartus_demo
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Demonstrations
+
+   demos/sim_demo
+   demos/quartus_demo
