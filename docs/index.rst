@@ -13,7 +13,12 @@ overall framework, and how users can use and/or modify implementations.
    :maxdepth: 1
    :caption: Overview
 
+   overview/motivation
+   overview/data_flow
    overview/versions
+   overview/build_system
+   overview/dependencies
+   overview/todo
 
 .. toctree::
    :maxdepth: 2
@@ -26,4 +31,19 @@ overall framework, and how users can use and/or modify implementations.
    :caption: Microarchitectural Details
 
    uarch/seq_nums.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Functional Level (FL) Utilities
+
+   fl/assembler
+   fl/proc
+
+.. toctree::
+   :maxdepth: 1
+   :caption: FPGA Implementation
+
+   fpga/peripherals
+   fpga/network
+   fpga/quartus_demo
 
