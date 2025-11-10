@@ -16,6 +16,7 @@ overall framework, and how users can use and/or modify implementations.
    overview/motivation
    overview/data_flow
    overview/versions
+   overview/repository_structure
    overview/build_system
    overview/dependencies
    overview/todo
