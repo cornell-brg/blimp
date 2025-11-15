@@ -54,6 +54,33 @@ network should be broken. Some ways to do this include:
  - Having separate credits for both channels in the memory network, with
    memory able to service the other channel if one is stalled
 
+SPI Enable
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+SPI communication is currently used to program the processor. However,
+unplugging the SPI lines once programming is finished (to allow the
+design to run on its own, not connected to a computer) can introduce
+noise that could be received and interpreted as a transaction by the SPI
+Minion. This behaviour was observed when testing and led to errors,
+especially if the "go" bit was written (stalling the processor). Instead,
+some mechanism outside of SPI should be introduced to enable SPI
+communication (perhaps a switch to enter "programming" mode), such that
+SPI programming can be disabled to allow an SPI channel to be disconnected.
+
+Functions vs. Tasks
+""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+In later versions of Verilator than those tested with, functions are
+(correctly) `not allowed to call tasks <https://verilator.org/guide/latest/warnings.html#cmdoption-arg-FUNCTIMECTL>`_.
+This behavior is currently violated by the calling of ``init_mem`` in
+the FL Memory (a task) by the corresponding function in the top-level
+processor simulators (where ``init_mem`` is a function). Either could
+be changed, but the best is likely to have the top-level simulators
+export ``init_mem`` as a task.
+
+(This error can be ignored by Verilator, but should be fixed instead to
+avoid unnecessary linting waivers)
+
 Enhancements
 --------------------------------------------------------------------------
 
@@ -72,6 +99,19 @@ however, many more may wish to be implemented for various operating
 systems, such as hardware privilege modes. A good reference/goal for
 minimal support would be those necessary to run `EGOS 2000 <https://github.com/yhzhang0128/egos-2000>`_,
 also developed at Cornell.
+
+.. admonition:: EGOS CSRs
+
+   Examining EGOS, the following CSRs (in addition to those listed
+   above) would be needed:
+
+   - ``mhartid``
+   - ``mvendorid``
+   - ``mscratch``
+   - ``mip``
+   - ``mie``
+   - ``mtime``
+   - ``mtimecmp``
 
 .. admonition:: Squashing Locations in the Processor
    :class: note
