@@ -1,0 +1,358 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processor Versions &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Repository Structure" href="../repository_structure/" />
+    <link rel="prev" title="Data Flow in the Processor" href="../data_flow/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Processor Versions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#version-1">Version 1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-2">Version 2</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-3">Version 3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-4">Version 4</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-5">Version 5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-6">Version 6</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-7">Version 7</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#version-8">Version 8</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Processor Versions</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/overview/versions.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="processor-versions">
+<h1>Processor Versions<a class="headerlink" href="#processor-versions" title="Link to this heading"></a></h1>
+<p>Blimp takes an iterative design approach, enabled through its modularity.
+Different levels of Blimp’s <a class="reference internal" href="../../units/units/"><span class="doc">microarchitectural units</span></a>
+can be composed to form different versions of Blimp processors. This
+enables the design of these components to occur iteratively, adding on
+functionality as the complexity of the processor progressed.</p>
+<p>Currently, 1 version of the processor is implemented. The table below
+details the level of each unit that each processor version supports:</p>
+<div class="note admonition">
+<p class="admonition-title">Instruction Routing/Arbitration</p>
+<p>While specific levels of execute units may be supported at a given
+processor version, many levels aren’t used in the given
+implementation, given that they are superseced by later levels with
+greater support</p>
+</div>
+<table class="docutils align-center">
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Proc. Version</p></th>
+<th class="head"><p>FU Level</p></th>
+<th class="head"><p>DIU Level</p></th>
+<th class="head"><p>XU Levels</p></th>
+<th class="head"><p>WCU Level</p></th>
+<th class="head"><p>SU Level</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>V1</p></th>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>V2</p></th>
+<td><p>2</p></td>
+<td><p>2</p></td>
+<td><p>1, 2</p></td>
+<td><p>2</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>V3</p></th>
+<td><p>2</p></td>
+<td><p>3</p></td>
+<td><p>1, 2</p></td>
+<td><p>3</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>V4</p></th>
+<td><p>2</p></td>
+<td><p>3</p></td>
+<td><p>1, 2, 3</p></td>
+<td><p>3</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>V5</p></th>
+<td><p>3</p></td>
+<td><p>4</p></td>
+<td><p>1, 2, 3, 4</p></td>
+<td><p>3</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>V6</p></th>
+<td><p>3</p></td>
+<td><p>5</p></td>
+<td><p>1, 2, 3, 4,
+5</p></td>
+<td><p>3</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>V7</p></th>
+<td><p>3</p></td>
+<td><p>5</p></td>
+<td><p>1, 2, 3, 4,
+5, 6</p></td>
+<td><p>3</p></td>
+<td><p>1</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>V8</p></th>
+<td><p>3</p></td>
+<td><p>5</p></td>
+<td><p>1, 2, 3, 4,
+5, 6, 7</p></td>
+<td><p>3</p></td>
+<td><p>1</p></td>
+</tr>
+</tbody>
+</table>
+<section id="version-1">
+<h2>Version 1<a class="headerlink" href="#version-1" title="Link to this heading"></a></h2>
+<p>The Version 1 processor is the simplest version, and aims to be the
+baseline needed for assembly execution with modular units. Only three
+instructions are supported (<code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">addi</span></code>, and <code class="docutils literal notranslate"><span class="pre">mul</span></code>). The processor
+is single-issue with in-order issue and completion, and assumes that
+Execute Units are single-cycle to maintain instruction ordering.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v1.png"><img alt="A picture of the Version 1 processor composition" class="bottompadding align-center" src="../../_images/versions-v1.png" style="width: 70%;" />
+</a>
+<div class="note admonition">
+<p class="admonition-title">Instruction Routing/Arbitration</p>
+<p>To prepare for out-of-order implementations, the Level 1 DIU
+dynamically routes instructions to XUs based on availability, and the
+Level 1 WCU implements Round-Robin arbitration to select which XU to
+receive an instruction from. However, this isn’t relevant based on
+the single-cycle guarantee of XUs, and could be replaced if needed
+for area.</p>
+</div>
+</section>
+<section id="version-2">
+<h2>Version 2<a class="headerlink" href="#version-2" title="Link to this heading"></a></h2>
+<p>The Version 2 processor adds support for operations with variable latency
+by modifying the DIU and WCU to reorder committing instructions based on
+a sequence number, and to resolve WAW hazards through stalling in the
+DIU. The FU is also modified to attach sequence numbers to instructions
+when fetched. To demonstrate this, a pipelined multiply unit is
+used as an XU to have intructions with varying latency.</p>
+<div class="note admonition">
+<p class="admonition-title">Sequence Number Generation</p>
+<p>The number of sequence numbers is a parameter for the overall processor,
+and represents how many instructions can be in-flight at once. This can
+be a fairly small value, as the number of in-flight instructions is also
+currently limited by processor pipeline depth. However, if the FU gets
+to a point where isn’t doesn’t have any more sequence numbers, it will
+stall until a sequence number is released through the associated
+instruction committing, communicated on the commit interface</p>
+</div>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v2.png"><img alt="A picture of the Version 2 processor composition" class="bottompadding align-center" src="../../_images/versions-v2.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-3">
+<h2>Version 3<a class="headerlink" href="#version-3" title="Link to this heading"></a></h2>
+<p>The Version 3 processor is similar to the Version 2 processor, but
+introduces register renaming to resolve WAW hazards instead of stalling.
+This requires modifying the DIU to include a rename table, as well as the
+WCU to forward the physical register back to the DIU upon
+completion/commit. Because of the commit interface indicating when a
+physical register is freed, the DIU must now also listen to the commit
+interface.</p>
+<div class="note admonition">
+<p class="admonition-title">Keeping track of the architectural register</p>
+<p>Strictly-speaking, we no longer need to propagate the architectural
+register specifier down the pipeline, as only physical registers are
+used after the DIU. However, we still maintain this to support
+backwards compatibility along the interfaces, as well as to be able
+to produce an architecturally-correct instruction trace upon commit
+for verification.</p>
+</div>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v3.png"><img alt="A picture of the Version 3 processor composition" class="bottompadding align-center" src="../../_images/versions-v3.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-4">
+<h2>Version 4<a class="headerlink" href="#version-4" title="Link to this heading"></a></h2>
+<p>The Version 4 processor adds support for memory operations, requiring
+an additional XU to communicate with a memory interface.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v4.png"><img alt="A picture of the Version 4 processor composition" class="bottompadding align-center" src="../../_images/versions-v4.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-5">
+<h2>Version 5<a class="headerlink" href="#version-5" title="Link to this heading"></a></h2>
+<p>The Version 5 processor adds support for unconditional control flow
+operations (i.e. jumps). This requires modifications to the DIU to
+identify and act on jump instructions through the (newly-introduced)
+squash interface, as well as modifications to the FU to redirect the
+front of the pipeline and squash all in-flight fetches. We also need
+an additional XU to propagate the jump instructions to commit, as well
+as to store the return address when necessary (ex. <code class="docutils literal notranslate"><span class="pre">JALR</span></code> instructions).</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v5.png"><img alt="A picture of the Version 5 processor composition" class="bottompadding align-center" src="../../_images/versions-v5.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-6">
+<h2>Version 6<a class="headerlink" href="#version-6" title="Link to this heading"></a></h2>
+<p>The Version 6 processor adds support for conditional control flow
+instructions. These instructions are detected and acted on in a new XU,
+which now interfaces with a squahs interface. Because control flow changes
+can now come from either an XU or the DIU, we also need a new Squash Unit
+(SU) to arbitrate between control flow changes based on sequence number.
+This also requires a new DIU to detect when it’s being squashed from an
+XU.</p>
+<div class="note admonition">
+<p class="admonition-title">Instruction Routing/Arbitration</p>
+<p>Currently, our processor requires that the control flow XU acts on
+control flow instructions in one cycle. This simplifies the design by
+not allowing mistakenly-speculated instructions to get past the DIU,
+but isn’t as modular as possible in design. An ideal implementation
+(discussed in <a class="reference internal" href="../todo/"><span class="doc">Further Work</span></a>) wouldn’t impose this limitation, but would
+additionally require all other XUs and the WCU to listen to and act
+on a squash interface.</p>
+</div>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v6.png"><img alt="A picture of the Version 6 processor composition" class="bottompadding align-center" src="../../_images/versions-v6.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-7">
+<h2>Version 7<a class="headerlink" href="#version-7" title="Link to this heading"></a></h2>
+<p>The Version 7 processor adds new XUs to support all TinyRV2 instructions,
+as specified in Cornell’s <a class="reference external" href="https://www.csl.cornell.edu/courses/ece4750/">ECE 4750</a>.
+This functionality is sufficient to run basic C code.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v7.png"><img alt="A picture of the Version 7 processor composition" class="bottompadding align-center" src="../../_images/versions-v7.png" style="width: 70%;" />
+</a>
+</section>
+<section id="version-8">
+<h2>Version 8<a class="headerlink" href="#version-8" title="Link to this heading"></a></h2>
+<p>The Version 8 processor eadds new XUs to support the complete RV32IM ISA.
+This functionality is sufficient to run complex C/C++ applications,
+including games.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/versions-v8.png"><img alt="A picture of the Version 8 processor composition" class="bottompadding align-center" src="../../_images/versions-v8.png" style="width: 70%;" />
+</a>
+</section>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../data_flow/" class="btn btn-neutral float-left" title="Data Flow in the Processor" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../repository_structure/" class="btn btn-neutral float-right" title="Repository Structure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

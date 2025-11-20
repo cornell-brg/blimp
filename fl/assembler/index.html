@@ -1,0 +1,289 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assembler and Disassembler &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Functional-Level Processor" href="../proc/" />
+    <link rel="prev" title="Further Work" href="../../overview/todo/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/versions/">Processor Versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Assembler and Disassembler</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#instruction-identification">Instruction Identification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#instruction-generation">Instruction Generation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#assembly-string-from-binary-instruction">Assembly String from Binary Instruction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#binary-instruction-from-assembly-string">Binary Instruction from Assembly String</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Assembler and Disassembler</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/fl/assembler.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="assembler-and-disassembler">
+<h1>Assembler and Disassembler<a class="headerlink" href="#assembler-and-disassembler" title="Link to this heading"></a></h1>
+<p>In developing and verifying BLIMP processors, a RISCV assembler and
+disassembler were also created in C++. The disassembler allowed instruction
+traces to clearly display instructions in the pipeline when being tested,
+and the assembler allowed processor tests to be written in assembly (being
+converted to bits before being used as a stimulus for the processor).
+These utilities were also used in the functional-level processor, which
+needed to be able to identify instructions in order to execute their
+semantics.</p>
+<p>When developing these utilities, extensibility and performance were two
+main goals. Accordingly, the current implementation strives to achieve
+the following:</p>
+<ul class="simple">
+<li><p>Adding support for new instructions should require minimal changes</p></li>
+<li><p>String operations should be avoided if possibe, to make operations
+quick (ex. when identifying a binary instruction)</p></li>
+</ul>
+<p>All of these utilities are implemented in the <code class="docutils literal notranslate"><span class="pre">asm</span></code> directory.</p>
+<section id="instruction-identification">
+<h2>Instruction Identification<a class="headerlink" href="#instruction-identification" title="Link to this heading"></a></h2>
+<p>Our assembler/disassembler utilities need some internal representation
+of each instruction type, which should contain all the information
+necessary to determine whether a string or binary instruction is of that
+particular type. This information is known as the instruction’s
+<em>specification</em>, and is defined in <code class="docutils literal notranslate"><span class="pre">inst.h</span></code>:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">inst_name_t</span><span class="w"> </span><span class="n">name</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">assembly</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w">    </span><span class="n">match</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w">    </span><span class="n">mask</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">inst_spec_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt>This includes:</dt><dd><ul class="simple">
+<li><p>The instruction’s name (a unique enumeration to identify the instruction
+type)</p></li>
+<li><p>A template of how the instruction is used in assembly, containing the
+fields in their appropriate position (ex. <code class="docutils literal notranslate"><span class="pre">addi</span> <span class="pre">rd,</span> <span class="pre">rs1,</span> <span class="pre">rs2</span></code>)</p></li>
+<li><p>32-bit <em>match</em> and <em>mask</em> values. To understand these values, consider
+each instruction’s bits as a combination of those that uniquely
+identify the instruction (ex. the opcode, <code class="docutils literal notranslate"><span class="pre">func3</span></code> / <code class="docutils literal notranslate"><span class="pre">func7</span></code> fields,
+etc.), and those that encode the instruction’s arguments (ex. the
+value of <code class="docutils literal notranslate"><span class="pre">rs1</span></code>). <em>match</em> contains the identification bits of the
+instruction (with non-identification bits set to 0), and the bits in
+<em>mask</em> are set to identify the location of identification bits in the
+instruction. In this way, for any given instruction, <code class="docutils literal notranslate"><span class="pre">inst</span> <span class="pre">&amp;</span> <span class="pre">mask</span></code>
+should equal <code class="docutils literal notranslate"><span class="pre">match</span></code> for any instance of that instruction, and not
+for an instance of a different instruction</p></li>
+</ul>
+</dd>
+</dl>
+<p>Instruction specifications are given for all possible instructions
+(currently implemented up to <code class="docutils literal notranslate"><span class="pre">RV32IM</span></code>). To identify the
+specification for a given assembly string, we can compare the first
+space-delimited word of the string to the first word in the template
+assembly; these will be the instruction names. To identify the
+specification for a given binary instruction <code class="docutils literal notranslate"><span class="pre">inst</span></code>, we can
+find the specification for which <code class="docutils literal notranslate"><span class="pre">inst</span> <span class="pre">&amp;</span> <span class="pre">mask</span> <span class="pre">==</span> <span class="pre">match</span></code>. This
+implementation additionally allows for ease of extensibility; if
+a designer wished to add a new (possibly custom) instruction to be
+identified, they would only need to add a new value to the
+<code class="docutils literal notranslate"><span class="pre">inst_name_t</span></code> enum, and define the instruction specification in
+<code class="docutils literal notranslate"><span class="pre">inst.h</span></code>.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/inst_spec.png"><img alt="A visualization of instruction specification identification" class="bottompadding align-center" src="../../_images/inst_spec.png" style="width: 100%;" />
+</a>
+</section>
+<section id="instruction-generation">
+<h2>Instruction Generation<a class="headerlink" href="#instruction-generation" title="Link to this heading"></a></h2>
+<p>Once we’ve identified the specification for a given instruction, we can
+use the template assembly to convert from a binary representation to a
+string or vice versa.</p>
+<section id="assembly-string-from-binary-instruction">
+<h3>Assembly String from Binary Instruction<a class="headerlink" href="#assembly-string-from-binary-instruction" title="Link to this heading"></a></h3>
+<p>When generating an assembly string, the base of the string is already
+given in the instruction template; all that’s left to do is replace
+the template fields (ex. <code class="docutils literal notranslate"><span class="pre">&quot;rs1&quot;</span></code>) with the values given in binary.
+For all instruction fields used in <code class="docutils literal notranslate"><span class="pre">RV32IM</span></code>, a <code class="docutils literal notranslate"><span class="pre">get_*_id</span></code> function is
+defined in <code class="docutils literal notranslate"><span class="pre">fields.h</span></code> (implemented in <code class="docutils literal notranslate"><span class="pre">fields.cpp</span></code>) to extract the
+correct string value for the field, given a binary representation (with
+a <code class="docutils literal notranslate"><span class="pre">get_*</span></code> function often being used just to obtain the numberic value).
+For example, the <code class="docutils literal notranslate"><span class="pre">get_rd_id</span></code> function takes in a binary instruction (as
+a <code class="docutils literal notranslate"><span class="pre">uint32_t</span></code>), and returns the string of the value in the <code class="docutils literal notranslate"><span class="pre">rd</span></code>
+position in the instruction. To disassemble an instruction, we accordingly
+take the base assembly template, and iterate through the template argument
+fields, using the corresponding <code class="docutils literal notranslate"><span class="pre">get_*_id</span></code> function to replace the field
+with its string value. The mapping of field strings to <code class="docutils literal notranslate"><span class="pre">get_*_id</span></code>
+functions is defined in <code class="docutils literal notranslate"><span class="pre">disassemble.cpp</span></code>.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/disassembly.png"><img alt="A visualization of disassembling an assembly string" class="bottompadding align-center" src="../../_images/disassembly.png" style="width: 70%;" />
+</a>
+<div class="note admonition">
+<p class="admonition-title">Function Signatures</p>
+<p>Most of the <code class="docutils literal notranslate"><span class="pre">get_*_id</span></code> functions only take in the binary instruction
+as a <code class="docutils literal notranslate"><span class="pre">uint32_t</span></code>. However, some instructions require the PC in
+addition to the instruction to be properly represented as a string.
+An example of this is the address in a jump; the string representation
+should show the absolute address, whereas the instruction only encodes
+the offset. These are maintained in a separate mapping, and are checked
+as well when finding the correct function to replace a field in the
+template assembly.</p>
+</div>
+</section>
+<section id="binary-instruction-from-assembly-string">
+<h3>Binary Instruction from Assembly String<a class="headerlink" href="#binary-instruction-from-assembly-string" title="Link to this heading"></a></h3>
+<p>When generating a binary instruction, the base of the instruction is
+already given by the <code class="docutils literal notranslate"><span class="pre">match</span></code> provided in the specification; this
+encodes all of the instruction-specific bits, such that we only need to
+provide the bits for the arguments. For all instruction fields used in
+<code class="docutils literal notranslate"><span class="pre">RV32IM</span></code>, a <code class="docutils literal notranslate"><span class="pre">*_mask</span></code> function is defined in <code class="docutils literal notranslate"><span class="pre">fields.h</span></code> (implemented
+in <code class="docutils literal notranslate"><span class="pre">fields.cpp</span></code>) that takes the string value of the field, and returns
+a 32-bit value containing the value in the appropriate bits (with all
+other bits set to 0). For example, the <code class="docutils literal notranslate"><span class="pre">rd_mask</span></code> function takes in
+a string representing the value for <code class="docutils literal notranslate"><span class="pre">rd</span></code>, and returns a <code class="docutils literal notranslate"><span class="pre">uint32_t</span></code>
+with the value for <code class="docutils literal notranslate"><span class="pre">rd</span></code> encoded in bits 7 through 11. To assemble
+an instruction, we accordingly take the <code class="docutils literal notranslate"><span class="pre">match</span></code>, and iterate through
+the fields in the assembly string; by matching them with the fields in
+the template assembly, we can use a corresponding <code class="docutils literal notranslate"><span class="pre">*_mask</span></code> function to
+turn the string values into bits, and bitwise-OR the results with our
+<code class="docutils literal notranslate"><span class="pre">match</span></code> to build up the instruction with its arguments. The mapping
+of field strings to <code class="docutils literal notranslate"><span class="pre">*_mask</span></code> functions is defined in <code class="docutils literal notranslate"><span class="pre">assemble.cpp</span></code>.</p>
+<a class="bottompadding reference internal image-reference" href="../../_images/assembly.png"><img alt="A visualization of assembling a binary instruction" class="bottompadding align-center" src="../../_images/assembly.png" style="width: 70%;" />
+</a>
+<div class="note admonition">
+<p class="admonition-title">Function Signatures</p>
+<p>Similar to the disassembler, a separate mapping is maintained to
+support instructions that require both the field’s string value and
+the current PC to determine the correct value.</p>
+</div>
+<p>This implementation naturally extends to support additional instructions.
+If the instruction uses fields that already have <code class="docutils literal notranslate"><span class="pre">*_mask</span></code> and
+<code class="docutils literal notranslate"><span class="pre">get_*_id</span></code> functions, <em>no more work is needed</em>; once the instruction
+specification is added in <code class="docutils literal notranslate"><span class="pre">inst.h</span></code>, assembly and disassembly can
+be done. If the instruction uses new fields, the user would only have
+to implement the <code class="docutils literal notranslate"><span class="pre">*_mask</span></code> and <code class="docutils literal notranslate"><span class="pre">get_*_id</span></code> functions for the new
+fields, and add them to the known functions in <code class="docutils literal notranslate"><span class="pre">assemble.cpp</span></code> and
+<code class="docutils literal notranslate"><span class="pre">disassemble.cpp</span></code>, respectively.</p>
+</section>
+</section>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../overview/todo/" class="btn btn-neutral float-left" title="Further Work" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../proc/" class="btn btn-neutral float-right" title="Functional-Level Processor" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

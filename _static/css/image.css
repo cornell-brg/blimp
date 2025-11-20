@@ -1,0 +1,14 @@
+/*
+==========================================================================
+image.css
+==========================================================================
+Classes to aid with image formatting
+*/
+
+.bottompadding {
+  margin-bottom: 24px !important;
+}
+
+.image-border img {
+  border: 2px solid #b31b1b;
+}

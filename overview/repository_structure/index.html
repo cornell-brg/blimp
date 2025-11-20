@@ -1,0 +1,198 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Repository Structure &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Build System" href="../build_system/" />
+    <link rel="prev" title="Processor Versions" href="../versions/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../versions/">Processor Versions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Repository Structure</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/overview/repository_structure.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="repository-structure">
+<h1>Repository Structure<a class="headerlink" href="#repository-structure" title="Link to this heading"></a></h1>
+<p>Blimp’s repository is organized in the following structure:</p>
+<blockquote>
+<div><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>: The top-level build system for the repository</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lint.sh</span></code>: A script to lint all of Blimp’s hardware designs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">app/</span></code>: Application code to be run on the processor. Each
+subdirectory is a different program</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">asm/</span></code>: Utilities for working with assembly, including a RISCV
+assembler and disassembler</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmake/</span></code>: Helper code for the CMake build system</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">defs/</span></code>: Common definitions used across the processor</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/</span></code>: Blimp’s documentation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fl/</span></code>: Functional-level utilities, including the Functional-level
+processor implementation, as well as a wrapper (<code class="docutils literal notranslate"><span class="pre">fl-sim</span></code>) to run
+code on it</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fpga/</span></code>: Hardware designs to work with the processor on an FPGA,
+so that it can be run as a standalone project</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hw/</span></code>: All hardware designs for the processor. The directory is
+split into several subdirectories, each with an associated <code class="docutils literal notranslate"><span class="pre">test/</span></code>
+subdirectory for tests for those designs:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">common/</span></code>: Common hardware modules</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">decode_issue/</span></code>: DIU implementations and supporting designs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">execute/</span></code>: XU implementations and supporting designs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fetch/</span></code>: FU implementations and supporting designs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">squash/</span></code>: SU implementations and supporting designs</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">top/</span></code>: The top-level processor modules, as well as
+system-level integration tests. Additionally, the <code class="docutils literal notranslate"><span class="pre">sim/</span></code>
+subdirectory includes wrappers to run code on processor
+implementations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">util/</span></code>: Utility modules used to support Blimp’s
+microarchitecture, particularly the use of sequence numbers</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">writeback_commit/</span></code>: WCU implementations and supporting designs</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">intf/</span></code>: The hardware interfaces used to connect Blimp’s units</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">test/</span></code>: Utilities used for testing hardware units, including
+functional-level wrappers around interfaces for concise syntax to
+send and receive messages</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tools/</span></code>: Tools used to support Blimp’s development:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rvelfdump.cpp</span></code>: A program to turn a compiled RISCV program into
+a text-based <code class="docutils literal notranslate"><span class="pre">address:</span> <span class="pre">data</span></code> mapping</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">spi_flash</span></code>: A Python program to communicate a text-based
+<code class="docutils literal notranslate"><span class="pre">address:</span> <span class="pre">data</span></code> mapping to an FPGA emulation of Blimp over SPI</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">types/</span></code>: Common types used throughout the processor</p></li>
+</ul>
+</div></blockquote>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../versions/" class="btn btn-neutral float-left" title="Processor Versions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../build_system/" class="btn btn-neutral float-right" title="Build System" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

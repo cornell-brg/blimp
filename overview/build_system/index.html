@@ -1,0 +1,459 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build System &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Dependencies" href="../dependencies/" />
+    <link rel="prev" title="Repository Structure" href="../repository_structure/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../versions/">Processor Versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Build System</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overall-build-system">Overall Build System</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#verilog-language-support">Verilog Language Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#riscv-cross-compilation">RISCV Cross-Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-new-targets">Adding New Targets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-hardware-unit-test">Adding a Hardware Unit Test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-hardware-top-level-test">Adding a Hardware Top-Level Test</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-new-blimp-version">Adding a New Blimp Version</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-program">Adding a Program</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-tool">Adding a Tool</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Build System</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/overview/build_system.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="build-system">
+<h1>Build System<a class="headerlink" href="#build-system" title="Link to this heading"></a></h1>
+<p>Blimp’s build system is written in CMake. This specifically involves the
+following files:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>: The main build system, defining the majority of
+targets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">app/</span></code>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>: Add RISCV targets for all programs (native
+targets are added at the top-level)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmake/rv32.cmake</span></code>: Discover and set up the RISCV compiler</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;program&gt;/CMakeLists.txt</span></code>: Define the files used in the program</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmake/</span></code>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlint.cmake</span></code>: Defines a function <code class="docutils literal notranslate"><span class="pre">vlint</span></code> for creating a target
+that lints Verilog source(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vdeps.cmake</span></code>: Defines a function <code class="docutils literal notranslate"><span class="pre">vdeps</span></code> for finding all
+dependencies of a Verilog file based on <code class="code docutils literal notranslate"><span class="pre">'include</span></code> statements,
+so that the CMake target can be rebuilt when needed. Dependencies are
+memoized to expedite build time (something like a 20x speedup during
+configuration)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMake*.cmake</span></code>: Files to support Verilog compilation as a first-class
+target in CMake</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hw/top/</span></code>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">test/tests.cmake</span></code>: Define the tests associated with each Blimp version
+(including the FL processor)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sim/sims.cmake</span></code>: Define the possible simulators to make</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tools/CMakeLists.txt</span></code>: Define our tool binaries</p></li>
+</ul>
+</div></blockquote>
+<p>The build system is usually built in the following fashion from the
+top-level directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>build
+<span class="nb">cd</span><span class="w"> </span>build
+cmake<span class="w"> </span>..
+</pre></div>
+</div>
+<p>In addition, user-defines can be specified on the command line with the
+<code class="docutils literal notranslate"><span class="pre">cmake</span></code> command; the two specific for Blimp are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-DTRACE=1</span></code> (to add tracing support for Verilator simulators)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-DCMAKE_Verilog_COMPILER_ID=(Verilator|VCS)</span></code> (to select a Verilog
+compiler)</p></li>
+</ul>
+</div></blockquote>
+<section id="overall-build-system">
+<h2>Overall Build System<a class="headerlink" href="#overall-build-system" title="Link to this heading"></a></h2>
+<p>The top-level CMake file is what’s invoked to create the build system.
+It handles the creation of all targets (with the exception of
+cross-compiled programs), using variables defined deeper in the hierarchy
+when necessary.</p>
+<p>Below is a summary of all the targets that the build system currently
+supports:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>For each hardware test file <code class="docutils literal notranslate"><span class="pre">&lt;test&gt;.v</span></code>, there exists a target
+<code class="docutils literal notranslate"><span class="pre">&lt;test&gt;</span></code> to build the binary to run that test</p>
+<ul>
+<li><p>This includes those defined in <code class="docutils literal notranslate"><span class="pre">tests.cmake</span></code></p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">list</span></code> command lists all of these tests</p></li>
+</ul>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">check</span></code> command runs all of the hardware tests (this takes a while!)</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">check-fl</span></code> runs all of the FL processor model tests</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">check-v&lt;version&gt;</span></code> runs all of the tests for the <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;</span></code>
+processor model</p></li>
+</ul>
+</li>
+<li><p>For each program in the <code class="docutils literal notranslate"><span class="pre">app/</span></code> subdirectory (named <code class="docutils literal notranslate"><span class="pre">&lt;program&gt;</span></code>),
+there exists</p>
+<ul>
+<li><p>A target <code class="docutils literal notranslate"><span class="pre">app-&lt;program&gt;-native</span></code> to build the native binary
+<code class="docutils literal notranslate"><span class="pre">&lt;program&gt;-native</span></code> in an <code class="docutils literal notranslate"><span class="pre">app/</span></code> directory in the build directory</p></li>
+<li><p>A target <code class="docutils literal notranslate"><span class="pre">app-&lt;program&gt;</span></code> to build the RISCV binary
+<code class="docutils literal notranslate"><span class="pre">&lt;program&gt;</span></code> in an <code class="docutils literal notranslate"><span class="pre">app/</span></code> directory in the build directory</p></li>
+</ul>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">fl-sim</span></code> target to build the FL processor simulator</p></li>
+<li><p>For each simulator <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;N&gt;_sim.v</span></code> in <code class="docutils literal notranslate"><span class="pre">sims.cmake</span></code>, there
+exists a target <code class="docutils literal notranslate"><span class="pre">v&lt;N&gt;-sim</span></code> to build the simulator for that
+version of Blimp</p></li>
+<li><p>For each tool <code class="docutils literal notranslate"><span class="pre">&lt;tool&gt;.cpp</span></code>, there exists a target <code class="docutils literal notranslate"><span class="pre">&lt;tool&gt;</span></code> to
+make the binary for that tool. Currently, this only includes
+<code class="docutils literal notranslate"><span class="pre">rvelfdump</span></code></p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="verilog-language-support">
+<h2>Verilog Language Support<a class="headerlink" href="#verilog-language-support" title="Link to this heading"></a></h2>
+<p>One of the main goals of the build system portion of Blimp was to
+elegantly support compilation with C/C++ and Verilog; this meant having
+support in CMake (chosen for its flexibility and support for C/C++) for
+compiling Verilog; specifically, having support for Verilog as a language
+(i.e. no hacky <code class="docutils literal notranslate"><span class="pre">add_custom_command</span></code> to compile a file, but rather
+just specifying the file to <code class="docutils literal notranslate"><span class="pre">add_executable</span></code>, with support for other
+related commands like <code class="docutils literal notranslate"><span class="pre">target_compile_options</span></code>).</p>
+<p>A good description of how to support this was found on
+<a class="reference external" href="https://stackoverflow.com/a/38296922">StackOverflow</a>, which prescribed
+the following four files:</p>
+<blockquote>
+<div><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeDetermineVerilogCompiler.cmake</span></code>: Commands to identify the
+desired compiler and set associated variables accordingly. This
+process currently supports Verilator, VCS, and Iverilog (with the
+latter not able to be used by Blimp due to advanced SystemVerilog
+usage), with the compiler selection defaulting to Verilator and
+switched by defining <code class="docutils literal notranslate"><span class="pre">CMAKE_Verilog_COMPILER_ID</span></code> at configuration
+time (i.e. <code class="docutils literal notranslate"><span class="pre">cmake</span> <span class="pre">&lt;path-to-root&gt;</span> <span class="pre">-DCMAKE_Verilog_COMPILER_ID=VCS</span></code>).
+Later optimizations might instead detect a compiler based on availability
+when not specified</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeVerilogCompiler.cmake.in</span></code>: A template for setting CMake variables
+to identify our compiler. This is templated for a given configuration by
+<code class="docutils literal notranslate"><span class="pre">CMakeDetermineVerilogCompiler.cmake</span></code>, such that the compiler doesn’t
+have to be re-discovered if the build system needs to be reconfigured</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeTestVerilogCompiler.cmake</span></code>: Any testing that needs to be done
+for the compiler to determine adequate support. Right now, we assume
+that if we can find it, it works</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMakeVerilogInformation.cmake</span></code>: The meat of the setup. This is where
+(based on our compiler) we set two key variables:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">CMAKE_Verilog_COMPILE_OBJECT</span></code>: The template for a command to
+turn a Verilog file into an object file</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMAKE_Verilog_LINK_EXECUTABLE</span></code>: The template for a command to
+link multiple Verilog object files into an executable. In the case
+that multiple languages are used, <code class="docutils literal notranslate"><span class="pre">CMAKE_Verilog_LINKER_PREFERENCE</span></code>
+is used to determine the linker used</p></li>
+</ul>
+</div></blockquote>
+<p>Each compiler has some nuance with their setup:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Verilator both “verilates” the Verilog file into C++, compiles the
+many resulting files, then uses the default CMake linker to link
+the resulting object files into one, so that it looks as though
+one Verilog file turned into one object file</p></li>
+<li><p>Both VCS and Iverilog don’t produce intermediate binaries. To support
+the pattern that CMake has given for compilation, their
+<code class="docutils literal notranslate"><span class="pre">COMPILE_OBJECT</span></code> commands simply preprocess the Verilog into an
+“object”, then actually compile the binary (along with any other
+objects, such as C++ libraries) during the <code class="docutils literal notranslate"><span class="pre">LINK_EXECUTABLE</span></code> step.
+To ensure that our “linker” is run, the linker preference is set
+very high in <code class="docutils literal notranslate"><span class="pre">CMakeDetermineVerilogCompiler.cmake</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+<p>With all of this, we can add the <code class="docutils literal notranslate"><span class="pre">cmake/</span></code> directory (where these files
+are stored) to our CMake module path for language discovery, and then
+call <code class="docutils literal notranslate"><span class="pre">project</span></code> as normal with our new language, able to handle <code class="docutils literal notranslate"><span class="pre">.v</span></code>
+and <code class="docutils literal notranslate"><span class="pre">.sv</span></code> files:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">list</span><span class="p">(</span><span class="s">APPEND</span><span class="w"> </span><span class="s">CMAKE_MODULE_PATH</span><span class="w"> </span><span class="s2">&quot;${CMAKE_CURRENT_SOURCE_DIR}/cmake&quot;</span><span class="p">)</span>
+<span class="nb">project</span><span class="p">(</span>
+<span class="w">  </span><span class="s">BLIMP</span>
+<span class="w">  </span><span class="s">VERSION</span><span class="w"> </span><span class="s">1.0</span>
+<span class="w">  </span><span class="s">DESCRIPTION</span><span class="w"> </span><span class="s2">&quot;BLIMP: BRG&#39;s Luculently-Interfaced Modular Processor&quot;</span>
+<span class="w">  </span><span class="s">LANGUAGES</span><span class="w"> </span><span class="s">Verilog</span><span class="w"> </span><span class="s">C</span><span class="w"> </span><span class="s">CXX</span><span class="w"> </span><span class="s">ASM</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="riscv-cross-compilation">
+<h2>RISCV Cross-Compilation<a class="headerlink" href="#riscv-cross-compilation" title="Link to this heading"></a></h2>
+<p>Most build systems require knowledge of the target architecture at
+configuration time, and are unable to switch once configured; if you want
+a different architecture, you have to re-configure the build system.
+However, Blimp’s build system allows programs to be compiled for both
+the native architecture and RISCV from one configuration.</p>
+<p>CMake doesn’t support this behaviour by default; the <code class="docutils literal notranslate"><span class="pre">CMAKE_C_COMPILER</span></code>
+and <code class="docutils literal notranslate"><span class="pre">CMAKE_CXX_COMPILER</span></code> hold the compilers for compiling C and C++,
+respectively, and are stored per project. However, CMake <em>does</em> allow
+you to include other CMake files, which may have their own targets
+with their own compilers. This allowed the build system to support
+multiple compilers by defining targets in multiple places:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>In <code class="docutils literal notranslate"><span class="pre">app/CMakeLists.txt</span></code>, the <code class="docutils literal notranslate"><span class="pre">rv32.cmake</span></code> file is included to
+use the RISCV compiler. Here, we define the cross-compile targets
+for RISCV (i.e. <code class="docutils literal notranslate"><span class="pre">app-&lt;program&gt;</span></code>). However, we also set the variable
+<code class="docutils literal notranslate"><span class="pre">PROGS</span></code> to a list of the programs, as well as setting
+<code class="docutils literal notranslate"><span class="pre">app-&lt;program&gt;-files</span></code> to the files needed to compile <code class="docutils literal notranslate"><span class="pre">&lt;program&gt;</span></code>.
+All of these are exported to the parent scope</p></li>
+<li><p>In the top-level <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> file (which uses the native
+compilers), we get access to the exported files, and can appropriately
+define <code class="docutils literal notranslate"><span class="pre">app-&lt;program&gt;-native</span></code> targets for each of them to get
+a native program target as well</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="adding-new-targets">
+<h2>Adding New Targets<a class="headerlink" href="#adding-new-targets" title="Link to this heading"></a></h2>
+<p>For users looking to extend Blimp, the following sections detail the
+places in the build system that you need to modify in order to make
+additions:</p>
+<section id="adding-a-hardware-unit-test">
+<h3>Adding a Hardware Unit Test<a class="headerlink" href="#adding-a-hardware-unit-test" title="Link to this heading"></a></h3>
+<blockquote>
+<div><ul class="simple">
+<li><p>After adding the file in the appropriate location, add the path
+relative to the top of the repo to the <code class="docutils literal notranslate"><span class="pre">V_TEST_FILES</span></code> definition
+in <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code></p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="adding-a-hardware-top-level-test">
+<h3>Adding a Hardware Top-Level Test<a class="headerlink" href="#adding-a-hardware-top-level-test" title="Link to this heading"></a></h3>
+<p>(This should likely be a suite of test cases in <code class="docutils literal notranslate"><span class="pre">hw/top/test/test_cases</span></code>)</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>If the test cases is semantically grouped with others, include it in the
+corresponding test file for the relevant processor versions (ex.
+<code class="docutils literal notranslate"><span class="pre">hw/top/test/BlimpVN_test/BlimpVN_&lt;test_type&gt;_test.v</span></code>)</p></li>
+<li><p>If not, create a new test file for it for every relevant processor
+version as <code class="docutils literal notranslate"><span class="pre">hw/top/test/BlimpVN_test/BlimpVN_&lt;test_type&gt;_test.v</span></code>.
+Modeling off those that exist already, create a test suite module
+that instantiates the test harness for a particular parametrization,
+then includes the tests. Create a top-level module that instantiates
+and runs multiple parametrizations of the test suite. Finally, after
+doing the above for each relevant version, add it to those versions’
+tests in <code class="docutils literal notranslate"><span class="pre">hw/top/test/tests.cmake</span></code></p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="adding-a-new-blimp-version">
+<h3>Adding a New Blimp Version<a class="headerlink" href="#adding-a-new-blimp-version" title="Link to this heading"></a></h3>
+<p>This is a relatively large ordeal, but is likely uncommon and still
+not too bad:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Define the new processor version in <code class="docutils literal notranslate"><span class="pre">hw/top</span></code>, similar to those
+that exist (and with the same naming, <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;.v</span></code>)</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">hw/top/test</span></code>, define a new test harness <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;TestHarness.v</span></code>
+similar to those that exist. It should instantiate the processor with
+connected memory, and provide the following functions:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">asm</span></code> to store an assembly instruction at a given address</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">check_trace</span></code> to use an <code class="docutils literal notranslate"><span class="pre">InstTraceSub</span></code> to check the
+result of a specific instruction</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">check_traces</span></code> to continuously check the results from the processor
+against the FL model</p></li>
+</ul>
+</li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">hw/top/test</span></code>, define a new subdirectory <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;_test</span></code>
+that contains main test files, each of which instantiation the harness
+and include tests to create a test suite, then instantiate that test
+suite multiple times with different processor parametrizations.</p></li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">hw/top/test/tests.cmake</span></code>, include the new processor’s name in
+the definition of <code class="docutils literal notranslate"><span class="pre">BLIMP_VERSIONS</span></code>. Additionally, define a new
+variable <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;_TESTS</span></code> that lists the tests in
+<code class="docutils literal notranslate"><span class="pre">hw/top/test/BlimpV&lt;version&gt;_test</span></code> to run in order to test that
+processor</p></li>
+<li><p>If relevant (i.e. the processor can simulate code), go to <code class="docutils literal notranslate"><span class="pre">hw/top/sim</span></code>
+and define a new file <code class="docutils literal notranslate"><span class="pre">BlimpV&lt;version&gt;_sim.v</span></code>. This should instantiate
+the processor, connect the memory, and provide a function <code class="docutils literal notranslate"><span class="pre">init_mem</span></code>
+to initialize the memory at a given address with data. Modify <code class="docutils literal notranslate"><span class="pre">sims.cmake</span></code>
+to include the name of your new simulation file</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="adding-a-program">
+<h3>Adding a Program<a class="headerlink" href="#adding-a-program" title="Link to this heading"></a></h3>
+<p>In the <code class="docutils literal notranslate"><span class="pre">app/</span></code> subdirectory:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Create a new subdirectory with the name of your program. In this
+directory, create all of the files for your program, then create
+a <code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> file with the following variable definitions
+in the parent scope:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">APP_FILES</span></code> are all the programs in your directory (i.e. all
+that include a <code class="docutils literal notranslate"><span class="pre">main</span></code> function). Each <code class="docutils literal notranslate"><span class="pre">&lt;program&gt;.cpp</span></code> will
+result in a target <code class="docutils literal notranslate"><span class="pre">&lt;program&gt;</span></code>, so make sure it’s globally unique.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SRC_FILES</span></code> are all of the supporting source code</p></li>
+<li><p>All of the files in <code class="docutils literal notranslate"><span class="pre">utils</span></code> are implicitly linked, and should be
+included relative to <code class="docutils literal notranslate"><span class="pre">app/</span></code></p></li>
+</ul>
+</li>
+<li><p>In <code class="docutils literal notranslate"><span class="pre">app/CMakeLists.txt</span></code>, add the name of your new subdirectory in
+the definition for <code class="docutils literal notranslate"><span class="pre">APP_SUBDIRS</span></code></p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="adding-a-tool">
+<h3>Adding a Tool<a class="headerlink" href="#adding-a-tool" title="Link to this heading"></a></h3>
+<p>This should go in the <code class="docutils literal notranslate"><span class="pre">tools/</span></code> subdirectory, and simply requires the
+modification of the <code class="docutils literal notranslate"><span class="pre">TOOL_FILES</span></code> definition in <code class="docutils literal notranslate"><span class="pre">tools/CMakeLists.txt</span></code>.
+The code in both the <code class="docutils literal notranslate"><span class="pre">asm/</span></code> and <code class="docutils literal notranslate"><span class="pre">fl/</span></code> folders are implicitly linked
+(see the definitions of <code class="docutils literal notranslate"><span class="pre">ASM_FILES</span></code> and <code class="docutils literal notranslate"><span class="pre">FL_PROC_FILES</span></code> in the top-level
+<code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code>), and necessary headers should be included relative to
+the top of the repository</p>
+</section>
+</section>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../repository_structure/" class="btn btn-neutral float-left" title="Repository Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../dependencies/" class="btn btn-neutral float-right" title="Dependencies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

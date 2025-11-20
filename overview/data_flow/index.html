@@ -1,0 +1,216 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Flow in the Processor &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Processor Versions" href="../versions/" />
+    <link rel="prev" title="Design Motivation and Philosophy" href="../motivation/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../versions/">Processor Versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Data Flow in the Processor</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/overview/data_flow.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="data-flow-in-the-processor">
+<h1>Data Flow in the Processor<a class="headerlink" href="#data-flow-in-the-processor" title="Link to this heading"></a></h1>
+<style> .blimp-blue {color:#2094F3; font-weight:bold; font-size:16px} </style>
+<style> .blimp-green {color:#97D077; font-weight:bold; font-size:16px} </style><p>Blimp is composed of many units, and also defines the methods by which
+units can communicate. Currently, there are two classes of communication
+methods:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><strong>Latency-Insensitive</strong> interfaces are used to communicate information
+down the pipeline. These include a <code class="docutils literal notranslate"><span class="pre">val</span></code> and a <code class="docutils literal notranslate"><span class="pre">rdy</span></code> signal, so
+that units later in the pipeline can back-pressure earlier units when
+they aren’t ready. Because of this, latency-insensitive interfaces can
+<em>only</em> proceed down the pipeline, never from later units to earlier
+units (which could cause circular deadlock). Instructions will follow
+these paths along their lifetime as they’re propagated between units.
+In Blimp’s diagrams, you’ll see these as <span class="blimp-blue">blue arrows</span>.</p></li>
+<li><p><strong>Latency-Sensitive</strong> interfaces (also known as <strong>notifications</strong>)
+are used to propagate information anywhere in the pipeline. These
+are for signals which cannot be backpressured (and must be acted on
+in the same cycle), and therefore only have a <code class="docutils literal notranslate"><span class="pre">val</span></code> signal (no
+<code class="docutils literal notranslate"><span class="pre">rdy</span></code>). However, this lack of backpressure means that units can
+notify other units throughout the processor (although they’re
+typically used to communicate to earlier units). Notifications are
+used to communicate information which must be acted on immediately,
+such as writebacks, commits, and squashes. In Blimp’s diagrams,
+you’ll see these as <span class="blimp-green">green arrows</span>.</p></li>
+</ul>
+</div></blockquote>
+<p>Latency-Insensitive interfaces are named as <code class="docutils literal notranslate"><span class="pre">&lt;src&gt;__&lt;dest&gt;Intf</span></code>, to
+indicate what units they’re communicating between. For example, the
+<code class="docutils literal notranslate"><span class="pre">F__DIntf</span></code> is used to communicate instructions from the FU to the DIU.</p>
+<p>Notifications don’t require a single source and/or
+destination, and are therefore named according to their semantics.
+Currently, Blimp uses three types of notifications:</p>
+<blockquote>
+<div><ul>
+<li><p><strong>Complete</strong> notifications (single source, single destination, named
+<code class="docutils literal notranslate"><span class="pre">CompleteNotif</span></code>) are used to communicate when an instruction is
+done executing, writing back the value to the register file if needed.
+This notification starts at the WCU, and notifies the DIU.</p></li>
+<li><p><strong>Commit</strong> notifications (single source, multiple destinations, named
+<code class="docutils literal notranslate"><span class="pre">CommitNotif</span></code>) are used to communicate when an instruction commits,
+allowing the physical register and sequence number to be freed. This
+notification starts at the WCU, and can notify both the DIU (when
+renaming registers) and the FU (when using sequence numbers)</p></li>
+<li><p><strong>Squash</strong> notifications (multiple sources, multiple destinations,
+named <code class="docutils literal notranslate"><span class="pre">SquashNotif</span></code>) are used to communicate when an instruction
+wants to squash all later instructions in the pipeline. Squashes can
+originate at multiple units (namely the DIU for jumps, as well as
+a control flow execute unit for branches), and need to notify
+multiple units, depending on where instructions may need to
+be squashed:</p>
+<ul class="simple">
+<li><p>Version 5 only notifies the FU, since squashes can only originate
+in the DIU</p></li>
+<li><p>Versions 6+ notify both the FU and DIU, since squashes can now
+originate from an execute unit (needing to squash the DIU)</p></li>
+<li><p>Later versions may need to propagate squash notifications to
+execute units and the WCU, depending on where instructions that
+need to be squashed could be (see <a class="reference internal" href="../todo/"><span class="doc">Further Work</span></a>)</p></li>
+</ul>
+<p>When squash notifications can come from multiple places, a
+<a class="reference internal" href="../../units/squash_unit/"><span class="doc">Squash Unit (SU)</span></a> is needed to arbitrate and select the
+oldest squash.</p>
+</li>
+</ul>
+</div></blockquote>
+<p>Lastly, the <code class="docutils literal notranslate"><span class="pre">InstTraceNotif</span></code> notification also exists, using signals
+also sent from the <code class="docutils literal notranslate"><span class="pre">CommitNotif</span></code>. This notification doesn’t provide
+any additional processor functionality, but rather communicates
+information about committing instructions outside of the processor. It
+is used for processor verification to make sure that the results of
+instructions are what we expect, as well as to compare them to the
+results from the functional-level processor.</p>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../motivation/" class="btn btn-neutral float-left" title="Design Motivation and Philosophy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../versions/" class="btn btn-neutral float-right" title="Processor Versions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

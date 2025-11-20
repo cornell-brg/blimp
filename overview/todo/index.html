@@ -1,0 +1,330 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Further Work &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="https://wavedrom.com/skins/default.js"></script>
+      <script src="https://wavedrom.com/wavedrom.min.js"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Assembler and Disassembler" href="../../fl/assembler/" />
+    <link rel="prev" title="Dependencies" href="../dependencies/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../versions/">Processor Versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies/">Dependencies</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Further Work</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#fixes">Fixes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#simplify-sequence-number-generation">Simplify Sequence Number Generation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fix-memory-network-dependence">Fix Memory Network Dependence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#spi-enable">SPI Enable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#functions-vs-tasks">Functions vs. Tasks</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#enhancements">Enhancements</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#privileged-isa-support">Privileged ISA Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#full-out-of-order-execution">Full Out-Of-Order Execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#superscalar-pipeline-support">Superscalar Pipeline Support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#formal-verification">Formal Verification</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/sim_demo/">Modifying Blimp</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../demos/quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Further Work</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/overview/todo.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="further-work">
+<h1>Further Work<a class="headerlink" href="#further-work" title="Link to this heading"></a></h1>
+<p>While Blimp has made lots of progress as both a processor and framework
+for processor development, there are still improvements that could be
+made</p>
+<section id="fixes">
+<h2>Fixes<a class="headerlink" href="#fixes" title="Link to this heading"></a></h2>
+<p>These improvements seek to address issues or shortcomings in the current
+design, and should be prioritized over enhancements</p>
+<section id="simplify-sequence-number-generation">
+<h3>Simplify Sequence Number Generation<a class="headerlink" href="#simplify-sequence-number-generation" title="Link to this heading"></a></h3>
+<p>Currently, the sequence generation units (<code class="docutils literal notranslate"><span class="pre">hw/fetch/SeqNumGen*</span></code>)
+maintain a vector representing which sequence numbers are in-flight
+(<code class="docutils literal notranslate"><span class="pre">seq_num_list</span></code>). This approach was taken when the exact semantics of
+sequence numbers were being defined, and allows for sequence numbers to
+be freed in any order. However, since sequence numbers are freed upon a
+commit (occuring in-order with respect to sequence numbers), this
+vector could be removed, with in-flight sequence numbers only needing
+a head and tail pointer to be represented. This would not only result
+in area savings, as well as a one-cycle saving by directly updating the
+tail pointer on a commit (instead of later reclaiming entries), but would
+cause the area associated with <span class="math notranslate nohighlight">\(N\)</span> sequence numbers to scale overall
+as <span class="math notranslate nohighlight">\(\log(N)\)</span>.</p>
+</section>
+<section id="fix-memory-network-dependence">
+<h3>Fix Memory Network Dependence<a class="headerlink" href="#fix-memory-network-dependence" title="Link to this heading"></a></h3>
+<p>With the current memory network, there exists a possibility for deadlock
+due to a dependency chain between <code class="docutils literal notranslate"><span class="pre">imem</span></code> and <code class="docutils literal notranslate"><span class="pre">dmem</span></code>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>A stalled fetch unit leads to a stalled <code class="docutils literal notranslate"><span class="pre">FPGAMem</span></code>, since the response
+cannot be taken</p></li>
+<li><p>A stalled <code class="docutils literal notranslate"><span class="pre">FPGAMem</span></code> leads to a stalled memory XU, since the request
+cannot be taken</p></li>
+<li><p>A stalled memory XU (in the case of another memory transaction) leads
+to a stalled pipeline, stalling the fetch unit</p></li>
+</ul>
+</div></blockquote>
+<p>Currently, this is resolved by placing FIFOs in the processor at the
+<code class="docutils literal notranslate"><span class="pre">imem</span></code> and <code class="docutils literal notranslate"><span class="pre">dmem</span></code> ports to buffer responses. If these FIFOs are sized
+to the pipeline depth of the memory network (and assuming fair
+arbitration), the memory network won’t stall; however, this approach isn’t
+very modular and doesn’t scale well.</p>
+<p>Instead, the dependency between <code class="docutils literal notranslate"><span class="pre">imem</span></code> and <code class="docutils literal notranslate"><span class="pre">dmem</span></code> in the memory
+network should be broken. Some ways to do this include:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Having separate pipelines for both channels in the memory (requiring
+a dual-ported memory)</p></li>
+<li><p>Having separate credits for both channels in the memory network, with
+memory able to service the other channel if one is stalled</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="spi-enable">
+<h3>SPI Enable<a class="headerlink" href="#spi-enable" title="Link to this heading"></a></h3>
+<p>SPI communication is currently used to program the processor. However,
+unplugging the SPI lines once programming is finished (to allow the
+design to run on its own, not connected to a computer) can introduce
+noise that could be received and interpreted as a transaction by the SPI
+Minion. This behaviour was observed when testing and led to errors,
+especially if the “go” bit was written (stalling the processor). Instead,
+some mechanism outside of SPI should be introduced to enable SPI
+communication (perhaps a switch to enter “programming” mode), such that
+SPI programming can be disabled to allow an SPI channel to be disconnected.</p>
+</section>
+<section id="functions-vs-tasks">
+<h3>Functions vs. Tasks<a class="headerlink" href="#functions-vs-tasks" title="Link to this heading"></a></h3>
+<p>In later versions of Verilator than those tested with, functions are
+(correctly) <a class="reference external" href="https://verilator.org/guide/latest/warnings.html#cmdoption-arg-FUNCTIMECTL">not allowed to call tasks</a>.
+This behavior is currently violated by the calling of <code class="docutils literal notranslate"><span class="pre">init_mem</span></code> in
+the FL Memory (a task) by the corresponding function in the top-level
+processor simulators (where <code class="docutils literal notranslate"><span class="pre">init_mem</span></code> is a function). Either could
+be changed, but the best is likely to have the top-level simulators
+export <code class="docutils literal notranslate"><span class="pre">init_mem</span></code> as a task.</p>
+<p>(This error can be ignored by Verilator, but should be fixed instead to
+avoid unnecessary linting waivers)</p>
+</section>
+</section>
+<section id="enhancements">
+<h2>Enhancements<a class="headerlink" href="#enhancements" title="Link to this heading"></a></h2>
+<p>These improvements seek to expand the functionality of Blimp’s processor
+models</p>
+<section id="privileged-isa-support">
+<h3>Privileged ISA Support<a class="headerlink" href="#privileged-isa-support" title="Link to this heading"></a></h3>
+<p>While the current ISA can support many programs, it lacks the support for
+operating system-level control. For this, the privileged RISCV ISA would
+need to be implemented, with support for CSRs (and their effects) as well
+as exceptions and interrupts. The basic CSRs needed for this would be
+<code class="docutils literal notranslate"><span class="pre">mtvec</span></code>, <code class="docutils literal notranslate"><span class="pre">mepc</span></code>, <code class="docutils literal notranslate"><span class="pre">mcause</span></code>, and <code class="docutils literal notranslate"><span class="pre">mstatus</span></code> (for interrupts);
+however, many more may wish to be implemented for various operating
+systems, such as hardware privilege modes. A good reference/goal for
+minimal support would be those necessary to run <a class="reference external" href="https://github.com/yhzhang0128/egos-2000">EGOS 2000</a>,
+also developed at Cornell.</p>
+<div class="admonition-egos-csrs admonition">
+<p class="admonition-title">EGOS CSRs</p>
+<p>Examining EGOS, the following CSRs (in addition to those listed
+above) would be needed:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">mhartid</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mvendorid</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mscratch</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mip</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mie</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mtime</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mtimecmp</span></code></p></li>
+</ul>
+</div>
+<div class="note admonition">
+<p class="admonition-title">Squashing Locations in the Processor</p>
+<p>Recall from the Version 6 processor that currently, we can limit
+the scope of squashing by handling all control flow instruction
+in one cycle, ensuring that no potentially-squashed instructions make
+it past the DIU. However, interrupt/exception handling breaks this
+assumption (particularly exceptions, which would be handled in the
+WCU).</p>
+<p>Before implementing the privileged ISA, Blimp will need to support
+squashing of instructions <em>anywhere</em> in the pipeline, including
+in XUs and the WCU (specifically the ROB) through squash notifications.
+While this requires many additional modules to be implemented, many
+should require minimal changes compared to existing versions, with
+a notable exception being the memory XU (to keep track of in-flight
+requests to determine which should be squashed, likely using an LSQ
+in an out-of-order architecture). However, it would also have the
+benefit of making the system more modular by removing the assumption
+on control flow resolution time.</p>
+</div>
+</section>
+<section id="full-out-of-order-execution">
+<h3>Full Out-Of-Order Execution<a class="headerlink" href="#full-out-of-order-execution" title="Link to this heading"></a></h3>
+<p>Currently, Blimp only implements an out-of-order backend; this feature
+would extend out-of-order processing to include the DIU, making the
+processor fully out-of-order. This would require the addition of an issue
+queue in the DIU, which would likely tightly couple with the rename table
+to determine which registers have pending writes. The rename table would
+also have to be able to free specific pending writes based on their
+sequence number on a squash. Additionally, the memory XU would now
+require a load-store queue (LSQ) to resolve potential RAW hazards through
+memory (after some discussion, we determined that the best place for the
+LSQ to live is in an execute unit).</p>
+<p>This change would also imply that instructions could be squashed anywhere
+in the pipeline; see the note above.</p>
+</section>
+<section id="superscalar-pipeline-support">
+<h3>Superscalar Pipeline Support<a class="headerlink" href="#superscalar-pipeline-support" title="Link to this heading"></a></h3>
+<p>Blimp currently only supports a single-issue pipeline; however, the
+methodology supports a superscalar pipeline. For this, the best way to
+modify the pipeline (ensuring backwards compatibility) would be to have
+units take a parametrized array of interfaces (ex. for multiple
+instructions being fetched at once, the FU would drive an array of <code class="docutils literal notranslate"><span class="pre">F__D</span></code>
+interfaces).</p>
+<p>The easiest path to implementation would be to start from the back of
+the processor, and gradually replace each interface with a parametrized
+array, modifying all of the units that it touches (i.e. support an
+array of <code class="docutils literal notranslate"><span class="pre">Commit</span></code> notifications before worrying about multiple issue).</p>
+<p>This change would also imply that instructions could make it into the
+pipeline at the same time as control flow instructions that would want
+to squash them; see the note on squashing above.</p>
+</section>
+<section id="formal-verification">
+<h3>Formal Verification<a class="headerlink" href="#formal-verification" title="Link to this heading"></a></h3>
+<p>While Blimp is extensively verified through unit and integration testing,
+both the directed and golden tests are user-specified. An ongoing effort
+has been to create formal models of each instruction, such that processors
+can be <a class="reference external" href="https://github.com/SymbioticEDA/riscv-formal">formally verified</a>.
+For this, the existing <code class="docutils literal notranslate"><span class="pre">InstTraceNotif</span></code> interface (for producing an
+instruction trace and verifying against the FL model) would need to be
+replaced with the <a class="reference external" href="https://github.com/SymbioticEDA/riscv-formal/blob/master/docs/rvfi.md">RVFI Interface</a>,
+to hook into RISCV’s formal verification framework.</p>
+</section>
+</section>
+</section>
+
+    <script type="text/javascript">
+        function init() {
+            WaveDrom.ProcessAll();
+        }
+        window.onload = init;
+    </script>
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../dependencies/" class="btn btn-neutral float-left" title="Dependencies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../fl/assembler/" class="btn btn-neutral float-right" title="Assembler and Disassembler" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
