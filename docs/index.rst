@@ -9,6 +9,8 @@ Blimp Documentation
 This is the home for Blimp's documentation, including installation, the
 overall framework, and how users can use and/or modify implementations.
 
+*Documentation is under construction - stay tuned for blank sections!*
+
 .. toctree::
    :maxdepth: 1
    :caption: Overview
