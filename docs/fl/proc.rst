@@ -134,5 +134,48 @@ one instruction). This involved:
 Interfacing with Verilog Testbenches
 --------------------------------------------------------------------------
 
+The interface to the functional-level processor from Verilog is
+contained in ``fl/fl_vtrace.v``, which exposes functions declared in
+``fl/fl_vtrace.h`` and defined in ``fl/fl_vtrace.cpp``. These include:
+
+* ``fl_reset()`` resets the processor state
+* ``fl_init( addr, data )`` initializes the processor's memory at the
+  address ``addr`` with ``data`` (both 32 bits)
+* ``fl_trace( *trace )`` steps the processor one execution cycle,
+  producing a ``FLTrace`` that shows what happened. From Verilog, this
+  looks like a function output (i.e. pass in the signal that you want
+  to modify), with the corresponding C++ acting on a pointer
+* ``fl_trace_str( trace )`` produces the string representation of a trace
+
+For testing RTL processors, ``fl_reset`` is used at the beginning of each
+test case (when the RTL processor is reset). Additionally, when the
+processor's memory is initialized in a test case, we also initialize the
+functional-level memory with ``fl_init`` (note that the ``asm`` function
+in test harnesses initializes both the RTL and FL memory the same).
+``fl_trace`` is used when testing the FL processor in directed testing
+(to ensure the expected result), but also to generate the expected result
+for golden-reference testing. Finally, ``fl_trace_str`` is used to
+generate an execution trace for the FL processor.
+
 Running Programs on the Processor
 --------------------------------------------------------------------------
+
+To run programs on the functional-level processor, we first need a way
+to interpret RISCV binary programs. This is done by ``parse_elf``, the
+name of both a C++ function and the corresponding ``.h/.cpp`` files in
+the ``fl`` directory. This function takes in a binary program and a
+call back function (of the signature ``callback( addr, data )``), and
+interprets the binary while calling the callback to store data at
+the addresses specified in the program. By operating on a generic function,
+this utility can be re-used across a variety of applications, including
+FL simulations, RTL simulations (see ``hw/top/sim/utils/load_elf.cpp`` and
+its use inside simulators in ``hw/top/sim``), and dumping address-data
+mappings (see ``tools/rvelfdump.cpp``).
+
+For functional-level simulations, the top-level file is ``fl/fl_sim.cpp``.
+This instantiates the functional-level processor, loads a binary using
+``parse_elf``, and steps the execution of the processor until it fails
+(usually exiting first with the ``FLExit`` peripheral - see
+:doc:`../fpga/peripherals`). This enables us to cross-compile programs
+to RISCV and run them on the standalone ``fl-sim`` program, verifying
+the program's functionality before running it on an RTL processor.

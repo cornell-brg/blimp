@@ -142,7 +142,7 @@ of field strings to ``*_mask`` functions is defined in ``assemble.cpp``.
    :alt: A visualization of assembling a binary instruction
    :class: bottompadding
 
-.. admonition:: Function Signatures
+.. admonition:: Control Flow Target Handling
    :class: note
 
    Similar to the disassembler, a separate mapping is maintained to
