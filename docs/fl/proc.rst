@@ -131,6 +131,29 @@ one instruction). This involved:
        // ...
    }
 
+.. admonition:: Writing a Performant Simulator
+   :class: note
+
+   Beyond the base goals of functionality, the functional-level processor
+   was written with performance in mind; specifically, all operations are
+   done on the binary form of instructions, with *no string operations
+   used*:
+
+   * Fetching the 32-bit value from memory is a simple lookup
+     (possibly made faster by pre-allocating an array, although a hashmap
+     proved good enough)
+   * Wrapping the instruction in an ``FLInst`` is trivial
+   * Getting the instruction's name (same as getting its specification)
+     is done with binary operations to find the instruction - see
+     Instruction Identification in :doc:`assembler`
+   * All field accesses in the instruction are bit slices
+
+   This allows the functional-level processor to emulate RISCV execution
+   very quickly; when running game applications, lag wasn't perceived
+   between user inputs. Later modifications to the processor should
+   ensure that the ``step`` function doesn't incur unnecessary lag by
+   avoiding complex operations wherever possible
+
 Interfacing with Verilog Testbenches
 --------------------------------------------------------------------------
 
