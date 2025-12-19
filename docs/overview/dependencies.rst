@@ -26,3 +26,8 @@ In particular, MacOS doesn't natively support ELF utilities (i.e. ``elf.h``),
 and has particular command-line flags with CMake that don't work with the
 RISCV toolchain. Further work could be done for this use case, but isn't
 needed at this time.
+
+.. admonition:: Verilator Version
+
+   Currently, Blimp will throw errors with the current version of Verilator
+   due to the use of tasks inside of a function - see :doc:`todo`

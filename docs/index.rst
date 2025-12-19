@@ -23,19 +23,17 @@ overall framework, and how users can use and/or modify implementations.
    overview/dependencies
    overview/todo
 
-..    overview/versions
+.. toctree::
+   :maxdepth: 2
+   :caption: Microarchitectural Units
 
-.. .. toctree::
-..    :maxdepth: 2
-..    :caption: Microarchitectural Units
+   units/units
 
-..    units/units
+.. toctree::
+   :maxdepth: 1
+   :caption: Microarchitectural Details
 
-.. .. toctree::
-..    :maxdepth: 1
-..    :caption: Microarchitectural Details
-
-..    uarch/seq_nums.md
+   uarch/seq_nums.rst
 
 .. toctree::
    :maxdepth: 1

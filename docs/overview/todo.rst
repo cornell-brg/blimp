@@ -166,6 +166,23 @@ the processor, and gradually replace each interface with a parametrized
 array, modifying all of the units that it touches (i.e. support an
 array of ``Commit`` notifications before worrying about multiple issue).
 
+.. admonition:: Fairness
+   :class: note
+
+   Currently, a round-robin arbiter is used at in the WCU to ensure that
+   all execute units are treated fairly and can make progress towards
+   committing their instruction. Maintaining this arbitration may scale
+   difficulty as the WCU supports multiple instructions; however, it's
+   not necessary to keep this selection fair. Fairness is likely useful
+   from a performance standpoint; however, the WCU could instead have
+   a fixed preference, knowing that other execute units will eventually
+   make progress (as dependent instructions would stall in the DIU).
+   Having such a fixed priority wasn't adopted for single-issue versions
+   as arbitrating was relatively simple; however, larger designs may
+   prefer a fixed priority over fairly arbitrating N instructions to
+   complete, as the lesser complexity is likely worth the slight
+   performance decrease.
+
 This change would also imply that instructions could make it into the
 pipeline at the same time as control flow instructions that would want
 to squash them; see the note on squashing above.

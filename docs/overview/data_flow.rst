@@ -10,9 +10,9 @@ Data Flow in the Processor
 
 .. role:: blimp-green
 
-Blimp is composed of many units, and also defines the methods by which
+Blimp is composed of many units, and also defines the interfaces by which
 units can communicate. Currently, there are two classes of communication
-methods:
+interfaces:
 
  - **Latency-Insensitive** interfaces are used to communicate information
    down the pipeline. These include a ``val`` and a ``rdy`` signal, so
@@ -21,7 +21,8 @@ methods:
    *only* proceed down the pipeline, never from later units to earlier
    units (which could cause circular deadlock). Instructions will follow
    these paths along their lifetime as they're propagated between units.
-   In Blimp's diagrams, you'll see these as :blimp-blue:`blue arrows`.
+   In Blimp's diagrams, you'll see these as :blimp-blue:`blue arrows`,
+   with bidirectional arrow heads indicating the ``val/rdy`` control flow
 
  - **Latency-Sensitive** interfaces (also known as **notifications**)
    are used to propagate information anywhere in the pipeline. These
@@ -32,7 +33,8 @@ methods:
    typically used to communicate to earlier units). Notifications are
    used to communicate information which must be acted on immediately,
    such as writebacks, commits, and squashes. In Blimp's diagrams,
-   you'll see these as :blimp-green:`green arrows`.
+   you'll see these as :blimp-green:`green arrows`, with unidirectional
+   arrow heads indicating the one-way signal flow.
 
 Latency-Insensitive interfaces are named as ``<src>__<dest>Intf``, to
 indicate what units they're communicating between. For example, the
@@ -69,7 +71,7 @@ Currently, Blimp uses three types of notifications:
 
    When squash notifications can come from multiple places, a
    :doc:`../units/squash_unit` is needed to arbitrate and select the
-   oldest squash.
+   squash from the oldest instruction.
 
 Lastly, the ``InstTraceNotif`` notification also exists, using signals
 also sent from the ``CommitNotif``. This notification doesn't provide

@@ -7,7 +7,7 @@ can be composed to form different versions of Blimp processors. This
 enables the design of these components to occur iteratively, adding on
 functionality as the complexity of the processor progressed.
 
-Currently, 1 version of the processor is implemented. The table below
+Currently, 8 versions of the processor are implemented. The table below
 details the level of each unit that each processor version supports:
 
 .. admonition:: Instruction Routing/Arbitration
