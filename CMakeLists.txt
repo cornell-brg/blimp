@@ -101,7 +101,6 @@ project(
 )
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/vdeps.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/verilator.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/vlint.cmake)
 
 enable_testing()

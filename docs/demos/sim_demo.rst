@@ -292,6 +292,7 @@ new multiplier to the last interface in the array
 
 .. code-block:: systemverilog
    :class: toggle
+   :emphasize-lines: 10
 
    DecodeIssueUnitL5 #(
      .p_num_pipes     (p_num_pipes),
@@ -342,6 +343,7 @@ multiplier - up to you
 
 .. code-block:: systemverilog
    :class: toggle
+   :emphasize-lines: 17, 18
 
    `ifndef SYNTHESIS
      function string trace( int trace_level );
