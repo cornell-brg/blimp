@@ -60,7 +60,7 @@ elseif(CMAKE_Verilog_COMPILER_ID STREQUAL "VCS")
   # Run VCS when linking (need to use sh for piping)
   if(NOT CMAKE_Verilog_LINK_EXECUTABLE)
     set(CMAKE_Verilog_LINK_EXECUTABLE
-      "bash -c 'set -o pipefail && <CMAKE_Verilog_COMPILER> -sverilog -q -cc <CMAKE_C_COMPILER> -cpp <CMAKE_CXX_COMPILER> <LINK_LIBRARIES> -LDFLAGS \"-z noexecstack\" <OBJECTS> -Mdir=<TARGET>.gen -o <TARGET> +warn=none 2>&1 | sed -n \'/Error/,+5p\''"
+      "bash -c 'set -o pipefail && <CMAKE_Verilog_COMPILER> -sverilog -mda -q -cc <CMAKE_C_COMPILER> -cpp <CMAKE_CXX_COMPILER> <LINK_LIBRARIES> -LDFLAGS \"-z noexecstack\" <OBJECTS> -Mdir=<TARGET>.gen -o <TARGET> +warn=none 2>&1 | sed -n \'/Error/,+5p\''"
     )
   endif()
   

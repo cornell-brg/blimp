@@ -14,6 +14,7 @@ set(V_TEST_FILES
   fpga/test/CharLUT_test.v
   hw/common/test/Fifo_test.v
   hw/common/test/PriorityEncoder_test.v
+  hw/common/test/MRRArb_test.v
   hw/common/test/RRArb_test.v
   hw/decode_issue/test/DecodeIssueUnitL1_test.v
   hw/decode_issue/test/DecodeIssueUnitL2_test.v
