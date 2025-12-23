@@ -1,115 +1,235 @@
+//========================================================================
+// RRArb_test.v
+//========================================================================
+// A testbench for our parametrized round-robin arbiter
+
+`include "test/TestUtils.v"
 `include "hw/common/MRRArb.v"
 
-module tb_mrrarb;
+import TestEnv::*;
 
-  localparam int P_WIDTH = 4;
-  localparam int P_MAX_M = 4;
-  localparam int MW      = $clog2(P_MAX_M);
+//========================================================================
+// RRArbTestSuite
+//========================================================================
+// A test suite for a particular parametrization of the arbiter
 
-  logic                  clk;
-  logic                  rst;
-  logic                  en;
-  logic [MW-1:0]          m;
-  logic [P_WIDTH-1:0]     req;
-  logic [P_WIDTH-1:0]     gnt;
+module MRRArbTestSuite #(
+  parameter p_suite_num = 0,
+  parameter p_width = 4,
+  parameter p_max_m = 4
+);
+  string suite_name = $sformatf("%0d: MRRArbTestSuite_%0d_%0d", 
+                                p_suite_num, p_width, p_max_m);
 
-  // DUT
+  //----------------------------------------------------------------------
+  // Setup
+  //----------------------------------------------------------------------
+
+  // verilator lint_off UNUSED
+  logic clk, rst;
+  // verilator lint_on UNUSED
+
+  TestUtils t( .* );
+
+  //----------------------------------------------------------------------
+  // Instantiate design under test
+  //----------------------------------------------------------------------
+
+  logic                     dut_en;
+  logic [$clog2(p_max_m):0] dut_m;
+  logic [p_width-1:0]       dut_req;
+  logic [p_width-1:0]       dut_gnt;
+
   MRRArb #(
-    .p_width(P_WIDTH),
-    .p_max_m(P_MAX_M)
-  ) dut (
-    .clk(clk),
-    .rst(rst),
-    .en(en),
-    .m(m),
-    .req(req),
-    .gnt(gnt)
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) DUT (
+    .clk (clk),
+    .rst (rst),
+    .en  (dut_en),
+    .m   (dut_m),
+    .req (dut_req),
+    .gnt (dut_gnt)
   );
 
-  // Clock
-  initial clk = 1'b0;
-  always #5 clk = ~clk;
+  //----------------------------------------------------------------------
+  // check
+  //----------------------------------------------------------------------
+  // All tasks start at #1 after the rising edge of the clock. So we
+  // write the inputs #1 after the rising edge, and check the outputs #1
+  // before the next rising edge.
 
-  // Waves (portable VCD)
-  initial begin
-    $dumpfile("tb_mrrarb.vcd");
-    $dumpvars(0, dut);
-  end
+  task check (
+    input logic                     en,
+    input logic [$clog2(p_max_m):0] m,
+    input logic [p_width-1:0]       req,
+    input logic [p_width-1:0]       gnt
+  );
+    if ( !t.failed ) begin
+      dut_req = req;
+      dut_m   = m;
+      dut_en  = en;
 
-  task automatic show(string tag);
-    $display("[%0t] %s  rst=%0b en=%0b m=%0d  req=%b  gnt=%b  head_ptr=%b  next_head_ptr=%b",
-             $time, tag, rst, en, m, req, gnt, dut.head_ptr, dut.next_head_ptr);
-  endtask
+      #8;
 
-  task automatic step(input logic [MW-1:0] m_i, input logic [P_WIDTH-1:0] req_i, string tag);
-    begin
-      m   = m_i;
-      req = req_i;
-      @(negedge clk); // setup before posedge
-      show({tag, " (pre)"});
-      @(posedge clk); // state updates here
-      #1;
-      show({tag, " (post)"});
+      if ( t.verbose ) begin
+        $display( "%3d: en=%b, m=%d, %b > %b", t.cycles,
+                  dut_en, dut_m, dut_req, dut_gnt );
+      end
+
+      `CHECK_EQ( dut_gnt, gnt );
+
+      #2;
+
     end
   endtask
 
-  initial begin
-    // init
-    rst = 1'b1;
-    en  = 1'b1;
-    m   = '0;
-    req = '0;
+  //----------------------------------------------------------------------
+  // test_case_1_basic
+  //----------------------------------------------------------------------
 
-    // reset for a couple cycles
-    repeat (2) @(posedge clk);
-    #1; show("after reset cycles");
-    rst = 1'b0;
+  task test_case_1_basic();
+    t.test_case_begin( "test_case_1_basic" );
+    if( !t.run_test ) return;
 
-    // ----------------------------
-    // Basic directed scenarios
-    // ----------------------------
-
-    // Single requester
-    step(1, 4'b0001, "single req bit0");
-    step(1, 4'b0001, "single req bit0 (again)");
-    step(1, 4'b1000, "single req bit3");
-
-    // Multiple requesters, m=1 (classic RR behavior)
-    step(1, 4'b1111, "all req, m=1");
-    step(1, 4'b1111, "all req, m=1");
-    step(1, 4'b1111, "all req, m=1");
-    step(1, 4'b1111, "all req, m=1");
-
-    // Multiple requesters, m=2
-    step(2, 4'b1111, "all req, m=2");
-    step(2, 4'b1111, "all req, m=2");
-    step(2, 4'b1111, "all req, m=2");
-
-    // Sparse req patterns, m=2
-    step(2, 4'b1010, "req=1010, m=2");
-    step(2, 4'b1010, "req=1010, m=2 (again)");
-    step(2, 4'b0101, "req=0101, m=2");
-
-    // m=0 edge case (should grant nothing, pointer should recycle)
-    step(0, 4'b1111, "m=0, req=1111");
-    step(0, 4'b0110, "m=0, req=0110");
-
-    // Change m dynamically
-    step(1, 4'b1111, "m=1, all req");
-    step(3, 4'b1111, "m=3, all req");
-    step(2, 4'b1111, "m=2, all req");
-    step(1, 4'b1111, "m=1, all req");
-
-    // ----------------------------
-    // Small sweep (optional): all req patterns for a fixed m
-    // ----------------------------
-    m = 2;
-    for (int rv = 0; rv < (1<<P_WIDTH); rv++) begin
-      step(2, rv[P_WIDTH-1:0], $sformatf("sweep m=2 req=0x%0h", rv));
+    //     en m in                    out
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, 1, p_width'('b0010), p_width'('b0010) );
+    check( 1, 1, p_width'('b0011), p_width'('b0001) );
+    if( p_width > 1 ) begin
+      check( 1, 1, p_width'('b0011), p_width'('b0010) );
+      check( 1, 2, p_width'('b0011), p_width'('b0011) );
+      check( 1, 2, p_width'('b0111), p_width'('b0101) );
+      check( 1, 2, p_width'('b0111), p_width'('b0110) );
+      check( 1, 3, p_width'('b0111), p_width'('b0111) );
+      check( 1, 3, p_width'('b0111), p_width'('b0111) );
+      check( 1, 3, p_width'('b1111), p_width'('b1011) );
+      check( 1, 3, p_width'('b1111), p_width'('b1101) );
+      check( 1, 3, p_width'('b1111), p_width'('b1110) );
     end
 
-    $display("\nDone.");
-    $finish;
-  end
+    t.test_case_end();
+  endtask
 
+  //----------------------------------------------------------------------
+  // test_case_2_no_grant
+  //----------------------------------------------------------------------
+
+  task test_case_2_no_grant();
+    t.test_case_begin( "test_case_2_no_grant" );
+    if( !t.run_test ) return;
+
+    //     en m in                    out
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 2, p_width'('b0000), p_width'('b0000) );
+    check( 1, 2, p_width'('b0000), p_width'('b0000) );
+    check( 1, 3, p_width'('b0000), p_width'('b0000) );
+    check( 1, 3, p_width'('b0000), p_width'('b0000) );
+    check( 1, 4, p_width'('b0000), p_width'('b0000) );
+    check( 1, 4, p_width'('b0000), p_width'('b0000) );
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_3_oscillate
+  //----------------------------------------------------------------------
+
+  task test_case_3_oscillate();
+    t.test_case_begin( "test_case_3_oscillate" );
+    if( !t.run_test ) return;
+
+    //     en m in                    out
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 1, p_width'('b0001), p_width'('b0001) );
+
+    check( 1, 1, p_width'('b0011), p_width'('b0010) );
+    check( 1, 1, p_width'('b0011), p_width'('b0001) );
+
+    check( 1, 1, p_width'('b0111), p_width'('b0010) );
+    check( 1, 1, p_width'('b0111), p_width'('b0100) );
+    check( 1, 1, p_width'('b0111), p_width'('b0001) );
+    check( 1, 1, p_width'('b1111), p_width'('b0010) );
+    check( 1, 1, p_width'('b1111), p_width'('b0100) );
+    check( 1, 1, p_width'('b1111), p_width'('b1000) );
+    check( 1, 1, p_width'('b1111), p_width'('b0001) );
+
+    check( 1, 1, p_width'('b1110), p_width'('b0010) );
+    check( 1, 1, p_width'('b1110), p_width'('b0100) );
+    check( 1, 1, p_width'('b1110), p_width'('b1000) );
+
+    check( 1, 1, p_width'('b1100), p_width'('b0100) );
+    check( 1, 1, p_width'('b1100), p_width'('b1000) );
+
+    check( 1, 1, p_width'('b1000), p_width'('b1000) );
+    check( 1, 1, p_width'('b1000), p_width'('b1000) );
+
+    check( 1, 2, p_width'('b0000), p_width'('b0000) );
+    check( 1, 2, p_width'('b0001), p_width'('b0001) );
+
+    check( 1, 2, p_width'('b0011), p_width'('b0011) );
+    check( 1, 2, p_width'('b0011), p_width'('b0011) );
+
+    check( 1, 2, p_width'('b0111), p_width'('b0110) );
+    check( 1, 2, p_width'('b0111), p_width'('b0011) );
+    check( 1, 2, p_width'('b0111), p_width'('b0101) );
+    check( 1, 2, p_width'('b1111), p_width'('b0110) );
+    check( 1, 2, p_width'('b1111), p_width'('b1001) );
+    check( 1, 2, p_width'('b1111), p_width'('b0110) );
+    check( 1, 2, p_width'('b1111), p_width'('b1001) );
+
+    check( 1, 2, p_width'('b1110), p_width'('b0110) );
+    check( 1, 2, p_width'('b1110), p_width'('b1010) );
+    check( 1, 2, p_width'('b1110), p_width'('b1100) );
+
+    check( 1, 2, p_width'('b1100), p_width'('b1100) );
+    check( 1, 2, p_width'('b1100), p_width'('b1100) );
+
+    check( 1, 2, p_width'('b1000), p_width'('b1000) );
+    check( 1, 2, p_width'('b1000), p_width'('b1000) );
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // run_test_suite
+  //----------------------------------------------------------------------
+
+  task run_test_suite();
+    t.test_suite_begin( suite_name );
+
+                      test_case_1_basic();
+                      test_case_2_no_grant();
+    if (p_width >= 4) test_case_3_oscillate();
+
+  endtask
+endmodule
+
+//========================================================================
+// RRArb_test
+//========================================================================
+
+module RRArb_test;
+  MRRArbTestSuite #(1)          suite_1();
+  MRRArbTestSuite #(2,  8)      suite_2();
+  MRRArbTestSuite #(3,  32,  8) suite_3();
+  MRRArbTestSuite #(4,  1)      suite_4();
+
+  int s;
+
+  initial begin
+    test_bench_begin( `__FILE__ );
+    s = get_test_suite();
+
+    if ((s <= 0) || (s == 1)) suite_1.run_test_suite();
+    if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
+    if ((s <= 0) || (s == 3)) suite_3.run_test_suite();
+    if ((s <= 0) || (s == 4)) suite_4.run_test_suite();
+
+    test_bench_end();
+  end
 endmodule
