@@ -1,0 +1,125 @@
+//========================================================================
+// MSeqAge.v
+//========================================================================
+// A module for monitoring the in-flight instructions, to compare ages between
+// sequence numbers. Determines the oldest instruction on the commit interface
+// when updating
+
+`ifndef HW_UTIL_MSEQAGE_V
+`define HW_UTIL_MSEQAGE_V
+
+`include "intf/CommitNotif.v"
+
+module MSeqAge #(
+  parameter p_num_be_lanes = 2
+) (
+  input  logic clk,
+  input  logic rst,
+
+  //----------------------------------------------------------------------
+  // Commit Interface
+  //----------------------------------------------------------------------
+
+  CommitNotif.sub commit [p_num_be_lanes]
+);
+
+  localparam p_seq_num_bits   = commit[0].p_seq_num_bits;
+  localparam p_phys_addr_bits = commit[0].p_phys_addr_bits;
+
+  logic                 [31:0] commit_pc      [p_num_be_lanes-1:0];
+  logic   [p_seq_num_bits-1:0] commit_seq_num [p_num_be_lanes-1:0];
+  logic                  [4:0] commit_waddr   [p_num_be_lanes-1:0];
+  logic                 [31:0] commit_wdata   [p_num_be_lanes-1:0];
+  logic                        commit_wen     [p_num_be_lanes-1:0];
+  logic [p_phys_addr_bits-1:0] commit_ppreg   [p_num_be_lanes-1:0];
+  logic                        commit_val     [p_num_be_lanes-1:0];
+
+  genvar i;
+  for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: UNPACK_FROM_INTF
+    assign commit_pc[i]      = commit[i].pc;
+    assign commit_seq_num[i] = commit[i].seq_num;
+    assign commit_waddr[i]   = commit[i].waddr;
+    assign commit_wdata[i]   = commit[i].wdata;
+    assign commit_wen[i]     = commit[i].wen;
+    assign commit_ppreg[i]   = commit[i].ppreg;
+    assign commit_val[i]     = commit[i].val;
+  end
+
+  // Keep track of the oldest in-flight sequence number
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+  logic [p_seq_num_bits-1:0] next_oldest_seq_num_m1;
+  logic                      any_commit;
+  assign any_commit = commit_val.or();
+
+  always_ff @( posedge clk ) begin
+    if( rst )
+      oldest_seq_num <= '0;
+    else if( any_commit )
+      oldest_seq_num <= next_oldest_seq_num_m1 + 1;
+  end
+
+  always_comb begin
+    next_oldest_seq_num_m1 = '0;
+    for( int j = 0; j < p_num_be_lanes; j++ ) begin
+      if( commit_val[j] && commit_seq_num[j] > next_oldest_seq_num_m1 )
+        next_oldest_seq_num_m1 = commit_seq_num[j];
+    end
+  end
+
+  //----------------------------------------------------------------------
+  // is_older
+  //----------------------------------------------------------------------
+  // Evaluates whether seq_num_0 is older than seq_num_1
+  //
+  // Inspiration: SonicBoom
+  // https://github.com/riscv-boom/riscv-boom/blob/7184be9db9d48bd01689cf9dd429a4ac32b21105/src/main/scala/v3/util/util.scala#L363
+  //
+  // if (
+  //   seq_num_0 < oldest_seq_num &
+  //   seq_num_1 < oldest_seq_num
+  // )
+  //   // Both less than oldest number - compare directly
+  //   return ( seq_num_0 < seq_num_1 );
+  //
+  // else if (
+  //   !( seq_num_0 < oldest_seq_num ) &
+  //   !( seq_num_1 < oldest_seq_num )
+  // )
+  //   // Both greater than oldest number - compare directly
+  //   return ( seq_num_0 < seq_num_1 );
+  //
+  // else
+  //   // Oldest number is in-between -> wraparound
+  //   return !( seq_num_0 < seq_num_1 );
+
+  function automatic logic is_older(
+    input [p_seq_num_bits-1:0] seq_num_0,
+    input [p_seq_num_bits-1:0] seq_num_1
+  );
+    return ( seq_num_0 < seq_num_1      ) ^ 
+           ( seq_num_0 < oldest_seq_num ) ^
+           ( seq_num_1 < oldest_seq_num );
+  endfunction
+
+  //----------------------------------------------------------------------
+  // Unused signals
+  //----------------------------------------------------------------------
+  // Include those that are used by SeqAge
+
+  logic [31:0] unused_commit_pc    [p_num_be_lanes];
+  logic  [4:0] unused_commit_waddr [p_num_be_lanes];
+  logic [31:0] unused_commit_wdata [p_num_be_lanes];
+  logic        unused_commit_wen   [p_num_be_lanes];
+  logic        unused_commit_val   [p_num_be_lanes];
+
+  for( i = 0; i < p_num_be_lanes; i++ ) begin
+    assign unused_commit_pc[i]    = commit[i].pc;
+    assign unused_commit_waddr[i] = commit[i].waddr;
+    assign unused_commit_wdata[i] = commit[i].wdata;
+    assign unused_commit_wen[i]   = commit[i].wen;
+    assign unused_commit_val[i]   = commit[i].val;
+  end
+
+endmodule
+
+`endif // HW_UTIL_SEQAGE_V

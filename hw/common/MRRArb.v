@@ -7,11 +7,10 @@
 // https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6673286
 // with modifications for variable m-select
 
-
 `ifndef HW_COMMON_MRRARB_V
 `define HW_COMMON_MRRARB_V
 
-module pick_first_m_nonzero #(
+module FirstMNonzero #(
   parameter p_width = 4,
   parameter p_max_m = 3
 )(
@@ -80,10 +79,10 @@ module MPEth #(
     end
   end
 
-  pick_first_m_nonzero #(
-    .p_width ( p_width ),
-    .p_max_m ( p_max_m )
-  ) pick_first_m_nonzero_inst (
+  FirstMNonzero #(
+    .p_width   ( p_width ),
+    .p_max_m   ( p_max_m )
+  ) FirstMNonzero_inst (
     .in  ( gnt_th_full ),
     .out ( gnt_th )
   );

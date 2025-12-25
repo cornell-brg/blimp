@@ -8,14 +8,15 @@
 `ifndef HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
 `define HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
 
-`include "hw/writeback_commit/ROB.v"
-`include "hw/util/SeqArb.v"
+`include "hw/writeback_commit/MROB.v"
+`include "hw/common/MRRArb.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 `include "intf/X__WIntf.v"
 
 module WritebackCommitUnitL4 #(
-  parameter p_num_pipes = 1
+  parameter p_num_pipes = 1,
+  parameter p_num_be_lanes = 2
 )(
   input  logic clk,
   input  logic rst,
@@ -24,19 +25,19 @@ module WritebackCommitUnitL4 #(
   // X <-> W Interface
   //----------------------------------------------------------------------
 
-  X__WIntf.W_intf Ex [p_num_pipes-1:0],
+  X__WIntf.W_intf Ex [p_num_pipes],
 
   //----------------------------------------------------------------------
-  // Completion Interface
+  // Completion Interfaces
   //----------------------------------------------------------------------
 
-  CompleteNotif.pub complete,
+  CompleteNotif.pub complete [p_num_be_lanes],
 
   //----------------------------------------------------------------------
   // Commit Interface
   //----------------------------------------------------------------------
 
-  CommitNotif.pub   commit
+  CommitNotif.pub   commit [p_num_be_lanes]
 );
 
   localparam p_seq_num_bits   = complete.p_seq_num_bits;
@@ -46,15 +47,15 @@ module WritebackCommitUnitL4 #(
   // Select which pipe to get from
   //----------------------------------------------------------------------
 
-  logic                 [31:0] Ex_pc      [p_num_pipes-1:0];
-  logic   [p_seq_num_bits-1:0] Ex_seq_num [p_num_pipes-1:0];
-  logic                  [4:0] Ex_waddr   [p_num_pipes-1:0];
-  logic                 [31:0] Ex_wdata   [p_num_pipes-1:0];
-  logic                        Ex_wen     [p_num_pipes-1:0];
-  logic [p_phys_addr_bits-1:0] Ex_preg    [p_num_pipes-1:0];
-  logic [p_phys_addr_bits-1:0] Ex_ppreg   [p_num_pipes-1:0];
-  logic                        Ex_val     [p_num_pipes-1:0];
-  logic                        Ex_rdy     [p_num_pipes-1:0];
+  logic                 [31:0] Ex_pc      [p_num_pipes];
+  logic   [p_seq_num_bits-1:0] Ex_seq_num [p_num_pipes];
+  logic                  [4:0] Ex_waddr   [p_num_pipes];
+  logic                 [31:0] Ex_wdata   [p_num_pipes];
+  logic                        Ex_wen     [p_num_pipes];
+  logic [p_phys_addr_bits-1:0] Ex_preg    [p_num_pipes];
+  logic [p_phys_addr_bits-1:0] Ex_ppreg   [p_num_pipes];
+  logic                        Ex_val     [p_num_pipes];
+  logic                        Ex_rdy     [p_num_pipes];
 
   genvar i;
   generate
@@ -71,64 +72,66 @@ module WritebackCommitUnitL4 #(
     end
   endgenerate
 
-  logic  Ex_gnt [p_num_pipes-1:0];
-
-  CommitNotif #(
-    .p_seq_num_bits   (p_seq_num_bits),
-    .p_phys_addr_bits (commit.p_phys_addr_bits)
-  ) arb_commit();
-
-  SeqArb #(
-    .p_seq_num_bits (p_seq_num_bits),
-    .p_num_arb      (p_num_pipes)
-  ) ex_arb (
-    .clk     (clk),
-    .rst     (rst),
-    .seq_num (Ex_seq_num),
-    .val     (Ex_val),
-    .gnt     (Ex_gnt),
-    .commit  (arb_commit)
-  );
-
-  logic                 [31:0] Ex_pc_masked      [p_num_pipes-1:0];
-  logic   [p_seq_num_bits-1:0] Ex_seq_num_masked [p_num_pipes-1:0];
-  logic                  [4:0] Ex_waddr_masked   [p_num_pipes-1:0];
-  logic                 [31:0] Ex_wdata_masked   [p_num_pipes-1:0];
-  logic                        Ex_wen_masked     [p_num_pipes-1:0];
-  logic [p_phys_addr_bits-1:0] Ex_preg_masked    [p_num_pipes-1:0];
-  logic [p_phys_addr_bits-1:0] Ex_ppreg_masked   [p_num_pipes-1:0];
-  logic                        Ex_val_masked     [p_num_pipes-1:0];
+  logic [p_num_pipes-1:0] Ex_val_packed;
+  logic [p_num_pipes-1:0] Ex_gnt_packed;
+  logic                   Ex_gnt         [p_num_pipes];
 
   generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: MASK
-      assign Ex_pc_masked[i]      = Ex_pc[i]      & {32{Ex_gnt[i]}};
-      assign Ex_seq_num_masked[i] = Ex_seq_num[i] & {p_seq_num_bits{Ex_gnt[i]}};
-      assign Ex_waddr_masked[i]   = Ex_waddr[i]   & {5{Ex_gnt[i]}};
-      assign Ex_wdata_masked[i]   = Ex_wdata[i]   & {32{Ex_gnt[i]}};
-      assign Ex_wen_masked[i]     = Ex_wen[i]     & Ex_gnt[i];
-      assign Ex_preg_masked[i]    = Ex_preg[i]    & {p_phys_addr_bits{Ex_gnt[i]}};
-      assign Ex_ppreg_masked[i]   = Ex_ppreg[i]   & {p_phys_addr_bits{Ex_gnt[i]}};
-      assign Ex_val_masked[i]     = Ex_val[i]     & Ex_gnt[i];
+    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: UNPACK
+      assign Ex_val_packed[i] = Ex_val[i];
+      assign Ex_gnt[i] = Ex_gnt_packed[i];
     end
   endgenerate
 
-  logic                 [31:0] Ex_pc_sel;
-  logic   [p_seq_num_bits-1:0] Ex_seq_num_sel;
-  logic                  [4:0] Ex_waddr_sel;
-  logic                 [31:0] Ex_wdata_sel;
-  logic                        Ex_wen_sel;
-  logic [p_phys_addr_bits-1:0] Ex_preg_sel;
-  logic [p_phys_addr_bits-1:0] Ex_ppreg_sel;
-  logic                        Ex_val_sel;
+  MRRArb #(
+    .p_width (p_num_pipes),
+    .p_max_m (p_num_be_lanes),
+  ) ex_arb (
+    .clk     (clk),
+    .rst     (rst),
+    .en      (1'b1),
+    .m       (), // TODO
+    .req     (Ex_val_packed),
+    .gnt     (Ex_gnt_packed)
+  );
 
-  assign Ex_pc_sel      = Ex_pc_masked.or();
-  assign Ex_seq_num_sel = Ex_seq_num_masked.or();
-  assign Ex_waddr_sel   = Ex_waddr_masked.or();
-  assign Ex_wdata_sel   = Ex_wdata_masked.or();
-  assign Ex_wen_sel     = Ex_wen_masked.or();
-  assign Ex_preg_sel    = Ex_preg_masked.or();
-  assign Ex_ppreg_sel   = Ex_ppreg_masked.or();
-  assign Ex_val_sel     = Ex_val_masked.or();
+  logic                 [31:0] Ex_pc_sel      [p_num_be_lanes];
+  logic   [p_seq_num_bits-1:0] Ex_seq_num_sel [p_num_be_lanes];
+  logic                  [4:0] Ex_waddr_sel   [p_num_be_lanes];
+  logic                 [31:0] Ex_wdata_sel   [p_num_be_lanes];
+  logic                        Ex_wen_sel     [p_num_be_lanes];
+  logic [p_phys_addr_bits-1:0] Ex_preg_sel    [p_num_be_lanes];
+  logic [p_phys_addr_bits-1:0] Ex_ppreg_sel   [p_num_be_lanes];
+  logic                        Ex_val_sel     [p_num_be_lanes];
+  int j, k;
+
+  always_comb begin
+    for ( j = 0; j < p_max_m; j++) begin
+      Ex_pc_sel[j]      = '0;
+      Ex_seq_num_sel[j] = '0;
+      Ex_waddr_sel[j]   = '0;
+      Ex_wdata_sel[j]   = '0;
+      Ex_wen_sel[j]     = '0;
+      Ex_preg_sel[j]    = '0;
+      Ex_ppreg_sel[j]   = '0;
+      Ex_val_sel[j]     = '0;
+    end
+
+    k = 0;
+    for( j = 0; j < p_num_pipes; j++ ) begin
+      if( Ex_gnt[j] && (k < p_num_be_lanes) ) begin
+        Ex_pc_sel[k]      = Ex_pc[j];
+        Ex_seq_num_sel[k] = Ex_seq_num[j];
+        Ex_waddr_sel[k]   = Ex_waddr[j];
+        Ex_wdata_sel[k]   = Ex_wdata[j];
+        Ex_wen_sel[k]     = Ex_wen[j];
+        Ex_preg_sel[k]    = Ex_preg[j];
+        Ex_ppreg_sel[k]   = Ex_ppreg[j];
+        Ex_val_sel[k]     = Ex_val[j];
+        k++;
+      end
+    end
+  end
 
   // No backpressure - always ready
   generate
@@ -151,53 +154,57 @@ module WritebackCommitUnitL4 #(
     logic [p_phys_addr_bits-1:0] ppreg;
   } X_input;
 
-  X_input X_reg;
-  X_input X_reg_next;
+  X_input X_reg      [p_num_be_lanes];
+  X_input X_reg_next [p_num_be_lanes];
 
-  always_ff @( posedge clk ) begin
-    if ( rst )
-      X_reg <= '{ 
-        val: 1'b0, 
-        pc: 'x,
-        seq_num: 'x, 
-        waddr: 'x, 
-        wdata: 'x, 
-        wen: 1'b0,
-        ppreg: 'x
-      };
-    else
-      X_reg <= X_reg_next;
-  end
+  generate
+    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: X_REG_GEN
+      always_ff @( posedge clk ) begin
+        if ( rst )
+          X_reg[i] <= '{ 
+            val: 1'b0, 
+            pc: 'x,
+            seq_num: 'x, 
+            waddr: 'x, 
+            wdata: 'x, 
+            wen: 1'b0,
+            ppreg: 'x
+          };
+        else
+          X_reg[i] <= X_reg_next[i];
+      end
 
-  always_comb begin
-    if ( Ex_val_sel )
-      X_reg_next = '{
-        val:     1'b1,
-        pc:      Ex_pc_sel,
-        seq_num: Ex_seq_num_sel,
-        waddr:   Ex_waddr_sel,
-        wdata:   Ex_wdata_sel,
-        wen:     Ex_wen_sel,
-        ppreg:   Ex_ppreg_sel
-      };
-    else
-      X_reg_next = '{ 
-        val: 1'b0, 
-        pc: 'x,
-        seq_num: 'x, 
-        waddr: 'x, 
-        wdata: 'x, 
-        wen: 1'b0,
-        ppreg: 'x
-      };
-  end
+      always_comb begin
+        if ( Ex_val_sel[i] )
+          X_reg_next[i] = '{
+            val:     1'b1,
+            pc:      Ex_pc_sel[i],
+            seq_num: Ex_seq_num_sel[i],
+            waddr:   Ex_waddr_sel[i],
+            wdata:   Ex_wdata_sel[i],
+            wen:     Ex_wen_sel[i],
+            ppreg:   Ex_ppreg_sel[i]
+          };
+        else
+          X_reg_next[i] = '{ 
+            val: 1'b0, 
+            pc: 'x,
+            seq_num: 'x, 
+            waddr: 'x, 
+            wdata: 'x, 
+            wen: 1'b0,
+            ppreg: 'x
+          };
+      end
+    end
 
-  assign complete.val     = Ex_val_sel;
-  assign complete.seq_num = Ex_seq_num_sel;
-  assign complete.waddr   = Ex_waddr_sel;
-  assign complete.wdata   = Ex_wdata_sel;
-  assign complete.wen     = ( Ex_waddr_sel == '0 ) ? 0 : Ex_wen_sel;
-  assign complete.preg    = Ex_preg_sel;
+    assign complete[i].val     = Ex_val_sel[i];
+    assign complete[i].seq_num = Ex_seq_num_sel[i];
+    assign complete[i].waddr   = Ex_waddr_sel[i];
+    assign complete[i].wdata   = Ex_wdata_sel[i];
+    assign complete[i].wen     = ( Ex_waddr_sel[i] == '0 ) ? 0 : Ex_wen_sel[i];
+    assign complete[i].preg    = Ex_preg_sel[i];
+  endgenerate
 
   //----------------------------------------------------------------------
   // ROB
@@ -221,7 +228,8 @@ module WritebackCommitUnitL4 #(
 
   localparam p_rob_depth = 2 ** p_seq_num_bits;
 
-  ROB #(
+  // TODO
+  MROB #(
     .p_depth    (p_rob_depth),
     .p_msg_bits ($bits(t_rob_msg))
   ) rob (
@@ -236,19 +244,12 @@ module WritebackCommitUnitL4 #(
     .*
   );
 
+  // TODO
   assign commit.pc    = rob_output.pc;
   assign commit.waddr = rob_output.waddr;
   assign commit.wdata = rob_output.wdata;
   assign commit.wen   = rob_output.wen;
   assign commit.ppreg = rob_output.ppreg;
-
-  assign arb_commit.val     = commit.val;
-  assign arb_commit.pc      = commit.pc;
-  assign arb_commit.seq_num = commit.seq_num;
-  assign arb_commit.waddr   = commit.waddr;
-  assign arb_commit.wdata   = commit.wdata;
-  assign arb_commit.wen     = commit.wen;
-  assign arb_commit.ppreg   = commit.ppreg;
 
   //----------------------------------------------------------------------
   // Linetracing
@@ -265,7 +266,7 @@ module WritebackCommitUnitL4 #(
                    ceil_div_4( 5 )              + 1 + // addr
                    8;                                 // data
   
-  function string trace( int trace_level );
+  function string trace( int trace_level ); // TODO
     if( X_reg.val ) begin
       if( trace_level > 0 )
         trace = $sformatf("%h:%h:%h:%h", X_reg.seq_num, X_reg.wen, X_reg.waddr, X_reg.wdata );
@@ -282,4 +283,4 @@ module WritebackCommitUnitL4 #(
 
 endmodule
 
-`endif // HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL2_V
+`endif // HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
