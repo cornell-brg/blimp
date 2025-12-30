@@ -16,10 +16,10 @@ Exact versions required are unknown, but all functionality was successfully
 demonstrated on the BRG research server. Those looking to replicate should
 aim for:
 
-* CMake >= 3.10
-* GCC >= 13 (necessary for using ``<format>``)
+* CMake ≥ 3.10
+* GCC ≥ 13 (necessary for using ``<format>``)
 * RISCV Toolchain built 2025 or later (we built in Jan. 2025)
-* Verilator >= 5.032
+* Verilator ≥ 5.032
 
 Note that the build system is currently only intended to work on Linux systems.
 In particular, MacOS doesn't natively support ELF utilities (i.e. ``elf.h``),
