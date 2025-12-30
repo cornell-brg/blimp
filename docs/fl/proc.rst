@@ -199,6 +199,6 @@ For functional-level simulations, the top-level file is ``fl/fl_sim.cpp``.
 This instantiates the functional-level processor, loads a binary using
 ``parse_elf``, and steps the execution of the processor until it fails
 (usually exiting first with the ``FLExit`` peripheral - see
-:doc:`../fpga/peripherals`). This enables us to cross-compile programs
+:doc:`../mem/peripherals`). This enables us to cross-compile programs
 to RISCV and run them on the standalone ``fl-sim`` program, verifying
 the program's functionality before running it on an RTL processor.

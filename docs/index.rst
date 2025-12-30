@@ -44,10 +44,10 @@ overall framework, and how users can use and/or modify implementations.
 
 .. toctree::
    :maxdepth: 1
-   :caption: FPGA Implementation
+   :caption: Memory Subsystem
 
-   fpga/peripherals
-   fpga/network
+   mem/peripherals
+   mem/network
 
 .. toctree::
    :maxdepth: 1

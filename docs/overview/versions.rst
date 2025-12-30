@@ -15,7 +15,7 @@ details the level of each unit that each processor version supports:
 
    While specific levels of execute units may be supported at a given
    processor version, many levels aren't used in the given
-   implementation, given that they are superseced by later levels with
+   implementation, given that they are superseded by later levels with
    greater support
 
 .. list-table::
