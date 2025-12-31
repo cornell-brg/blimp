@@ -8,17 +8,17 @@
 
 module TestMPub #(
   parameter type t_msg    = logic[31:0],
-  parameter      num_msgs = 2
+  parameter int  p_num_msgs = 2
 )(
   input  logic clk,
   
-  output t_msg msg [num_msgs],
-  output logic val [num_msgs] 
+  output t_msg msg [p_num_msgs],
+  output logic val [p_num_msgs] 
 );
 
   initial begin
-    for( int i = 0; i < num_msgs; i++ ) begin
-      msg[i] = '{default: '0};
+    for( int i = 0; i < p_num_msgs; i++ ) begin
+      msg[i] = '{default: 'x};
       val[i] = '0;
     end
   end
@@ -29,11 +29,11 @@ module TestMPub #(
   // A function to send a notification
 
   task pub (
-    input t_msg dut_msg [num_msgs],
-    input logic dut_val [num_msgs]
+    input t_msg dut_msg [p_num_msgs],
+    input logic dut_val [p_num_msgs]
   );
 
-    for( int i = 0; i < num_msgs; i++ ) begin
+    for( int i = 0; i < p_num_msgs; i++ ) begin
       if( dut_val[i] ) begin
         val[i] = 1'b1;
         msg[i] = dut_msg[i];
@@ -43,7 +43,7 @@ module TestMPub #(
     @( posedge clk );
     #1;
 
-    for( int i = 0; i < num_msgs; i++ ) begin
+    for( int i = 0; i < p_num_msgs; i++ ) begin
       val[i] = 1'b0;
       msg[i] = 'x;
     end

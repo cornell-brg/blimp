@@ -42,6 +42,7 @@ module WritebackCommitUnitL4 #(
 
   localparam p_seq_num_bits   = complete.p_seq_num_bits;
   localparam p_phys_addr_bits = complete.p_phys_addr_bits;
+  localparam p_rob_depth      = 2 ** p_seq_num_bits;
 
   //----------------------------------------------------------------------
   // Select which pipe to get from
@@ -83,14 +84,21 @@ module WritebackCommitUnitL4 #(
     end
   endgenerate
 
+  logic [p_seq_num_bits:0]         avail_slots_mrob;
+  logic [$clog2(p_num_be_lanes):0] avail_slots_mrrarb;
+
+  assign avail_slots_mrrarb = ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
+                                                    p_num_be_lanes :
+                                                    avail_slots_mrob);
+
   MRRArb #(
     .p_width (p_num_pipes),
-    .p_max_m (p_num_be_lanes),
+    .p_max_m (p_num_be_lanes)
   ) ex_arb (
     .clk     (clk),
     .rst     (rst),
     .en      (1'b1),
-    .m       (), // TODO
+    .m       (avail_slots_mrrarb),
     .req     (Ex_val_packed),
     .gnt     (Ex_gnt_packed)
   );
@@ -106,7 +114,7 @@ module WritebackCommitUnitL4 #(
   int j, k;
 
   always_comb begin
-    for ( j = 0; j < p_max_m; j++) begin
+    for ( j = 0; j < p_num_be_lanes; j++) begin
       Ex_pc_sel[j]      = '0;
       Ex_seq_num_sel[j] = '0;
       Ex_waddr_sel[j]   = '0;
@@ -196,14 +204,14 @@ module WritebackCommitUnitL4 #(
             ppreg: 'x
           };
       end
-    end
 
-    assign complete[i].val     = Ex_val_sel[i];
-    assign complete[i].seq_num = Ex_seq_num_sel[i];
-    assign complete[i].waddr   = Ex_waddr_sel[i];
-    assign complete[i].wdata   = Ex_wdata_sel[i];
-    assign complete[i].wen     = ( Ex_waddr_sel[i] == '0 ) ? 0 : Ex_wen_sel[i];
-    assign complete[i].preg    = Ex_preg_sel[i];
+      assign complete[i].val     = Ex_val_sel[i];
+      assign complete[i].seq_num = Ex_seq_num_sel[i];
+      assign complete[i].waddr   = Ex_waddr_sel[i];
+      assign complete[i].wdata   = Ex_wdata_sel[i];
+      assign complete[i].wen     = ( Ex_waddr_sel[i] == '0 ) ? 0 : Ex_wen_sel[i];
+      assign complete[i].preg    = Ex_preg_sel[i];
+    end
   endgenerate
 
   //----------------------------------------------------------------------
@@ -218,68 +226,92 @@ module WritebackCommitUnitL4 #(
     logic [p_phys_addr_bits-1:0] ppreg;
   } t_rob_msg;
 
-  t_rob_msg rob_input, rob_output;
+  t_rob_msg rob_input [p_num_be_lanes], rob_output [p_num_be_lanes];
 
-  assign rob_input.pc      = X_reg.pc;
-  assign rob_input.waddr   = X_reg.waddr;
-  assign rob_input.wdata   = X_reg.wdata;
-  assign rob_input.wen     = ( X_reg.waddr == '0 ) ? 0 : X_reg.wen;
-  assign rob_input.ppreg   = X_reg.ppreg;
+  generate
+    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_ROB_INPUT
+      assign rob_input[i].pc      = X_reg[i].pc;
+      assign rob_input[i].waddr   = X_reg[i].waddr;
+      assign rob_input[i].wdata   = X_reg[i].wdata;
+      assign rob_input[i].wen     = ( X_reg[i].waddr == '0 ) ? 0 : X_reg[i].wen;
+      assign rob_input[i].ppreg   = X_reg[i].ppreg;
+    end
+  endgenerate
 
-  localparam p_rob_depth = 2 ** p_seq_num_bits;
+  logic [p_seq_num_bits-1:0] X_reg_seq_num [p_num_be_lanes];
+  logic                      X_reg_val     [p_num_be_lanes];
+  generate
+    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_X_REG_PACKED
+      assign X_reg_seq_num[i] = X_reg[i].seq_num;
+      assign X_reg_val[i]     = X_reg[i].val;
+    end
+  endgenerate
 
-  // TODO
+  logic deq_rdy;
+  logic deq_msg_val [p_num_be_lanes];
+  logic [p_seq_num_bits-1:0] rob_output_seq_num [p_num_be_lanes];
+
   MROB #(
-    .p_depth    (p_rob_depth),
-    .p_msg_bits ($bits(t_rob_msg))
+    .p_depth     (p_rob_depth),
+    .p_num_lanes (p_num_be_lanes),
+    .p_msg_bits  ($bits(t_rob_msg))
   ) rob (
-    .ins_idx (X_reg.seq_num),
-    .ins_msg (rob_input),
-    .ins_en  (X_reg.val),
+    .ins_idx     (X_reg_seq_num),
+    .ins_msg     (rob_input),
+    .ins_msg_val (X_reg_val),
+    .ins_en      (X_reg_val.or()),
+    .ins_rdy     (),
+    .avail_slots (avail_slots_mrob),
 
-    .deq_idx (commit.seq_num),
-    .deq_msg (rob_output),
-    .deq_en  (commit.val),
-    .deq_rdy (commit.val),
+    .deq_idx     (rob_output_seq_num),
+    .deq_msg     (rob_output),
+    .deq_msg_val (deq_msg_val),
+    .deq_en      (deq_rdy),
+    .deq_rdy     (deq_rdy),
     .*
   );
 
-  // TODO
-  assign commit.pc    = rob_output.pc;
-  assign commit.waddr = rob_output.waddr;
-  assign commit.wdata = rob_output.wdata;
-  assign commit.wen   = rob_output.wen;
-  assign commit.ppreg = rob_output.ppreg;
+  generate
+    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_COMMIT_OUTPUT
+      assign commit[i].pc      = rob_output[i].pc;
+      assign commit[i].waddr   = rob_output[i].waddr;
+      assign commit[i].wdata   = rob_output[i].wdata;
+      assign commit[i].wen     = rob_output[i].wen;
+      assign commit[i].ppreg   = rob_output[i].ppreg;
+      assign commit[i].val     = deq_msg_val[i];
+      assign commit[i].seq_num = rob_output_seq_num[i];
+    end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Linetracing
   //----------------------------------------------------------------------
 
-`ifndef SYNTHESIS
-  function int ceil_div_4( int val );
-    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-  endfunction
+// `ifndef SYNTHESIS
+//   function int ceil_div_4( int val );
+//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+//   endfunction
 
-  int str_len;
-  assign str_len = ceil_div_4( p_seq_num_bits ) + 1 + // seq_num
-                   1                            + 1 + // wen
-                   ceil_div_4( 5 )              + 1 + // addr
-                   8;                                 // data
+//   int str_len;
+//   assign str_len = ceil_div_4( p_seq_num_bits ) + 1 + // seq_num
+//                    1                            + 1 + // wen
+//                    ceil_div_4( 5 )              + 1 + // addr
+//                    8;                                 // data
   
-  function string trace( int trace_level ); // TODO
-    if( X_reg.val ) begin
-      if( trace_level > 0 )
-        trace = $sformatf("%h:%h:%h:%h", X_reg.seq_num, X_reg.wen, X_reg.waddr, X_reg.wdata );
-      else
-        trace = $sformatf("%h", X_reg.seq_num);
-    end else begin
-      if( trace_level > 0 )
-        trace = {str_len{" "}};
-      else
-        trace = {(ceil_div_4( p_seq_num_bits )){" "}};
-    end
-  endfunction
-`endif
+//   function string trace( int trace_level ); // TODO
+//     if( X_reg.val ) begin
+//       if( trace_level > 0 )
+//         trace = $sformatf("%h:%h:%h:%h", X_reg.seq_num, X_reg.wen, X_reg.waddr, X_reg.wdata );
+//       else
+//         trace = $sformatf("%h", X_reg.seq_num);
+//     end else begin
+//       if( trace_level > 0 )
+//         trace = {str_len{" "}};
+//       else
+//         trace = {(ceil_div_4( p_seq_num_bits )){" "}};
+//     end
+//   endfunction
+// `endif
 
 endmodule
 

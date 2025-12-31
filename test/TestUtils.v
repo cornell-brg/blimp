@@ -263,7 +263,7 @@ endmodule
 
 `define CHECK_EQ( __dut, __ref )                                        \
   if ( __ref !== ( __ref ^ __dut ^ __ref ) ) begin                      \
-    if ( t.verbose )                                              \
+    if ( t.verbose )                                                    \
       $display( "\n%sERROR%s (cycle=%0d): %s != %s (%b != %b)",         \
                 `RED, `RESET, t.cycles, `"__dut`", `"__ref`",           \
                 __dut, __ref );                                         \
@@ -273,9 +273,31 @@ endmodule
     TestEnv::TestStatus::test_fail();                                   \
   end                                                                   \
   else begin                                                            \
-    if ( !t.verbose )                                              \
+    if ( !t.verbose )                                                   \
       $write( "%s.%s", `GREEN, `RESET );                                \
   end                                                                   \
   if (1)
+
+`define CHECK_EQ_SET( __dut, __refs, __refs_val )                             \
+  begin                                                                       \
+    int match_found = 0;                                                      \
+    foreach ( __refs[i] ) begin                                               \
+      if ( __refs_val[i] && __refs[i] === ( __refs[i] ^ __dut ^ __refs[i] ) ) \
+        match_found = 1;                                                      \
+    end                                                                       \
+    if( match_found == 0 ) begin                                              \
+      if ( t.verbose )                                                        \
+        $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%b)",           \
+                  `RED, `RESET, t.cycles, `"__dut`",                          \
+                  `"__refs`", __dut );                                        \
+      else                                                                    \
+        $write( "%sF%s", `RED, `RESET );                                      \
+      t.failed = 1;                                                           \
+      TestEnv::TestStatus::test_fail();                                       \
+    end else begin                                                            \
+      if ( !t.verbose )                                                       \
+        $write( "%s.%s", `GREEN, `RESET );                                    \
+    end                                                                       \
+  end
 
 `endif // TEST_TEST_UTILS_V
