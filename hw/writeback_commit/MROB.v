@@ -50,6 +50,7 @@ module MROB #(
   } t_entry;
 
   t_entry entries [p_depth];
+  t_entry next_entries_enqd [p_depth];
 
   assign ins_rdy = (avail_slots > 0);
 
@@ -77,6 +78,33 @@ module MROB #(
     end
   end
 
+  always_comb begin
+    next_entries_enqd = entries;
+    for( int i = 0; i < p_num_lanes; i++ ) begin
+      if( ins_en & ins_msg_val[i] ) begin
+        next_entries_enqd[ins_idx[i]] = '{
+          msg: ins_msg[i],
+          val: 1'b1
+        };
+      end
+    end
+  end
+
+  //----------------------------------------------------------------------
+  // Bypass
+  //----------------------------------------------------------------------
+
+  logic can_bypass;
+
+  always_comb begin
+    can_bypass = 1'b1;
+    for( int i = 0; i < p_num_lanes; i++ ) begin
+      if( ins_idx[i] != deq_ptr ) begin
+        can_bypass = 1'b0;
+      end
+    end
+  end
+
   //----------------------------------------------------------------------
   // Dequeue
   //----------------------------------------------------------------------
@@ -84,7 +112,7 @@ module MROB #(
   logic [p_entry_bits-1:0] deq_ptr_next;
   logic [p_depth-1:0]      val_rot_pack;
 
-  assign deq_rdy = entries[deq_ptr].val;
+  assign deq_rdy = entries[deq_ptr].val | ( can_bypass & ins_en );
 
   logic [p_entry_bits-1:0] deq_idx_full [p_depth];
   logic [p_msg_bits-1:0]   deq_msg_full [p_depth];
@@ -93,12 +121,12 @@ module MROB #(
   always_comb begin
     for( int i = 0; i < p_depth; i++ ) begin
       if( i + int'(deq_ptr) < p_depth ) begin
-        val_rot_pack[i] = entries[i + int'(deq_ptr)].val;
-        deq_msg_full[i] = entries[i + int'(deq_ptr)].msg;
+        val_rot_pack[i] = next_entries_enqd[i + int'(deq_ptr)].val;
+        deq_msg_full[i] = next_entries_enqd[i + int'(deq_ptr)].msg;
         deq_idx_full[i] = deq_ptr + p_entry_bits'(i);
       end else begin
-        val_rot_pack[i] = entries[i + int'(deq_ptr) - p_depth].val;
-        deq_msg_full[i] = entries[i + int'(deq_ptr) - p_depth].msg;
+        val_rot_pack[i] = next_entries_enqd[i + int'(deq_ptr) - p_depth].val;
+        deq_msg_full[i] = next_entries_enqd[i + int'(deq_ptr) - p_depth].msg;
         deq_idx_full[i] = deq_ptr + p_entry_bits'(i - p_depth);
       end
     end
