@@ -62,27 +62,34 @@ module TestMSub #(
   // Linetracing
   //----------------------------------------------------------------------
 
-  // string test_trace;
-  // int trace_len;
-  // initial begin
-  //   test_trace = $sformatf("%p", msg);
-  //   trace_len = test_trace.len();
-  // end
+  string test_trace;
+  int trace_len;
+  initial begin
+    test_trace = $sformatf("%h", msg[0]);
+    trace_len = test_trace.len();
+  end
 
-  // function string trace(
-  //   // verilator lint_off UNUSEDSIGNAL
-  //   int trace_level
-  //   // verilator lint_on UNUSEDSIGNAL
-  // );
-  //   if( val & waiting )
-  //     trace = $sformatf("%p", msg);
-  //   else if( val )
-  //     trace = {{(trace_len-1){" "}}, "X"};
-  //   else if( waiting )
-  //     trace = {(trace_len){" "}};
-  //   else
-  //     trace = {{(trace_len-1){" "}}, "."};
-  // endfunction
+  function string trace(
+    // verilator lint_off UNUSEDSIGNAL
+    int trace_level
+    // verilator lint_on UNUSEDSIGNAL
+  );
+    trace = "";
+
+    for( int i = 0; i < p_num_msgs; i++ ) begin
+      if( i != 0 )
+        trace = {trace, "  "};
+
+      if( val[i] & waiting )
+        trace = $sformatf("%h", msg[i]);
+      else if( val[i] )
+        trace = {{(trace_len-1){" "}}, "X"};
+      else if( waiting )
+        trace = {(trace_len){" "}};
+      else
+        trace = {{(trace_len-1){" "}}, "."};
+    end
+  endfunction
 
 endmodule
 

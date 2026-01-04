@@ -123,7 +123,7 @@ module MROB #(
         val_rot_pack_thermo[i] = val_rot_pack_first_edge[i] | val_rot_pack_thermo[i+1];
 
       if (val_rot_pack_first_edge[i])
-        first_invalid_idx = (p_entry_bits)'(i+1);
+        first_invalid_idx = (p_entry_bits)'(i+1) + deq_ptr;
     end
   end
 
@@ -147,12 +147,10 @@ module MROB #(
   always_comb begin
 
     // get value to add to deq_ptr based on first invalid index
-    if( entries[first_invalid_idx].val ) begin
-      deq_ptr_add_val = (p_entry_bits+1)'(p_depth) - (p_entry_bits+1)'(deq_ptr);
-    end else if( (p_entry_bits+1)'(first_invalid_idx + deq_ptr) > (p_entry_bits+1)'(p_depth - 1) ) begin
-      deq_ptr_add_val = (p_entry_bits+1)'(first_invalid_idx) - (p_entry_bits+1)'(p_depth);
+    if( first_invalid_idx > deq_ptr ) begin
+      deq_ptr_add_val = (p_entry_bits+1)'(first_invalid_idx) - (p_entry_bits+1)'(deq_ptr);
     end else begin
-      deq_ptr_add_val = (p_entry_bits+1)'(first_invalid_idx);
+      deq_ptr_add_val = (p_entry_bits+1)'(p_depth) - (p_entry_bits+1)'(deq_ptr) + (p_entry_bits+1)'(first_invalid_idx);
     end
 
     // truncate actual value added if > number of available lanes
@@ -174,47 +172,54 @@ module MROB #(
   // Linetracing
   //----------------------------------------------------------------------
 
-// `ifndef SYNTHESIS
-//   function int ceil_div_4( int val );
-//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-//   endfunction
+`ifndef SYNTHESIS
+  function int ceil_div_4( int val );
+    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+  endfunction
 
-//   string test_trace;
-//   int    msg_len;
+  string test_trace;
+  int    msg_len;
 
-//   initial begin
-//     test_trace = $sformatf("%x:%x", ins_idx, ins_msg);
-//     msg_len = test_trace.len();
-//   end
+  initial begin
+    test_trace = $sformatf("%x:%x", ins_idx[0], ins_msg[0]);
+    msg_len = test_trace.len();
+  end
 
-//   function string trace( int trace_level );
-//     if( ins_en ) begin
-//       if( trace_level > 0 )
-//         trace = $sformatf("%x:%x", ins_idx, ins_msg);
-//       else
-//         trace = $sformatf("%x", ins_idx);
-//     end else begin
-//       if( trace_level > 0 )
-//         trace = {(msg_len){" "}};
-//       else 
-//         trace = {(ceil_div_4(p_entry_bits)){" "}};
-//     end
+  function string trace( int trace_level );
+    trace = "";
 
-//     trace = {trace, " > "};
+    for( int i = 0; i < p_num_lanes; i++ ) begin
+      if( i != 0 )
+        trace = {trace, "  "};
 
-//     if( deq_en & deq_rdy ) begin
-//       if( trace_level > 0 )
-//         trace = {trace, $sformatf("%x:%x", deq_idx, deq_msg)};
-//       else
-//         trace = {trace, $sformatf("%x", deq_idx)};
-//     end else begin
-//       if( trace_level > 0 )
-//         trace = {trace, {(msg_len){" "}}};
-//       else 
-//         trace = {trace, {(ceil_div_4(p_entry_bits)){" "}}};
-//     end
-//   endfunction
-// `endif
+      if( ins_en ) begin
+        if( trace_level > 0 )
+          trace = {trace, $sformatf("%x:%x", ins_idx[i], ins_msg[i])};
+        else
+          trace = {trace, $sformatf("%x", ins_idx[i])};
+      end else begin
+        if( trace_level > 0 )
+          trace = {trace, {(msg_len){" "}}};
+        else 
+          trace = {trace, {(ceil_div_4(p_entry_bits)){" "}}};
+      end
+
+      trace = {trace, " > "};
+
+      if( deq_en & deq_rdy ) begin
+        if( trace_level > 0 )
+          trace = {trace, $sformatf("%x:%x", deq_idx[i], deq_msg[i])};
+        else
+          trace = {trace, $sformatf("%x", deq_idx[i])};
+      end else begin
+        if( trace_level > 0 )
+          trace = {trace, {(msg_len){" "}}};
+        else 
+          trace = {trace, {(ceil_div_4(p_entry_bits)){" "}}};
+      end
+    end
+  endfunction
+`endif
 
 endmodule
 

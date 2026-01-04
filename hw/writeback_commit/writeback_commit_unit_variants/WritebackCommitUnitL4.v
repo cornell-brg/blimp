@@ -287,31 +287,37 @@ module WritebackCommitUnitL4 #(
   // Linetracing
   //----------------------------------------------------------------------
 
-// `ifndef SYNTHESIS
-//   function int ceil_div_4( int val );
-//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-//   endfunction
+`ifndef SYNTHESIS
+  function int ceil_div_4( int val );
+    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+  endfunction
 
-//   int str_len;
-//   assign str_len = ceil_div_4( p_seq_num_bits ) + 1 + // seq_num
-//                    1                            + 1 + // wen
-//                    ceil_div_4( 5 )              + 1 + // addr
-//                    8;                                 // data
+  int str_len;
+  assign str_len = ceil_div_4( p_seq_num_bits ) + 1 + // seq_num
+                   1                            + 1 + // wen
+                   ceil_div_4( 5 )              + 1 + // addr
+                   8;                                 // data
   
-//   function string trace( int trace_level ); // TODO
-//     if( X_reg.val ) begin
-//       if( trace_level > 0 )
-//         trace = $sformatf("%h:%h:%h:%h", X_reg.seq_num, X_reg.wen, X_reg.waddr, X_reg.wdata );
-//       else
-//         trace = $sformatf("%h", X_reg.seq_num);
-//     end else begin
-//       if( trace_level > 0 )
-//         trace = {str_len{" "}};
-//       else
-//         trace = {(ceil_div_4( p_seq_num_bits )){" "}};
-//     end
-//   endfunction
-// `endif
+  function string trace( int trace_level );
+    trace = "";
+    for( int i = 0; i < p_num_be_lanes; i++ ) begin
+      if( i != 0 )
+        trace = {trace, "  "};
+
+      if( X_reg[i].val ) begin
+        if( trace_level > 0 )
+          trace = {trace, $sformatf("%h:%h:%h:%h", X_reg[i].seq_num, X_reg[i].wen, X_reg[i].waddr, X_reg[i].wdata )};
+        else
+          trace = {trace, $sformatf("%h", X_reg[i].seq_num)};
+      end else begin
+        if( trace_level > 0 )
+          trace = {trace, {str_len{" "}}};
+        else
+          trace = {trace, {(ceil_div_4( p_seq_num_bits )){" "}}};
+      end
+    end
+  endfunction
+`endif
 
 endmodule
 

@@ -57,7 +57,7 @@ module TestMPub #(
   string test_trace;
   int trace_len;
   initial begin
-    test_trace = $sformatf("%p", msg);
+    test_trace = $sformatf("%h", msg[0]);
     trace_len = test_trace.len();
   end
 
@@ -66,10 +66,17 @@ module TestMPub #(
     int trace_level
     // verilator lint_on UNUSEDSIGNAL
   );
-    if( val.or() )
-      trace = $sformatf("%p", msg);
-    else
-      trace = {(trace_len){" "}};
+    trace = "";
+
+    for( int i = 0; i < p_num_msgs; i++ ) begin
+      if( i != 0 )
+        trace = {trace, "  "};
+
+      if( val[i] )
+        trace = {trace, $sformatf("%h", msg[i])};
+      else
+        trace = {trace, {(trace_len){" "}}};
+    end
   endfunction
 
 endmodule

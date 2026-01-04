@@ -187,22 +187,22 @@ module MROBTestSuite #(
   // Linetracing
   //----------------------------------------------------------------------
 
-  // string trace;
+  string trace;
 
-  // // verilator lint_off BLKSEQ
-  // always @( posedge clk ) begin
-  //   #2;
-  //   trace = "";
+  // verilator lint_off BLKSEQ
+  always @( posedge clk ) begin
+    #2;
+    trace = "";
 
-  //   trace = {trace, ins_caller.trace( t.trace_level )};
-  //   trace = {trace, " | "};
-  //   trace = {trace, dut.trace( t.trace_level )};
-  //   trace = {trace, " | "};
-  //   trace = {trace, deq_caller.trace( t.trace_level )};
+    trace = {trace, ins_caller.trace( t.trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, dut.trace( t.trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, deq_caller.trace( t.trace_level )};
 
-  //   t.trace( trace );
-  // end
-  // // verilator lint_on BLKSEQ
+    t.trace( trace );
+  end
+  // verilator lint_on BLKSEQ
 
   //----------------------------------------------------------------------
   // test_case_basic
@@ -291,6 +291,25 @@ module MROBTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
+  // test_case_wrap_around
+  //----------------------------------------------------------------------
+
+  task test_case_wrap_around();
+    t.test_case_begin( "test_case_wrap_around" );
+    if( !t.run_test ) return;
+
+    //   msg                        idx           val
+    send('{'h11111111, 'h22222222}, '{'d0, 'd1},  '{'1, '1});
+    send('{'h33333333, 'x},         '{'d2, 'x},   '{'1, '0});
+    recv('{'h11111111, 'h22222222}, '{'d0, 'd1},  '{'1, '1});
+    recv('{'h33333333, 'x},         '{'d2, 'x},   '{'1, '0});
+    send('{'h44444444, 'h55555555}, '{'d3, 'd0},  '{'1, '1});
+    recv('{'h44444444, 'h55555555}, '{'d3, 'd0},  '{'1, '1});
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
   // run_test_suite
   //----------------------------------------------------------------------
 
@@ -300,6 +319,7 @@ module MROBTestSuite #(
     test_case_basic();
     test_case_capacity();
     test_case_out_of_order();
+    test_case_wrap_around();
   endtask
 
 endmodule

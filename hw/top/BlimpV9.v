@@ -1,5 +1,5 @@
 //========================================================================
-// BlimpV8.v
+// BlimpV9.v
 //========================================================================
 // A top-level implementation of the Blimp processor with support for
 // RV32IM (no exceptions) and superscalar backend
@@ -8,14 +8,14 @@
 `define HW_TOP_BLIMPV9_V
 
 `include "defs/UArch.v"
-`include "hw/fetch/fetch_unit_variants/FetchUnitL3.v"
+`include "hw/fetch/fetch_unit_variants/FetchUnitL4.v"
 `include "hw/decode_issue/decode_issue_unit_variants/DecodeIssueUnitL6.v"
 `include "hw/execute/ExQueue.v"
 `include "hw/execute/execute_units_l6/ALUL6.v"
 `include "hw/execute/execute_units_l7/IterativeMulDivRemL7.v"
 `include "hw/execute/execute_units_l7/LoadStoreUnitL7.v"
 `include "hw/execute/execute_units_l6/ControlFlowUnitL6.v"
-`include "hw/squash/SquashUnitL1.v"
+`include "hw/squash/SquashUnitL2.v"
 `include "hw/writeback_commit/writeback_commit_unit_variants/WritebackCommitUnitL4.v"
 `include "intf/MemIntf.v"
 `include "intf/F__DIntf.v"
@@ -26,7 +26,7 @@
 `include "intf/SquashNotif.v"
 `include "intf/InstTraceNotif.v"
 
-module BlimpV8 #(
+module BlimpV9 #(
   parameter p_opaq_bits     = 8,
   parameter p_seq_num_bits  = 5,
   parameter p_num_phys_regs = 36,
@@ -51,7 +51,7 @@ module BlimpV8 #(
   // Instruction Trace
   //----------------------------------------------------------------------
 
-  InstTraceNotif.pub inst_trace
+  InstTraceNotif.pub inst_trace [p_num_be_lanes]
 );
 
   localparam p_num_pipes = 4;
@@ -91,22 +91,26 @@ module BlimpV8 #(
   CompleteNotif #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) complete_notif() [p_num_be_lanes];
+  ) complete_notif [p_num_be_lanes]();
 
   CommitNotif #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) commit_notif() [p_num_be_lanes];
+  ) commit_notif [p_num_be_lanes]();
 
-  // TODO
-  assign inst_trace.pc    = commit_notif.pc;
-  assign inst_trace.waddr = commit_notif.waddr;
-  assign inst_trace.wdata = commit_notif.wdata;
-  assign inst_trace.wen   = commit_notif.wen;
-  assign inst_trace.val   = commit_notif.val;
+  logic [4:0] unused_complete_waddr [p_num_be_lanes];
 
-  logic [4:0] unused_complete_waddr;
-  assign unused_complete_waddr = complete_notif.waddr;
+  genvar i;
+  generate
+    for( i = 0; i < p_num_be_lanes; i++ ) begin
+      assign inst_trace[i].pc         = commit_notif[i].pc;
+      assign inst_trace[i].waddr      = commit_notif[i].waddr;
+      assign inst_trace[i].wdata      = commit_notif[i].wdata;
+      assign inst_trace[i].wen        = commit_notif[i].wen;
+      assign inst_trace[i].val        = commit_notif[i].val;
+      assign unused_complete_waddr[i] = complete_notif[i].waddr;
+    end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Units
@@ -152,8 +156,9 @@ module BlimpV8 #(
                             OP_BLTU_VEC |
                             OP_BGEU_VEC;
 
-  FetchUnitL3 #(
-    .p_max_in_flight (8)
+  FetchUnitL4 #(
+    .p_max_in_flight (8),
+    .p_num_be_lanes  (p_num_be_lanes)
   ) FU (
     .mem    (inst_mem),
     .D      (f__d_intf),
@@ -226,8 +231,9 @@ module BlimpV8 #(
     .*
   );
 
-  SquashUnitL1 #(
-    .p_num_arb (2)
+  SquashUnitL2 #(
+    .p_num_arb      (2),
+    .p_num_be_lanes (p_num_be_lanes)
   ) SU (
     .arb    (squash_arb_notif),
     .gnt    (squash_gnt_notif),
@@ -260,4 +266,4 @@ module BlimpV8 #(
 
 endmodule
 
-`endif // HW_TOP_BLIMPV8_V
+`endif // HW_TOP_BLIMPV9_V

@@ -281,49 +281,49 @@ module WritebackCommitUnitL4TestSuite #(
   // Linetracing
   //----------------------------------------------------------------------
 
-  // string X_traces [p_num_pipes-1:0];
-  // generate
-  //   for( i = 0; i < p_num_pipes; i = i + 1 ) begin
-  //     // verilator lint_off BLKSEQ
-  //     always @( posedge clk ) begin
-  //       #2;
-  //       X_traces[i] = X_Istreams[i].X_Istream.trace( t.trace_level );
-  //     end
-  //     // verilator lint_on BLKSEQ
-  //   end
-  // endgenerate
+  string X_traces [p_num_pipes-1:0];
+  generate
+    for( i = 0; i < p_num_pipes; i = i + 1 ) begin
+      // verilator lint_off BLKSEQ
+      always @( posedge clk ) begin
+        #2;
+        X_traces[i] = X_Istreams[i].X_Istream.trace( t.trace_level );
+      end
+      // verilator lint_on BLKSEQ
+    end
+  endgenerate
 
   // Need to store other traces, to be aligned with X_Istream traces
-  // string trace;
-  // // string dut_trace;
-  // string CompleteSub_trace;
-  // string CommitSub_trace;
+  string trace;
+  string dut_trace;
+  string CompleteSub_trace;
+  string CommitSub_trace;
 
-  // // verilator lint_off BLKSEQ
-  // always @( posedge clk ) begin
-  //   #2;
-  //   // dut_trace         = dut.trace( t.trace_level );
-  //   CompleteSub_trace = CompleteSub.trace( t.trace_level );
-  //   CommitSub_trace   = CommitSub.trace( t.trace_level );
+  // verilator lint_off BLKSEQ
+  always @( posedge clk ) begin
+    #2;
+    dut_trace         = dut.trace( t.trace_level );
+    CompleteSub_trace = CompleteSub.trace( t.trace_level );
+    CommitSub_trace   = CommitSub.trace( t.trace_level );
 
-  //   // Wait until X_Istream traces are ready
-  //   #1;
-  //   trace = "";
+    // Wait until X_Istream traces are ready
+    #1;
+    trace = "";
 
-  //   for( int j = 0; j < p_num_pipes; j++ ) begin
-  //     if( j > 0 )
-  //       trace = {trace, " "};
-  //     trace = {trace, X_traces[j]};
-  //   end
-  //   // trace = {trace, " | "};
-  //   // trace = {trace, dut_trace};
-  //   trace = {trace, " | "};
-  //   trace = {trace, CompleteSub_trace};
-  //   trace = {trace, " - "};
-  //   trace = {trace, CommitSub_trace};
+    for( int j = 0; j < p_num_pipes; j++ ) begin
+      if( j > 0 )
+        trace = {trace, " "};
+      trace = {trace, X_traces[j]};
+    end
+    trace = {trace, " | "};
+    trace = {trace, dut_trace};
+    trace = {trace, " | "};
+    trace = {trace, CompleteSub_trace};
+    trace = {trace, " - "};
+    trace = {trace, CommitSub_trace};
     
-  //   t.trace( trace );
-  // end
+    t.trace( trace );
+  end
   // verilator lint_on BLKSEQ
 
   //----------------------------------------------------------------------
