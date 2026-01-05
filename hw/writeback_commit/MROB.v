@@ -71,6 +71,8 @@ module MROB #(
             val: 1'b1
           };
         end
+      end
+      for( int i = 0; i < p_num_lanes; i++ ) begin
         if( deq_en & deq_rdy & deq_msg_val[i] ) begin
           entries[deq_idx[i]] <= '{msg: 'x, val: 1'b0};
         end
@@ -97,10 +99,10 @@ module MROB #(
   logic can_bypass;
 
   always_comb begin
-    can_bypass = 1'b1;
+    can_bypass = 1'b0;
     for( int i = 0; i < p_num_lanes; i++ ) begin
-      if( ins_idx[i] != deq_ptr ) begin
-        can_bypass = 1'b0;
+      if( ins_idx[i] == deq_ptr && ins_msg_val[i]) begin
+        can_bypass = 1'b1;
       end
     end
   end

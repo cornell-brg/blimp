@@ -308,25 +308,25 @@ add_custom_target(
 # Include RISCV programs
 #------------------------------------------------------------------------
 
-# foreach(APP_SUBDIR ${APP_SUBDIRS})
-#   set(PROGS "")
-#   add_subdirectory(${APP_SUBDIR})
-#   add_prefix(SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
-#   add_prefix(APP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
+foreach(APP_SUBDIR ${APP_SUBDIRS})
+  set(PROGS "")
+  add_subdirectory(${APP_SUBDIR})
+  add_prefix(SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
+  add_prefix(APP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
 
-#   # Include native builds for all apps
-#   foreach(PROG ${PROGS})
-#     set(SRC_FILES ${${APP_SUBDIR}-${PROG}-files})
-#     add_prefix(SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
-#     add_executable(${APP_SUBDIR}-${PROG}-native ${SRC_FILES})
-#     target_compile_options(${APP_SUBDIR}-${PROG}-native PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror)
-#     target_include_directories(${APP_SUBDIR}-${PROG}-native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR})
-#     set_target_properties(${APP_SUBDIR}-${PROG}-native PROPERTIES
-#       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${APP_SUBDIR}"
-#       OUTPUT_NAME ${PROG}-native
-#     )
-#   endforeach(PROG)
-# endforeach(APP_SUBDIR)
+  # Include native builds for all apps
+  foreach(PROG ${PROGS})
+    set(SRC_FILES ${${APP_SUBDIR}-${PROG}-files})
+    add_prefix(SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR}/)
+    add_executable(${APP_SUBDIR}-${PROG}-native ${SRC_FILES})
+    target_compile_options(${APP_SUBDIR}-${PROG}-native PRIVATE -O3 -Wall -Wextra -Wpedantic -Werror)
+    target_include_directories(${APP_SUBDIR}-${PROG}-native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${APP_SUBDIR})
+    set_target_properties(${APP_SUBDIR}-${PROG}-native PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${APP_SUBDIR}"
+      OUTPUT_NAME ${PROG}-native
+    )
+  endforeach(PROG)
+endforeach(APP_SUBDIR)
 
 #-------------------------------------------------------------------------
 # Include FL simulator

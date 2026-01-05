@@ -43,14 +43,14 @@ module TestMCaller #(
   );
     for( int i = 0; i < p_num_msgs; i++ )
       call_msg[i] = dut_call_msg[i];
-    
-    while( !rdy ) begin
-      @( posedge clk );
-      #1;
-    end
 
     // Interface is ready - can call message
     en = 1'b1;
+    
+    while( !rdy ) begin
+      // @( posedge clk );
+      #1;
+    end
 
     #2;
     for( int i = 0; i < p_num_msgs; i++ )

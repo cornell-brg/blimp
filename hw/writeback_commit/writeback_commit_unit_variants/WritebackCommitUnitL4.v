@@ -278,7 +278,7 @@ module WritebackCommitUnitL4 #(
       assign commit[i].wdata   = rob_output[i].wdata;
       assign commit[i].wen     = rob_output[i].wen;
       assign commit[i].ppreg   = rob_output[i].ppreg;
-      assign commit[i].val     = deq_msg_val[i];
+      assign commit[i].val     = deq_msg_val[i] & deq_rdy;
       assign commit[i].seq_num = rob_output_seq_num[i];
     end
   endgenerate

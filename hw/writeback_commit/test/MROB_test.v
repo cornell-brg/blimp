@@ -225,10 +225,10 @@ module MROBTestSuite #(
     fork
         //    msg                        idx          val
       begin
-        send( '{'hdeadbeef, 'hfeebdaed}, '{'d1, 'd2}, '{'1, '1} );
+        send( '{'h11111111, 'h22222222}, '{'d1, 'd2}, '{'1, '1} );
       end
       begin
-        recv( '{'hdeadbeef, 'hfeebdaed}, '{'d1, 'd2}, '{'1, '1} );
+        recv( '{'h11111111, 'h22222222}, '{'d1, 'd2}, '{'1, '1} );
       end
     join
 

@@ -54,7 +54,7 @@ module BlimpV9 #(
   InstTraceNotif.pub inst_trace [p_num_be_lanes]
 );
 
-  localparam p_num_pipes = 4;
+  localparam p_num_pipes = 6;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
   //----------------------------------------------------------------------
@@ -78,7 +78,7 @@ module BlimpV9 #(
   X__WIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) buffer_intf();
+  ) buffer_intf [2]();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -171,8 +171,10 @@ module BlimpV9 #(
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
     .p_pipe_subsets ({
-      p_alu_subset, // ALU
-      p_m_subset,   // M-Extension
+      p_alu_subset, // ALU0
+      p_alu_subset, // ALU1
+      p_m_subset,   // M-Extension for MUL0
+      p_m_subset,   // M-Extension for MUL1
       p_mem_subset, // Memory
       p_ctrl_subset // Control Flow
     }),
@@ -187,36 +189,54 @@ module BlimpV9 #(
     .*
   );
 
-  ALUL6 ALU_XU (
+  ALUL6 ALU0_XU (
     .D (d__x_intfs[0]),
-    .W (buffer_intf),
+    .W (buffer_intf[0]),
     .*
   );
 
-  ExQueue #(1) alu_buf (
-    .in  (buffer_intf),
+  ALUL6 ALU1_XU (
+    .D (d__x_intfs[1]),
+    .W (buffer_intf[1]),
+    .*
+  );
+
+  ExQueue #(1) alu0_buf (
+    .in  (buffer_intf[0]),
     .out (x__w_intfs[0]),
     .*
   );
 
-  IterativeMulDivRemL7 MUL_DIV_REM_XU (
-    .D (d__x_intfs[1]),
-    .W (x__w_intfs[1]),
+  ExQueue #(1) alu1_buf (
+    .in  (buffer_intf[1]),
+    .out (x__w_intfs[1]),
+    .*
+  );
+
+  IterativeMulDivRemL7 MUL_DIV_REM0_XU (
+    .D (d__x_intfs[2]),
+    .W (x__w_intfs[2]),
+    .*
+  );
+
+  IterativeMulDivRemL7 MUL_DIV_REM1_XU (
+    .D (d__x_intfs[3]),
+    .W (x__w_intfs[3]),
     .*
   );
 
   LoadStoreUnitL7 #(
     .p_opaq_bits (p_opaq_bits)
   ) MEM_XU (
-    .D   (d__x_intfs[2]),
-    .W   (x__w_intfs[2]),
+    .D   (d__x_intfs[4]),
+    .W   (x__w_intfs[4]),
     .mem (data_mem),
     .*
   );
 
   ControlFlowUnitL6 CTRL_XU (
-    .D      (d__x_intfs[3]),
-    .W      (x__w_intfs[3]),
+    .D      (d__x_intfs[5]),
+    .W      (x__w_intfs[5]),
     .squash (squash_arb_notif[1]),
     .*
   );
@@ -252,9 +272,13 @@ module BlimpV9 #(
     trace = {trace, " | "};
     trace = {trace, DIU.trace( trace_level )};
     trace = {trace, " | "};
-    trace = {trace, ALU_XU.trace( trace_level )};
+    trace = {trace, ALU0_XU.trace( trace_level )};
     trace = {trace, " | "};
-    trace = {trace, MUL_DIV_REM_XU.trace( trace_level )};
+    trace = {trace, ALU1_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
     trace = {trace, " | "};
     trace = {trace, MEM_XU.trace( trace_level )};
     trace = {trace, " | "};
