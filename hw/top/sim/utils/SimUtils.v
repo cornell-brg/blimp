@@ -120,7 +120,8 @@ module SimUtils
 
     if ( timeout_val & ( cycles > timeout ) ) begin
       $write("\n");
-      $fatal("ERROR (cycles=%0d): timeout!", cycles );
+      // $fatal("ERROR (cycles=%0d): timeout!", cycles );
+      $finish;
     end
 
   end

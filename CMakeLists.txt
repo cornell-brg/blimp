@@ -15,14 +15,18 @@ set(V_TEST_FILES
   hw/common/test/Fifo_test.v
   hw/common/test/PriorityEncoder_test.v
   hw/common/test/RRArb_test.v
+  hw/common/test/MRRArb_test.v
   hw/decode_issue/test/DecodeIssueUnitL1_test.v
   hw/decode_issue/test/DecodeIssueUnitL2_test.v
   hw/decode_issue/test/DecodeIssueUnitL3_test.v
   hw/decode_issue/test/DecodeIssueUnitL4_test.v
   hw/decode_issue/test/DecodeIssueUnitL5_test.v
+  hw/decode_issue/test/DecodeIssueUnitL6_test.v
   hw/decode_issue/test/ImmGen_test.v
   hw/decode_issue/test/RegfilePending_test.v
+  hw/decode_issue/test/MRegfile_test.v
   hw/decode_issue/test/RenameTable_test.v
+  hw/decode_issue/test/MRenameTable_test.v
   hw/execute/test/ExQueue_test.v
   hw/execute/test/l1/ALUL1_test.v
   hw/execute/test/l1/MultiplierL1_test.v
@@ -43,11 +47,14 @@ set(V_TEST_FILES
   hw/squash/test/SquashUnitL1_test.v
   hw/squash/test/SquashUnitL1Chain_test.v
   hw/util/test/SeqAge_test.v
+  hw/util/test/MSeqAge_test.v
   hw/util/test/SeqArb_test.v
   hw/writeback_commit/test/WritebackCommitUnitL1_test.v
   hw/writeback_commit/test/WritebackCommitUnitL2_test.v
   hw/writeback_commit/test/WritebackCommitUnitL3_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL4_test.v
   hw/writeback_commit/test/ROB_test.v
+  hw/writeback_commit/test/MROB_test.v
 )
 
 set(ASM_FILES

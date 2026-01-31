@@ -261,21 +261,70 @@ endmodule
 // XOR operator so that an X in __ref will match 0, 1, or X in __dut, but
 // an X in __dut will only match an X in __ref.
 
-`define CHECK_EQ( __dut, __ref )                                        \
-  if ( __ref !== ( __ref ^ __dut ^ __ref ) ) begin                      \
-    if ( t.verbose )                                              \
-      $display( "\n%sERROR%s (cycle=%0d): %s != %s (%b != %b)",         \
-                `RED, `RESET, t.cycles, `"__dut`", `"__ref`",           \
-                __dut, __ref );                                         \
-    else                                                                \
-      $write( "%sF%s", `RED, `RESET );                                  \
-    t.failed = 1;                                                       \
-    TestEnv::TestStatus::test_fail();                                   \
-  end                                                                   \
-  else begin                                                            \
-    if ( !t.verbose )                                              \
-      $write( "%s.%s", `GREEN, `RESET );                                \
-  end                                                                   \
+`define CHECK_EQ( __dut, __ref )                                \
+  if ( __ref !== ( __ref ^ __dut ^ __ref ) ) begin              \
+    if ( t.verbose )                                            \
+      $display( "\n%sERROR%s (cycle=%0d): %s != %s (%b != %b)", \
+                `RED, `RESET, t.cycles, `"__dut`", `"__ref`",   \
+                __dut, __ref );                                 \
+    else                                                        \
+      $write( "%sF%s", `RED, `RESET );                          \
+    t.failed = 1;                                               \
+    TestEnv::TestStatus::test_fail();                           \
+  end                                                           \
+  else begin                                                    \
+    if ( !t.verbose )                                           \
+      $write( "%s.%s", `GREEN, `RESET );                        \
+  end                                                           \
   if (1)
+
+`define CHECK_EQ_SET( __dut, __refs, __refs_val )                                   \
+  begin                                                                             \
+    int match_found = 0;                                                            \
+    foreach ( __refs[i] ) begin                                                     \
+      if ( __refs_val[i] && __refs[i] === ( __refs[i] ^ __dut ^ __refs[i] ) ) begin \
+        match_found = 1;                                                            \
+        break;                                                                      \
+      end                                                                           \
+    end                                                                             \
+    if( match_found == 0 ) begin                                                    \
+      if ( t.verbose )                                                              \
+        $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%b)",                 \
+                  `RED, `RESET, t.cycles, `"__dut`",                                \
+                  `"__refs`", __dut );                                              \
+      else                                                                          \
+        $write( "%sF%s", `RED, `RESET );                                            \
+      t.failed = 1;                                                                 \
+      TestEnv::TestStatus::test_fail();                                             \
+    end else begin                                                                  \
+      if ( !t.verbose )                                                             \
+        $write( "%s.%s", `GREEN, `RESET );                                          \
+    end                                                                             \
+  end
+
+`define CHECK_DEL_EQ_Q( __dut_q, __ref )                            \
+  begin                                                             \
+    automatic int match_found = 0;                                  \
+    foreach ( __dut_q[i] ) begin                                    \
+      if ( __ref === ( __ref ^ __dut_q[i] ^ __ref ) ) begin         \
+        match_found = 1;                                            \
+        __dut_q.delete(i);                                          \
+        break;                                                      \
+      end                                                           \
+    end                                                             \
+    if( match_found == 0 ) begin                                    \
+      if ( t.verbose )                                              \
+        $display( "\n%sERROR%s (cycle=%0d): %s (%b) not found in trace queue %s", \
+                  `RED, `RESET, t.cycles, `"__ref`", __ref,         \
+                  `"__dut_q`");                                     \
+      else                                                          \
+        $write( "%sF%s", `RED, `RESET );                            \
+      t.failed = 1;                                                 \
+      TestEnv::TestStatus::test_fail();                             \
+    end else begin                                                  \
+      if ( !t.verbose )                                             \
+        $write( "%s.%s", `GREEN, `RESET );                          \
+    end                                                             \
+  end
 
 `endif // TEST_TEST_UTILS_V

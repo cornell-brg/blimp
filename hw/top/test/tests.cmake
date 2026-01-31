@@ -13,6 +13,7 @@ set(BLIMP_VERSIONS
   BlimpV6
   BlimpV7
   BlimpV8
+  BlimpV9
 )
 
 # ------------------------------------------------------------------------
@@ -137,7 +138,7 @@ set(BlimpV7_TESTS
 )
 
 # ------------------------------------------------------------------------
-# BlimpV7
+# BlimpV8
 # ------------------------------------------------------------------------
 
 set(BlimpV8_TESTS
@@ -192,4 +193,64 @@ set(BlimpV8_TESTS
   BlimpV8_test/BlimpV8_divu_test.v
   BlimpV8_test/BlimpV8_rem_test.v
   BlimpV8_test/BlimpV8_remu_test.v
+)
+
+# ------------------------------------------------------------------------
+# BlimpV9
+# ------------------------------------------------------------------------
+
+set(BlimpV9_TESTS
+  BlimpV9_test/BlimpV9_add_test.v
+  BlimpV9_test/BlimpV9_addi_test.v
+  BlimpV9_test/BlimpV9_lw_test.v
+  BlimpV9_test/BlimpV9_sw_test.v
+  BlimpV9_test/BlimpV9_jal_test.v
+  BlimpV9_test/BlimpV9_jalr_test.v
+  BlimpV9_test/BlimpV9_bne_test.v
+
+  BlimpV9_test/BlimpV9_sub_test.v
+  BlimpV9_test/BlimpV9_and_test.v
+  BlimpV9_test/BlimpV9_or_test.v
+  BlimpV9_test/BlimpV9_xor_test.v
+  BlimpV9_test/BlimpV9_slt_test.v
+  BlimpV9_test/BlimpV9_sltu_test.v
+  BlimpV9_test/BlimpV9_sra_test.v
+  BlimpV9_test/BlimpV9_srl_test.v
+  BlimpV9_test/BlimpV9_sll_test.v
+
+  BlimpV9_test/BlimpV9_andi_test.v
+  BlimpV9_test/BlimpV9_ori_test.v
+  BlimpV9_test/BlimpV9_xori_test.v
+  BlimpV9_test/BlimpV9_slti_test.v
+  BlimpV9_test/BlimpV9_sltiu_test.v
+  BlimpV9_test/BlimpV9_srai_test.v
+  BlimpV9_test/BlimpV9_srli_test.v
+  BlimpV9_test/BlimpV9_slli_test.v
+  BlimpV9_test/BlimpV9_lui_test.v
+  BlimpV9_test/BlimpV9_auipc_test.v
+
+  BlimpV9_test/BlimpV9_beq_test.v
+  BlimpV9_test/BlimpV9_blt_test.v
+  BlimpV9_test/BlimpV9_bge_test.v
+  BlimpV9_test/BlimpV9_bltu_test.v
+  BlimpV9_test/BlimpV9_bgeu_test.v
+
+  BlimpV9_test/BlimpV9_lb_test.v
+  BlimpV9_test/BlimpV9_lh_test.v
+  BlimpV9_test/BlimpV9_lbu_test.v
+  BlimpV9_test/BlimpV9_lhu_test.v
+  BlimpV9_test/BlimpV9_sb_test.v
+  BlimpV9_test/BlimpV9_sh_test.v
+  BlimpV9_test/BlimpV9_fence_test.v
+
+  BlimpV9_test/BlimpV9_mul_test.v
+  BlimpV9_test/BlimpV9_mulh_test.v
+  BlimpV9_test/BlimpV9_mulhu_test.v
+  BlimpV9_test/BlimpV9_mulhsu_test.v
+  BlimpV9_test/BlimpV9_div_test.v
+  BlimpV9_test/BlimpV9_divu_test.v
+  BlimpV9_test/BlimpV9_rem_test.v
+  BlimpV9_test/BlimpV9_remu_test.v
+
+  BlimpV9_test/BlimpV9_mixed_test.v
 )
