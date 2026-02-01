@@ -21,10 +21,13 @@ module FirstMNonzero #(
   int i, k;
 
   always_comb begin
+
+    // Set out to all 0's initially
     for ( i = 0; i < p_max_m; i++) begin
       out[i] = '0;
     end
 
+    // Select first m non-zero entries from in
     k = 0;
     for ( i = 0; i < p_width; i++) begin
       if ((in[i] != '0) && (k < p_max_m)) begin
@@ -49,15 +52,18 @@ module MPEth #(
   logic [p_width-1:0]       gnt_th_full [p_width];
   int i;
 
+  // Add req to sum until hits m (max sum), then edge-detect on saturated sum at
+  // each index to get the thermo-coded grants
   always_comb begin
 
-    // Initialize saturated sums
+    // Initialize saturated sums to 0
     for( i = 0; i < p_width; i = i + 1 ) begin
       sat_sum[i] = '0;
     end
 
-    // Compute saturated sums
     for( i = 0; i < p_width; i = i + 1 ) begin
+
+      // Compute saturated sums
       if ( m == 0 ) begin
         sat_sum[i] = '0;
       end else if ( i == 0 ) begin
@@ -89,14 +95,14 @@ module MPEth #(
 
 endmodule
 
-module merge_mux_stack #(
+module MergeMuxStack #(
   parameter int p_width = 8,
   parameter int p_max_m = 4
 )(
   input  logic [$clog2(p_max_m):0] m,
-  input  logic [p_width-1:0] gnt_p [p_max_m],   // gnt1'..gntM'  (thermo from LSB)
-  input  logic [p_width-1:0] gnt_d [p_max_m],   // gnt1''..gntM'' (thermo from LSB)
-  output logic [p_width-1:0] gnt   [p_max_m]    // gnt1..gntM
+  input  logic [p_width-1:0] gnt_p [p_max_m],
+  input  logic [p_width-1:0] gnt_d [p_max_m],
+  output logic [p_width-1:0] gnt   [p_max_m]
 );
 
   int i, j, k;
@@ -121,7 +127,7 @@ module merge_mux_stack #(
 
 endmodule
 
-module headptr_update_mux #(
+module HeadptrUpdateMux #(
   parameter int p_width = 8,
   parameter int p_max_m = 4
 )(
@@ -181,10 +187,18 @@ module MRRArb #(
   //--------------------------------------------------------------------
   // Priority encoders
   //--------------------------------------------------------------------
+  // We split the priority encoding into two parts: one over the entire req
+  // vector, and one over the portion from headptr to the MSB. The head pointer
+  // indicates the next input to be given priority, so if we get a gnt from the
+  // first PE, then we use that directly. If not, we use the gnt from the second
+  // PE, which effectively "wraps around" the req vector. This way, we can
+  // maintain the round-robin order without having to actually rotate the req
+  // vector.
 
   logic [p_width-1:0] gnt_th_p_1 [p_max_m];
   logic [p_width-1:0] gnt_th_p_2 [p_max_m];
 
+  // Multi-priority encoder over req[n-1:headptr]
   MPEth #(
     .p_width ( p_width ),
     .p_max_m ( p_max_m )
@@ -194,6 +208,7 @@ module MRRArb #(
     .gnt_th ( gnt_th_p_1 )
   );
 
+  // Multi-priority encoder over req[n-1:0]
   MPEth #(
     .p_width ( p_width ),
     .p_max_m ( p_max_m )
@@ -206,10 +221,12 @@ module MRRArb #(
   //--------------------------------------------------------------------
   // Priority encoder selector
   //--------------------------------------------------------------------
+  // Merge the two priority encoder outputs to obtain at most m grants, giving
+  // priority to the first PE's grants over the second PE's grants if present.
 
   logic [p_width-1:0] gnt_th [p_max_m];
 
-  merge_mux_stack #(
+  MergeMuxStack #(
     .p_width ( p_width ),
     .p_max_m ( p_max_m )
   ) merge_mux_stack_inst (
@@ -222,8 +239,11 @@ module MRRArb #(
   //--------------------------------------------------------------------
   // Head pointer update
   //--------------------------------------------------------------------
+  // Choose the next head pointer as a rotated version of one of the final
+  // grants, with the grants from the second PE used to determine which grant to
+  // use since they reflect the original request order.
 
-  headptr_update_mux #(
+  HeadptrUpdateMux #(
     .p_width ( p_width ),
     .p_max_m ( p_max_m )
   ) headptr_update_mux_inst (
@@ -237,6 +257,10 @@ module MRRArb #(
   //--------------------------------------------------------------------
   // Edge-detect and get final grant vector
   //--------------------------------------------------------------------
+  // Out of the final m grants from the MergeMuxStack, edge-detect each to get
+  // each grant in a one-hot encoding, then OR them together to get the final
+  // grant vector where each bit corresponds to one input.
+
   logic [p_width-1:0] gnt_ed [p_max_m];
 
   always_comb begin

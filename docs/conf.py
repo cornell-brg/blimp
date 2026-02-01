@@ -7,8 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Blimp"
-copyright = "2024, Aidan McNay"
-author = "Aidan McNay"
+copyright = "2026, Aidan McNay & Parker Schless"
+author = "Aidan McNay & Parker Schless"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

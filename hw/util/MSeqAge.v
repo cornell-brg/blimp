@@ -61,7 +61,7 @@ module MSeqAge #(
   always_comb begin
     next_oldest_seq_num_m1 = '0;
     for( int j = 0; j < p_num_be_lanes; j++ ) begin
-      if( commit_val[j] && (commit_seq_num[j] > next_oldest_seq_num_m1) )
+      if( commit_val[j] && is_older( commit_seq_num[j], next_oldest_seq_num_m1 ) )
         next_oldest_seq_num_m1 = commit_seq_num[j];
     end
   end

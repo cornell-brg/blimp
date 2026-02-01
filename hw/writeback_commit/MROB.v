@@ -64,6 +64,8 @@ module MROB #(
         entries[i] <= '{msg: 'x, val: 1'b0};
       end
     end else begin
+
+      // Insert message into entries for each insert index that is valid
       for( int i = 0; i < p_num_lanes; i++ ) begin
         if( ins_en & ins_msg_val[i] ) begin
           entries[ins_idx[i]] <= '{
@@ -72,6 +74,8 @@ module MROB #(
           };
         end
       end
+
+      // If, however, we are also dequeuing this index, clear the entry
       for( int i = 0; i < p_num_lanes; i++ ) begin
         if( deq_en & deq_rdy & deq_msg_val[i] ) begin
           entries[deq_idx[i]] <= '{msg: 'x, val: 1'b0};
@@ -80,6 +84,7 @@ module MROB #(
     end
   end
 
+  // Create a next-state version of entries with just the inserts applied
   always_comb begin
     next_entries_enqd = entries;
     for( int i = 0; i < p_num_lanes; i++ ) begin
@@ -95,6 +100,7 @@ module MROB #(
   //----------------------------------------------------------------------
   // Bypass
   //----------------------------------------------------------------------
+  // Bypassing is enabled if any of the insert indices match the deq_ptr
 
   logic can_bypass;
 
@@ -111,15 +117,16 @@ module MROB #(
   // Dequeue
   //----------------------------------------------------------------------
 
+  // Ready to dequeue if we have a valid entry at deq_ptr or can bypass
+  assign deq_rdy = entries[deq_ptr].val | ( can_bypass & ins_en );
+  
+  // Create rotated version of data structure to prevent needing to perform
+  // wrap-around calculations in succeeding steps.
+  logic [p_entry_bits-1:0] deq_idx_full [p_depth];
+  logic [p_msg_bits-1:0]   deq_msg_full [p_depth];
   logic [p_entry_bits-1:0] deq_ptr_next;
   logic [p_depth-1:0]      val_rot_pack;
 
-  assign deq_rdy = entries[deq_ptr].val | ( can_bypass & ins_en );
-
-  logic [p_entry_bits-1:0] deq_idx_full [p_depth];
-  logic [p_msg_bits-1:0]   deq_msg_full [p_depth];
-  
-  // get which entries are valid with entry at deq_ptr at index 0
   always_comb begin
     for( int i = 0; i < p_depth; i++ ) begin
       if( i + int'(deq_ptr) < p_depth ) begin
@@ -134,24 +141,31 @@ module MROB #(
     end
   end
 
-  // set output rdy bits up to first invalid entry
-  logic [p_depth-1:0] val_rot_pack_edges;
-  logic [p_depth-1:0] val_rot_pack_first_edge;
+  // Using rotated entries, find first p_num_lanes valid entries to dequeue,
+  // stopping at the first invalid entry. Based on the rotated, packed valid
+  // bits, find the first edge from index 0 (deq_ptr) which indicates the first
+  // invalid index such that all previous entries are valid and consecutive from
+  // deq_ptr.
+  logic [p_depth-1:0]      val_rot_pack_edges;
+  logic [p_depth-1:0]      val_rot_pack_first_edge;
   logic [p_entry_bits-1:0] first_invalid_idx;
+  logic [p_depth-1:0]      val_rot_pack_thermo;
 
-  assign val_rot_pack_edges = val_rot_pack & ~(val_rot_pack >> 1);
+  assign val_rot_pack_edges      = val_rot_pack & ~(val_rot_pack >> 1);
   assign val_rot_pack_first_edge = val_rot_pack_edges & (~val_rot_pack_edges + 1);
-
-  logic [p_depth-1:0] val_rot_pack_thermo;
 
   always_comb begin
     first_invalid_idx = '0;
     for( int i = p_depth-1; i >= 0; i-- ) begin
+
+      // Get thermo-encoded valid bits up to first invalid entry
       if (i == p_depth-1)
         val_rot_pack_thermo[i] = val_rot_pack_first_edge[i];
       else
         val_rot_pack_thermo[i] = val_rot_pack_first_edge[i] | val_rot_pack_thermo[i+1];
 
+      // Set first invalid index based on the first edge detected and "undo" the
+      // wrap-around by adding deq_ptr
       if (val_rot_pack_first_edge[i])
         first_invalid_idx = (p_entry_bits)'(i+1) + deq_ptr;
     end
@@ -165,6 +179,11 @@ module MROB #(
     end
   end
 
+  // Update deq_ptr by adding to it the number of dequeued entries as calculated
+  // from the first invalid index (found above), but capped at p_num_lanes
+  // (hardware limitation)
+  logic [p_entry_bits:0] deq_ptr_add_val;
+
   always_ff @( posedge clk ) begin
     if( rst )
       deq_ptr <= '0;
@@ -172,24 +191,23 @@ module MROB #(
       deq_ptr <= deq_ptr_next;
   end
 
-  logic [p_entry_bits:0] deq_ptr_add_val;
-
   always_comb begin
 
-    // get value to add to deq_ptr based on first invalid index
+    // Get value to add to deq_ptr based on first invalid index
     if( first_invalid_idx > deq_ptr ) begin
       deq_ptr_add_val = (p_entry_bits+1)'(first_invalid_idx) - (p_entry_bits+1)'(deq_ptr);
     end else begin
       deq_ptr_add_val = (p_entry_bits+1)'(p_depth) - (p_entry_bits+1)'(deq_ptr) + (p_entry_bits+1)'(first_invalid_idx);
     end
 
-    // truncate actual value added if > number of available lanes
+    // Truncate actual value added if > number of available lanes
     if( deq_ptr_add_val > (p_entry_bits+1)'(p_num_lanes) ) 
       deq_ptr_next = deq_ptr + p_entry_bits'(p_num_lanes);
     else
       deq_ptr_next = deq_ptr + p_entry_bits'(deq_ptr_add_val);
   end
 
+  // Set number of available slots based on which entries are not valid
   always_comb begin
     avail_slots = '0;
     for( int i = 0; i < p_depth; i++ ) begin

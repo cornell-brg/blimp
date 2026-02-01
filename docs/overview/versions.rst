@@ -89,6 +89,14 @@ details the level of each unit that each processor version supports:
      - 3
      - 1
 
+   * - V9
+     - 4
+     - 6
+     - 1, 2, 3, 4,
+       5, 6, 7
+     - 4
+     - 2
+
 Version 1
 --------------------------------------------------------------------------
 
@@ -249,4 +257,23 @@ including games.
    :align: center
    :width: 70%
    :alt: A picture of the Version 8 processor composition
+   :class: bottompadding
+
+Version 9
+--------------------------------------------------------------------------
+
+The Version 9 processor supports superscalar backend, by using an m-select
+arbiter in the WCU to select multiple completed instructions from XUs, as well
+as a multi-ported ROB to intake multiple instructions from the arbiter as well
+as commit multiple instructions. Modified versions of FU, DIU, and SU are also
+required to support multiple completed and committed instructions with a new
+sequence number generator (SeqNumGenL4), new sequence age tracker (MSeqAge),
+multi-rename table (MRenameTable), and multi-write-ported register file
+(MRegisterFile) as the complete and commit interfaces are now parameterized
+based on the number of backend superscalar lanes (configurable at the toplevel).
+
+.. image:: img/versions-v9.png
+   :align: center
+   :width: 70%
+   :alt: A picture of the Version 9 processor composition
    :class: bottompadding
