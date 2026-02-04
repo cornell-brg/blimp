@@ -262,7 +262,7 @@ foreach(V_TEST_FILE_REL_PATH ${V_TEST_FILES})
       target_link_options(${V_TEST_BIN} PRIVATE +vcs+dumpvars+${V_TEST_BIN}.vcd +vcs+vcdpluson +vcs+vcdplusmemon)
     endif()
     if(COVERAGE)
-      target_link_options(${V_TEST_BIN} PRIVATE -cm line+cond+tgl+fsm+branch -cm_dir ${V_TEST_BIN}.vdb)
+      target_link_options(${V_TEST_BIN} PRIVATE +cover=all -cm line+cond+tgl+fsm+branch -cm_dir ${V_TEST_BIN}.vdb)
     endif()
   endif()
 

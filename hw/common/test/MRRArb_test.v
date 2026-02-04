@@ -5,11 +5,13 @@
 
 `include "test/TestUtils.v"
 `include "hw/common/MRRArb.v"
+`include "hw/common/test/intf/MRRArbIntf.v"
+`include "hw/common/test/coverage/MRRArbCoverage.v"
 
 import TestEnv::*;
 
 //========================================================================
-// RRArbTestSuite
+// MRRArbTestSuite
 //========================================================================
 // A test suite for a particular parametrization of the arbiter
 
@@ -32,6 +34,17 @@ module MRRArbTestSuite #(
   TestUtils t( .* );
 
   //----------------------------------------------------------------------
+  // Instantiate interface to drive DUT and coverage class
+  //----------------------------------------------------------------------
+
+  MRRArbIntf #(
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) intf (
+    .clk (clk)
+  );
+
+  //----------------------------------------------------------------------
   // Instantiate design under test
   //----------------------------------------------------------------------
 
@@ -39,6 +52,12 @@ module MRRArbTestSuite #(
   logic [$clog2(p_max_m):0] dut_m;
   logic [p_width-1:0]       dut_req;
   logic [p_width-1:0]       dut_gnt;
+
+  // TODO - temporary assigns to connect DUT to interface
+  assign intf.en = dut_en;
+  assign intf.m  = dut_m;
+  assign intf.req = dut_req;
+  assign intf.gnt = dut_gnt;
 
   MRRArb #(
     .p_width (p_width),
@@ -83,6 +102,23 @@ module MRRArbTestSuite #(
 
     end
   endtask
+
+  //----------------------------------------------------------------------
+  // Declare and instantiate coverage object
+  //----------------------------------------------------------------------
+
+  `ifndef VERILATOR
+
+  MRRArbCoverage #(
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) mrrarb_cov_obj;
+
+  initial begin
+    mrrarb_cov_obj = new( intf );
+  end
+
+  `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // test_case_1_basic
@@ -210,10 +246,10 @@ module MRRArbTestSuite #(
 endmodule
 
 //========================================================================
-// RRArb_test
+// MRRArb_test
 //========================================================================
 
-module RRArb_test;
+module MRRArb_test;
   MRRArbTestSuite #(1)          suite_1();
   MRRArbTestSuite #(2,  8)      suite_2();
   MRRArbTestSuite #(3,  32,  8) suite_3();
