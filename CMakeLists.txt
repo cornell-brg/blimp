@@ -23,6 +23,7 @@ set(V_TEST_FILES
   hw/decode_issue/test/DecodeIssueUnitL5_test.v
   hw/decode_issue/test/DecodeIssueUnitL6_test.v
   hw/decode_issue/test/ImmGen_test.v
+  hw/decode_issue/test/IssueQueueInOrder_test.v
   hw/decode_issue/test/RegfilePending_test.v
   hw/decode_issue/test/MRegfile_test.v
   hw/decode_issue/test/RenameTable_test.v

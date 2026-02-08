@@ -65,27 +65,27 @@ module TestCaller #(
   // Linetracing
   //----------------------------------------------------------------------
 
-  // string test_trace;
-  // int trace_len;
-  // initial begin
-  //   test_trace = $sformatf("%x:%x", call_msg, ret_msg);
-  //   trace_len = test_trace.len();
-  // end
+  string test_trace;
+  int trace_len;
+  initial begin
+    test_trace = $sformatf("%x:%x", call_msg, ret_msg);
+    trace_len = test_trace.len();
+  end
 
-  // function string trace(
-  //   // verilator lint_off UNUSEDSIGNAL
-  //   int trace_level
-  //   // verilator lint_on UNUSEDSIGNAL
-  // );
-  //   if( en & rdy )
-  //     trace = $sformatf("%x:%x", call_msg, ret_msg);
-  //   else if( rdy )
-  //     trace = {(trace_len){" "}};
-  //   else if( en ) // Violate calling convention
-  //     trace = {(trace_len){"X"}};
-  //   else
-  //     trace = {{(trace_len-1){" "}}, "."};
-  // endfunction
+  function string trace(
+    // verilator lint_off UNUSEDSIGNAL
+    int trace_level
+    // verilator lint_on UNUSEDSIGNAL
+  );
+    if( en & rdy )
+      trace = $sformatf("%x:%x", call_msg, ret_msg);
+    else if( rdy )
+      trace = {(trace_len){" "}};
+    else if( en ) // Violate calling convention
+      trace = {(trace_len){"X"}};
+    else
+      trace = {{(trace_len-1){" "}}, "."};
+  endfunction
 endmodule
 
 `endif // TEST_FL_TESTCALLER_V
