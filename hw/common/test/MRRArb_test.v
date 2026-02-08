@@ -53,12 +53,6 @@ module MRRArbTestSuite #(
   logic [p_width-1:0]       dut_req;
   logic [p_width-1:0]       dut_gnt;
 
-  // TODO - temporary assigns to connect DUT to interface
-  assign intf.en = dut_en;
-  assign intf.m  = dut_m;
-  assign intf.req = dut_req;
-  assign intf.gnt = dut_gnt;
-
   MRRArb #(
     .p_width (p_width),
     .p_max_m (p_max_m)
@@ -70,6 +64,13 @@ module MRRArbTestSuite #(
     .req (dut_req),
     .gnt (dut_gnt)
   );
+
+  // TODO - temporary assigns to connect DUT to interface
+  assign intf.en       = dut_en;
+  assign intf.m        = dut_m;
+  assign intf.req      = dut_req;
+  assign intf.gnt      = dut_gnt;
+  assign intf.head_ptr = DUT.head_ptr;
 
   //----------------------------------------------------------------------
   // check
@@ -149,11 +150,54 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // test_case_2_no_grant
+  // test_case_2_enable
   //----------------------------------------------------------------------
 
-  task test_case_2_no_grant();
-    t.test_case_begin( "test_case_2_no_grant" );
+  task test_case_2_enable();
+    t.test_case_begin( "test_case_2_enable" );
+    if( !t.run_test ) return;
+
+    //     en m in                    out
+    check( 1, 1, p_width'('b0000), p_width'('b0000) );
+    check( 1, 1, p_width'('b0001), p_width'('b0001) );
+    check( 1, 1, p_width'('b0010), p_width'('b0010) );
+    check( 1, 1, p_width'('b0011), p_width'('b0001) );
+    
+    check( 0, 1, p_width'('b0000), p_width'('b0000) );
+    check( 0, 1, p_width'('b0001), p_width'('b0000) );
+    check( 0, 1, p_width'('b0010), p_width'('b0000) );
+    check( 0, 1, p_width'('b0011), p_width'('b0000) );
+    check( 0, 1, p_width'('b1000), p_width'('b0000) );
+    check( 0, 1, p_width'('b1111), p_width'('b0000) );
+    check( 0, 1, p_width'('b0101), p_width'('b0000) );
+    check( 0, 1, p_width'('b1010), p_width'('b0000) );
+
+    check( 0, 2, p_width'('b0000), p_width'('b0000) );
+    check( 1, 2, p_width'('b0000), p_width'('b0000) );
+    check( 0, 2, p_width'('b0001), p_width'('b0000) );
+    check( 1, 2, p_width'('b0001), p_width'('b0001) );
+    check( 0, 2, p_width'('b0010), p_width'('b0000) );
+    check( 1, 2, p_width'('b0010), p_width'('b0010) );
+    check( 0, 2, p_width'('b0011), p_width'('b0000) );
+    check( 1, 2, p_width'('b0011), p_width'('b0011) );
+    check( 0, 2, p_width'('b1000), p_width'('b0000) );
+    check( 1, 2, p_width'('b1000), p_width'('b1000) );
+    check( 0, 2, p_width'('b1111), p_width'('b0000) );
+    check( 1, 2, p_width'('b1111), p_width'('b0011) );
+    check( 0, 2, p_width'('b0101), p_width'('b0000) );
+    check( 1, 2, p_width'('b0101), p_width'('b0101) );
+    check( 0, 2, p_width'('b1010), p_width'('b0000) );
+    check( 1, 2, p_width'('b1010), p_width'('b1010) );
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_3_no_grant
+  //----------------------------------------------------------------------
+
+  task test_case_3_no_grant();
+    t.test_case_begin( "test_case_3_no_grant" );
     if( !t.run_test ) return;
 
     //     en m in                    out
@@ -173,11 +217,11 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // test_case_3_oscillate
+  // test_case_4_oscillate
   //----------------------------------------------------------------------
 
-  task test_case_3_oscillate();
-    t.test_case_begin( "test_case_3_oscillate" );
+  task test_case_4_oscillate();
+    t.test_case_begin( "test_case_4_oscillate" );
     if( !t.run_test ) return;
 
     //     en m in                    out
@@ -239,8 +283,9 @@ module MRRArbTestSuite #(
     t.test_suite_begin( suite_name );
 
                       test_case_1_basic();
-                      test_case_2_no_grant();
-    if (p_width >= 4) test_case_3_oscillate();
+                      test_case_2_enable();
+                      test_case_3_no_grant();
+    if (p_width >= 4) test_case_4_oscillate();
 
   endtask
 endmodule
