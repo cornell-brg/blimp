@@ -14,6 +14,7 @@ set(BLIMP_VERSIONS
   BlimpV7
   BlimpV8
   BlimpV9
+  BlimpV10
 )
 
 # ------------------------------------------------------------------------
@@ -253,4 +254,64 @@ set(BlimpV9_TESTS
   BlimpV9_test/BlimpV9_remu_test.v
 
   BlimpV9_test/BlimpV9_mixed_test.v
+)
+
+# ------------------------------------------------------------------------
+# BlimpV10
+# ------------------------------------------------------------------------
+
+set(BlimpV10_TESTS
+  BlimpV10_test/BlimpV10_add_test.v
+  BlimpV10_test/BlimpV10_addi_test.v
+  BlimpV10_test/BlimpV10_lw_test.v
+  BlimpV10_test/BlimpV10_sw_test.v
+  BlimpV10_test/BlimpV10_jal_test.v
+  BlimpV10_test/BlimpV10_jalr_test.v
+  BlimpV10_test/BlimpV10_bne_test.v
+
+  BlimpV10_test/BlimpV10_sub_test.v
+  BlimpV10_test/BlimpV10_and_test.v
+  BlimpV10_test/BlimpV10_or_test.v
+  BlimpV10_test/BlimpV10_xor_test.v
+  BlimpV10_test/BlimpV10_slt_test.v
+  BlimpV10_test/BlimpV10_sltu_test.v
+  BlimpV10_test/BlimpV10_sra_test.v
+  BlimpV10_test/BlimpV10_srl_test.v
+  BlimpV10_test/BlimpV10_sll_test.v
+
+  BlimpV10_test/BlimpV10_andi_test.v
+  BlimpV10_test/BlimpV10_ori_test.v
+  BlimpV10_test/BlimpV10_xori_test.v
+  BlimpV10_test/BlimpV10_slti_test.v
+  BlimpV10_test/BlimpV10_sltiu_test.v
+  BlimpV10_test/BlimpV10_srai_test.v
+  BlimpV10_test/BlimpV10_srli_test.v
+  BlimpV10_test/BlimpV10_slli_test.v
+  BlimpV10_test/BlimpV10_lui_test.v
+  BlimpV10_test/BlimpV10_auipc_test.v
+
+  BlimpV10_test/BlimpV10_beq_test.v
+  BlimpV10_test/BlimpV10_blt_test.v
+  BlimpV10_test/BlimpV10_bge_test.v
+  BlimpV10_test/BlimpV10_bltu_test.v
+  BlimpV10_test/BlimpV10_bgeu_test.v
+
+  BlimpV10_test/BlimpV10_lb_test.v
+  BlimpV10_test/BlimpV10_lh_test.v
+  BlimpV10_test/BlimpV10_lbu_test.v
+  BlimpV10_test/BlimpV10_lhu_test.v
+  BlimpV10_test/BlimpV10_sb_test.v
+  BlimpV10_test/BlimpV10_sh_test.v
+  BlimpV10_test/BlimpV10_fence_test.v
+
+  BlimpV10_test/BlimpV10_mul_test.v
+  BlimpV10_test/BlimpV10_mulh_test.v
+  BlimpV10_test/BlimpV10_mulhu_test.v
+  BlimpV10_test/BlimpV10_mulhsu_test.v
+  BlimpV10_test/BlimpV10_div_test.v
+  BlimpV10_test/BlimpV10_divu_test.v
+  BlimpV10_test/BlimpV10_rem_test.v
+  BlimpV10_test/BlimpV10_remu_test.v
+
+  BlimpV10_test/BlimpV10_mixed_test.v
 )

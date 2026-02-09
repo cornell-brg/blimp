@@ -24,8 +24,7 @@ module InstRouterIQUnit #(
 ) (
   input  rv_uop                    uop,
   input  logic                     uop_val,
-  input  logic                     rdy,
-  output logic                     pipe_rdy
+  output logic                     iq_compat_op
 );
   logic val_uop;
   
@@ -75,46 +74,45 @@ module InstRouterIQUnit #(
     end
   endgenerate
 
-  assign pipe_rdy = val_uop & uop_val;
+  assign iq_compat_op = val_uop & uop_val;
 
 endmodule
 
-module PipePicker #(
-  parameter int p_num_pipes      = 8,
-  parameter int p_iq_entry_bits  = 4,
-  parameter int p_pipe_idx_width = $clog2(p_num_pipes)
+module IQPicker #(
+  parameter p_num_pipes     = 8,
+  parameter p_iq_entry_bits = 4,
+  parameter p_iq_idx_width  = $clog2( p_num_pipes )
 ) (
-  input  logic                       pipe_rdy         [p_num_pipes],
-  input  logic [p_iq_entry_bits-1:0] pipe_avail_slots [p_num_pipes],
-  output logic                       gnt_pipe         [p_num_pipes],
-  output logic                       any_gnt
+  input  logic                      iq_compat_op   [p_num_pipes],
+  input  logic [p_iq_entry_bits:0]  iq_avail_slots [p_num_pipes],
+  output logic                      gnt_iq         [p_num_pipes],
+  output logic                      any_gnt,
+  output logic [p_iq_idx_width-1:0] sel_iq
 );
-  logic [p_iq_entry_bits-1:0]  sel_slots;
-  logic [p_pipe_idx_width-1:0] sel_pipe;
+  logic [p_iq_entry_bits:0] sel_slots;
 
   always_comb begin
 
     // Initialize
     any_gnt   = 1'b0;
     sel_slots = '0;
-    sel_pipe  = '0;
-    for (int i = 0; i < p_num_pipes; i++)
-      gnt_pipe[i] = 1'b0;
+    sel_iq    = '0;
 
     // Iterate in increasing index order; ties keep first due to strict ">"
     for (int i = 0; i < p_num_pipes; i++) begin
-      if (pipe_rdy[i]) begin
-        if (!any_gnt || (pipe_avail_slots[i] > sel_slots)) begin
+      if (iq_compat_op[i]) begin
+        if (!any_gnt || (iq_avail_slots[i] > sel_slots)) begin
           any_gnt = 1'b1;
-          sel_pipe = logic'(i);
-          sel_slots = pipe_avail_slots[i];
+          sel_iq = (p_iq_idx_width)'(i);
+          sel_slots = iq_avail_slots[i];
         end
       end
     end
 
     // If at least one pipe is ready, grant the one with the most available
     // slots
-    gnt_pipe[sel_pipe] = 1'b1;
+    for (int i = 0; i < p_num_pipes; i++)
+      gnt_iq[i] = (i == int'(sel_iq)) & any_gnt;
   end
 
 endmodule
@@ -124,47 +122,52 @@ endmodule
 //------------------------------------------------------------------------
 
 module InstRouterIQ #(
-  parameter p_num_pipes                                = 3,
+  parameter p_num_pipes                                = 8,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1},
   parameter p_iq_depth                                 = 8,
-  parameter p_iq_entry_bits                            = $clog2(p_iq_depth)
+  parameter p_iq_idx_width                             = $clog2( p_num_pipes + 1 ),
+  parameter p_iq_entry_bits                            = $clog2( p_iq_depth )
 ) (
   input  rv_uop uop,
   input  logic  val,
   output logic  xfer,
 
-  input  logic                       pipe_rdy         [p_num_pipes],
-  input  logic [p_iq_entry_bits-1:0] pipe_avail_slots [p_num_pipes],
-  output logic                       pipe_val         [p_num_pipes]
+  input  logic                     iq_rdy         [p_num_pipes],
+  input  logic [p_iq_entry_bits:0] iq_avail_slots [p_num_pipes],
+  output logic                     iq_val         [p_num_pipes]
 );
 
-  logic pipe_rdy_filtered [p_num_pipes];
+  logic                      iq_compat_op [p_num_pipes];
+  logic                      any_gnt;
+  logic [p_iq_idx_width-1:0] sel_iq;
   
   // Router units
   genvar i;
   generate
     for( i = 0; i < p_num_pipes; i = i + 1 ) begin: inst_router_units
       InstRouterIQUnit #(
-        .p_isa_subset (p_pipe_subsets[i])
+        .p_isa_subset (p_pipe_subsets[p_num_pipes-i-1])
       ) router_unit (
         .uop           (uop),
         .uop_val       (val),
-        .rdy           (pipe_rdy[i]),
-        .pipe_rdy      (pipe_rdy_filtered[i])
+        .iq_compat_op  (iq_compat_op[i])
       );
     end
   endgenerate
 
   // Choose the pipe based on operand support and available slots
-  PipePicker #(
+  IQPicker #(
     .p_num_pipes     (p_num_pipes),
     .p_iq_entry_bits (p_iq_entry_bits)
-  ) pipe_picker (
-    .pipe_rdy    (pipe_rdy_filtered),
-    .avail_slots (pipe_avail_slots),
-    .gnt_pipe    (pipe_val),
-    .any_gnt     (xfer)
+  ) iq_picker (
+    .iq_compat_op   (iq_compat_op),
+    .iq_avail_slots (iq_avail_slots),
+    .gnt_iq         (iq_val),
+    .any_gnt        (any_gnt),
+    .sel_iq         (sel_iq)
   );
+
+  assign xfer = any_gnt & iq_rdy[int'(sel_iq)];
 
 endmodule
 

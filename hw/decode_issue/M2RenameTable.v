@@ -200,7 +200,7 @@ module M2RenameTable #(
   end
 
   always_comb begin
-    for( int k = 0; k < p_num_lookup_ports; k++ ) begin=
+    for( int k = 0; k < p_num_lookup_ports; k++ ) begin
       for( int l = 0; l < 2; l++ ) begin
         got_complete_lookup[k][l] = '0;
       end
