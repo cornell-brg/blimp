@@ -95,6 +95,19 @@ module MRRArbTestSuite #(
       if ( t.verbose ) begin
         $display( "%3d: en=%b, m=%d, %b > %b", t.cycles,
                   dut_en, dut_m, dut_req, dut_gnt );
+        // // TODO: DEBUG
+        // for ( int i = 0; i < p_max_m; i++ ) begin
+        //   $display( "    gnt_ed[%0d]=%b", i, DUT.gnt_ed[i] );
+        // end
+        // for ( int i = 0; i < p_max_m; i++ ) begin
+        //   $display( "    gnt_th[%0d]=%b", i, DUT.gnt_th[i] );
+        // end
+        // for ( int i = 0; i < p_max_m; i++ ) begin
+        //   $display( "    gnt_th_p_1[%0d]=%b", i, DUT.gnt_th_p_1[i] );
+        // end
+        // for ( int i = 0; i < p_max_m; i++ ) begin
+        //   $display( "    gnt_th_p_2[%0d]=%b", i, DUT.gnt_th_p_2[i] );
+        // end
       end
 
       `CHECK_EQ( dut_gnt, gnt );
@@ -276,6 +289,117 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
+  // test_case_5_enable_random
+  //----------------------------------------------------------------------
+
+  logic                     rand_en;
+  logic [$clog2(p_max_m):0] rand_m;
+  logic [$clog2(p_max_m):0] temp_m;
+  logic [p_width-1:0]       rand_req;
+  logic [p_width-1:0]       exp_gnt;
+
+  int   head_idx, scan_idx, next_head_idx;
+
+  task test_case_5_enable_random();
+    t.test_case_begin( "test_case_5_enable_random" );
+    if( !t.run_test ) return;
+
+    head_idx = 0;
+
+    for( int i = 0; i < 200; i = i + 1 ) begin
+
+      // Generate random input values
+      rand_en  = 1'( $urandom() );
+      rand_m   = ($clog2(p_max_m)+1)'( $urandom() );
+      rand_req = p_width'( $urandom() );
+
+      // Determine the expected output
+      temp_m        = (rand_m > p_max_m) ? p_max_m : rand_m;
+      exp_gnt       = '0;
+      next_head_idx = head_idx;
+
+      if ( rand_en ) begin
+        for ( scan_idx = head_idx; scan_idx < p_width; scan_idx++ ) begin
+          if ( rand_req[scan_idx] && (temp_m > 0) ) begin
+            exp_gnt[scan_idx] = 1'b1;
+            temp_m = temp_m - 1;
+            if ( (scan_idx+1) == p_width )
+              next_head_idx = 0;
+            else
+              next_head_idx = scan_idx + 1;
+          end
+        end
+
+        for ( scan_idx = 0; scan_idx < head_idx; scan_idx++ ) begin
+          if ( rand_req[scan_idx] && (temp_m > 0) ) begin
+            exp_gnt[scan_idx] = 1'b1;
+            temp_m = temp_m - 1;
+            next_head_idx = scan_idx + 1;
+          end
+        end
+      end
+
+      // Check that outputs match corresponding inputs
+      check( rand_en, rand_m, rand_req, exp_gnt );
+
+      // Update the index of the head pointer
+      head_idx = next_head_idx;
+    end
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_6_random
+  //----------------------------------------------------------------------
+
+  task test_case_6_random();
+    t.test_case_begin( "test_case_6_random" );
+    if( !t.run_test ) return;
+
+    head_idx = 0;
+
+    for( int i = 0; i < 200; i = i + 1 ) begin
+
+      // Generate random input values
+      rand_m   = ($clog2(p_max_m)+1)'( $urandom() );
+      rand_req = p_width'( $urandom() );
+
+      // Determine the expected output
+      temp_m        = (rand_m > p_max_m) ? p_max_m : rand_m;
+      exp_gnt       = '0;
+      next_head_idx = head_idx;
+
+      for ( scan_idx = head_idx; scan_idx < p_width; scan_idx++ ) begin
+        if ( rand_req[scan_idx] && (temp_m > 0) ) begin
+          exp_gnt[scan_idx] = 1'b1;
+          temp_m = temp_m - 1;
+          if ( (scan_idx+1) == p_width )
+            next_head_idx = 0;
+          else
+            next_head_idx = scan_idx + 1;
+        end
+      end
+
+      for ( scan_idx = 0; scan_idx < head_idx; scan_idx++ ) begin
+        if ( rand_req[scan_idx] && (temp_m > 0) ) begin
+          exp_gnt[scan_idx] = 1'b1;
+          temp_m = temp_m - 1;
+          next_head_idx = scan_idx + 1;
+        end
+      end
+
+      // Check that outputs match corresponding inputs
+      check( 1'b1, rand_m, rand_req, exp_gnt );
+
+      // Update the index of the head pointer
+      head_idx = next_head_idx;
+    end
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
   // run_test_suite
   //----------------------------------------------------------------------
 
@@ -286,6 +410,8 @@ module MRRArbTestSuite #(
                       test_case_2_enable();
                       test_case_3_no_grant();
     if (p_width >= 4) test_case_4_oscillate();
+                      test_case_5_enable_random();
+                      test_case_6_random();
 
   endtask
 endmodule
