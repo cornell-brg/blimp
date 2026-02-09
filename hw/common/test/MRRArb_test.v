@@ -66,6 +66,7 @@ module MRRArbTestSuite #(
   );
 
   // TODO - temporary assigns to connect DUT to interface
+  assign intf.rst      = rst;
   assign intf.en       = dut_en;
   assign intf.m        = dut_m;
   assign intf.req      = dut_req;
@@ -108,6 +109,7 @@ module MRRArbTestSuite #(
         // for ( int i = 0; i < p_max_m; i++ ) begin
         //   $display( "    gnt_th_p_2[%0d]=%b", i, DUT.gnt_th_p_2[i] );
         // end
+        $display( "MAX_REQ: %d", $countones($unsigned((1 << p_width) - 1)) );
       end
 
       `CHECK_EQ( dut_gnt, gnt );
@@ -230,11 +232,90 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // test_case_4_oscillate
+  // test_case_4_edge_cases_m
   //----------------------------------------------------------------------
 
-  task test_case_4_oscillate();
-    t.test_case_begin( "test_case_4_oscillate" );
+  task test_case_4_edge_cases_m();
+    t.test_case_begin( "test_case_4_edge_cases_m" );
+    if( !t.run_test ) return;
+
+    //     en       m in                    out
+    check( 1,       0, p_width'('b0000), p_width'('b0000) );
+    check( 1,       0, p_width'('b0101), p_width'('b0000) );
+    check( 1,       0, p_width'('b1010), p_width'('b0000) );
+    check( 1,       0, p_width'('b1111), p_width'('b0000) );
+    
+    check( 1, p_max_m, p_width'('b0000), p_width'('b0000) );
+    check( 1, p_max_m, p_width'('b0101), p_width'('b0101) );
+    check( 1, p_max_m, p_width'('b1010), p_width'('b1010) );
+    check( 1, p_max_m, p_width'('b1111), p_width'('b1111) );
+    
+    check( 1,      '1, p_width'('b0000), p_width'('b0000) );
+    check( 1,      '1, p_width'('b0101), p_width'('b0101) );
+    check( 1,      '1, p_width'('b1010), p_width'('b1010) );
+    check( 1,      '1, p_width'('b1111), p_width'('b1111) );
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_5_max_num_req_gnt
+  //----------------------------------------------------------------------
+
+  logic [$clog2(p_max_m):0] temp_m;
+  logic [p_width-1:0]       exp_gnt;
+
+  int   head_idx, scan_idx, next_head_idx;
+
+  task test_case_5_max_num_req_gnt();
+    t.test_case_begin( "test_case_5_max_num_req_gnt" );
+    if( !t.run_test ) return;
+
+    head_idx = 0;
+
+    for( int i = 0; i < 20; i = i + 1 ) begin
+
+      // Determine the expected output
+      temp_m        = p_max_m;
+      exp_gnt       = '0;
+      next_head_idx = head_idx;
+
+      for ( scan_idx = head_idx; scan_idx < p_width; scan_idx++ ) begin
+        if ( temp_m > 0 ) begin
+          exp_gnt[scan_idx] = 1'b1;
+          temp_m = temp_m - 1;
+          if ( (scan_idx+1) == p_width )
+            next_head_idx = 0;
+          else
+            next_head_idx = scan_idx + 1;
+        end
+      end
+
+      for ( scan_idx = 0; scan_idx < head_idx; scan_idx++ ) begin
+        if ( temp_m > 0 ) begin
+          exp_gnt[scan_idx] = 1'b1;
+          temp_m = temp_m - 1;
+          next_head_idx = scan_idx + 1;
+        end
+      end
+
+      // Check that outputs match corresponding inputs
+      //     en       m in   out
+      check( 1, p_max_m, '1, exp_gnt );
+
+      // Update the index of the head pointer
+      head_idx = next_head_idx;
+    end
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_6_oscillate
+  //----------------------------------------------------------------------
+
+  task test_case_6_oscillate();
+    t.test_case_begin( "test_case_6_oscillate" );
     if( !t.run_test ) return;
 
     //     en m in                    out
@@ -289,19 +370,15 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // test_case_5_enable_random
+  // test_case_7_enable_random
   //----------------------------------------------------------------------
 
   logic                     rand_en;
   logic [$clog2(p_max_m):0] rand_m;
-  logic [$clog2(p_max_m):0] temp_m;
   logic [p_width-1:0]       rand_req;
-  logic [p_width-1:0]       exp_gnt;
 
-  int   head_idx, scan_idx, next_head_idx;
-
-  task test_case_5_enable_random();
-    t.test_case_begin( "test_case_5_enable_random" );
+  task test_case_7_enable_random();
+    t.test_case_begin( "test_case_7_enable_random" );
     if( !t.run_test ) return;
 
     head_idx = 0;
@@ -350,11 +427,11 @@ module MRRArbTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // test_case_6_random
+  // test_case_8_random
   //----------------------------------------------------------------------
 
-  task test_case_6_random();
-    t.test_case_begin( "test_case_6_random" );
+  task test_case_8_random();
+    t.test_case_begin( "test_case_8_random" );
     if( !t.run_test ) return;
 
     head_idx = 0;
@@ -409,9 +486,11 @@ module MRRArbTestSuite #(
                       test_case_1_basic();
                       test_case_2_enable();
                       test_case_3_no_grant();
-    if (p_width >= 4) test_case_4_oscillate();
-                      test_case_5_enable_random();
-                      test_case_6_random();
+                      test_case_4_edge_cases_m();
+                      test_case_5_max_num_req_gnt();
+    if (p_width >= 4) test_case_6_oscillate();
+                      test_case_7_enable_random();
+                      test_case_8_random();
 
   endtask
 endmodule
