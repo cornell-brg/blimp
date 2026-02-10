@@ -29,8 +29,7 @@ module IssueQueueInOrder #(
   //----------------------------------------------------------------------
 
   input  logic [31:0]               ins_msg_pc,
-  input  logic [4:0]                ins_msg_decoder_raddr0,
-  input  logic [4:0]                ins_msg_decoder_raddr1,
+  input  logic [p_addr_bits-1:0]    ins_msg_preg [2],
   input  rv_uop                     ins_msg_decoder_uop,
   input  logic [4:0]                ins_msg_decoder_waddr,
   input  logic [31:0]               ins_msg_imm,
@@ -53,8 +52,7 @@ module IssueQueueInOrder #(
   // Rename Table Access
   //----------------------------------------------------------------------
 
-  output logic             [4:0] rt_lookup_areg    [2],
-  input  logic [p_addr_bits-1:0] rt_lookup_preg    [2],
+  output logic [p_addr_bits-1:0] rt_lookup_preg    [2],
   input  logic                   rt_lookup_pending [2],
   output logic                   rt_lookup_en      [2],
 
@@ -100,8 +98,8 @@ module IssueQueueInOrder #(
 
       typedef struct packed {
         logic [31:0]               pc;
-        logic [4:0]                decoder_raddr0;
-        logic [4:0]                decoder_raddr1;
+        logic [p_addr_bits-1:0]    preg0;
+        logic [p_addr_bits-1:0]    preg1;
         rv_uop                     decoder_uop;
         logic [4:0]                decoder_waddr;
         logic [31:0]               imm;
@@ -138,8 +136,8 @@ module IssueQueueInOrder #(
           if( ins_en & (!bypass | !both_src_ready) ) begin
             entries[ins_ptr[p_entry_bits-1:0]] <= '{
               decoder_uop     : ins_msg_decoder_uop,      
-              decoder_raddr0  : ins_msg_decoder_raddr0,
-              decoder_raddr1  : ins_msg_decoder_raddr1,
+              preg0           : ins_msg_preg[0],
+              preg1           : ins_msg_preg[1],
               decoder_waddr   : ins_msg_decoder_waddr,
               imm             : ins_msg_imm,
               decoder_op2_sel : ins_msg_decoder_op2_sel,
@@ -177,30 +175,32 @@ module IssueQueueInOrder #(
       // file read addresses to get the data
       assign rt_lookup_en[0]   = can_bypass | !empty;
       assign rt_lookup_en[1]   = can_bypass | !empty;
-      assign rt_lookup_areg[0] = can_bypass ? ins_msg_decoder_raddr0 : entries[deq_ptr[p_entry_bits-1:0]].decoder_raddr0;
-      assign rt_lookup_areg[1] = can_bypass ? ins_msg_decoder_raddr1 : entries[deq_ptr[p_entry_bits-1:0]].decoder_raddr1;
+      assign rt_lookup_preg[0] = can_bypass ? ins_msg_preg[0] : entries[deq_ptr[p_entry_bits-1:0]].preg0;
+      assign rt_lookup_preg[1] = can_bypass ? ins_msg_preg[1] : entries[deq_ptr[p_entry_bits-1:0]].preg1;
       assign rf_raddr[0]       = rt_lookup_preg[0];
       assign rf_raddr[1]       = rt_lookup_preg[1];
 
-      // Check if one of the complete interfaces is writing back a preg that matches
-      // either of the lookup preg for the deq entry
-      logic got_complete_lookup [2];
-      always_comb begin
-        for( int i = 0; i < 2; i++ ) begin
-          got_complete_lookup[i] = 1'b0;
-          for( int j = 0; j < p_num_be_lanes; j++ ) begin
-            if( complete_val[j] & complete_wen[j] & (complete_preg[j] == rt_lookup_preg[i]) ) begin
-              got_complete_lookup[i] = 1'b1;
-            end
-          end
-        end
-      end
+      // Check if one of the complete interfaces is writing back a preg that
+      // matches either of the lookup preg for the deq entry. TODO: can i get
+      // rid of this since retrned pending from RT will cover this case?
+      // logic got_complete_lookup [2];
+      // always_comb begin
+      //   for( int i = 0; i < 2; i++ ) begin
+      //     got_complete_lookup[i] = 1'b0;
+      //     for( int j = 0; j < p_num_be_lanes; j++ ) begin
+      //       if( complete_val[j] & complete_wen[j] & (complete_preg[j] == rt_lookup_preg[i]) ) begin
+      //         got_complete_lookup[i] = 1'b1;
+      //       end
+      //     end
+      //   end
+      // end
 
       // Can deq if not empty or can bypass, and both src regs are ready (either
       // ready as indicated in rename table or just completed on this cycle)
       logic both_src_ready;
-      assign both_src_ready = ( !rt_lookup_pending[0] | got_complete_lookup[0] ) &
-                              ( !rt_lookup_pending[1] | got_complete_lookup[1] );
+      // assign both_src_ready = ( !rt_lookup_pending[0] | got_complete_lookup[0] ) &
+      //                         ( !rt_lookup_pending[1] | got_complete_lookup[1] );
+      assign both_src_ready = ( !rt_lookup_pending[0] ) & ( !rt_lookup_pending[1] );
       assign deq_rdy = ( !empty | (can_bypass & ins_en) ) & both_src_ready;
 
       // Output deq fields
@@ -264,30 +264,32 @@ module IssueQueueInOrder #(
       // file read addresses to get the data
       assign rt_lookup_en[0]   = ins_en;
       assign rt_lookup_en[1]   = ins_en;
-      assign rt_lookup_areg[0] = ins_msg_decoder_raddr0;
-      assign rt_lookup_areg[1] = ins_msg_decoder_raddr1;
+      assign rt_lookup_preg[0] = ins_msg_preg[0];
+      assign rt_lookup_preg[1] = ins_msg_preg[1];
       assign rf_raddr[0]       = rt_lookup_preg[0];
       assign rf_raddr[1]       = rt_lookup_preg[1];
 
-      // Check if one of the complete interfaces is writing back a preg that matches
-      // either of the lookup preg for the deq entry
-      logic got_complete_lookup [2];
-      always_comb begin
-        for( int i = 0; i < 2; i++ ) begin
-          got_complete_lookup[i] = 1'b0;
-          for( int j = 0; j < p_num_be_lanes; j++ ) begin
-            if( complete_val[j] & complete_wen[j] & (complete_preg[j] == rt_lookup_preg[i]) ) begin
-              got_complete_lookup[i] = 1'b1;
-            end
-          end
-        end
-      end
+      // Check if one of the complete interfaces is writing back a preg that
+      // matches either of the lookup preg for the deq entry. TODO: can i get
+      // rid of this since retrned pending from RT will cover this case?
+      // logic got_complete_lookup [2];
+      // always_comb begin
+      //   for( int i = 0; i < 2; i++ ) begin
+      //     got_complete_lookup[i] = 1'b0;
+      //     for( int j = 0; j < p_num_be_lanes; j++ ) begin
+      //       if( complete_val[j] & complete_wen[j] & (complete_preg[j] == rt_lookup_preg[i]) ) begin
+      //         got_complete_lookup[i] = 1'b1;
+      //       end
+      //     end
+      //   end
+      // end
 
       // Can deq if not empty or can bypass, and both src regs are ready (either
       // ready as indicated in rename table or just completed on this cycle)
       logic both_src_ready;
-      assign both_src_ready = ( !rt_lookup_pending[0] | got_complete_lookup[0] ) &
-                              ( !rt_lookup_pending[1] | got_complete_lookup[1] );
+      // assign both_src_ready = ( !rt_lookup_pending[0] | got_complete_lookup[0] ) &
+      //                         ( !rt_lookup_pending[1] | got_complete_lookup[1] );
+      assign both_src_ready = ( !rt_lookup_pending[0] ) & ( !rt_lookup_pending[1] );
       assign Ex.val  = ins_en & both_src_ready;
       assign ins_rdy = Ex.rdy & both_src_ready;
     end

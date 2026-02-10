@@ -154,7 +154,7 @@ module DecodeIssueUnitL6 #(
     .alloc_en       (alloc_rdy & decoder_wen & X_xfer & !should_squash),
     .alloc_rdy      (alloc_rdy),
 
-    .lookup_areg    ({decoder_raddr1, decoder_raddr0}),
+    .lookup_areg    ({decoder_raddr0, decoder_raddr1}),
     .lookup_preg    (lookup_preg),
     .lookup_pending (lookup_pending),
     .lookup_en      ({1'b1, 1'b1}),
@@ -184,7 +184,7 @@ module DecodeIssueUnitL6 #(
     .clk                (clk),
     .rst                (rst),
     .raddr              (lookup_preg),
-    .rdata              ({rdata1, rdata0}),
+    .rdata              ({rdata0, rdata1}),
     .waddr              (complete_preg),
     .wdata              (complete_wdata),
     .wen                (complete_wen_and_val)

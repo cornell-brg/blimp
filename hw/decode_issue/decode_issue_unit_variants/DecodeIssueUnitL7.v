@@ -146,10 +146,15 @@ module DecodeIssueUnitL7 #(
 
   logic [p_phys_addr_bits-1:0] alloc_preg, alloc_ppreg;
   logic                        alloc_rdy;
-  logic                  [4:0] lookup_areg    [p_num_pipes][2];
-  logic [p_phys_addr_bits-1:0] lookup_preg    [p_num_pipes][2];
-  logic                        lookup_pending [p_num_pipes][2];
-  logic                        lookup_en      [p_num_pipes][2];
+
+  logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [2];
+  logic                        lookup_new_inst_en   [2];
+
+  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes][2];
+  logic                        lookup_iq_en      [p_num_pipes][2];
+  logic                        lookup_iq_pending [p_num_pipes][2];
+
+  assign lookup_new_inst_en = '{1'b1, 1'b1};
 
   M2RenameTable #(
     .p_num_phys_regs    (p_num_phys_regs),
@@ -165,10 +170,13 @@ module DecodeIssueUnitL7 #(
     .alloc_en       (alloc_rdy & decoder_wen & IQ_xfer & !should_squash),
     .alloc_rdy      (alloc_rdy),
 
-    .lookup_areg    (lookup_areg),
-    .lookup_preg    (lookup_preg),
-    .lookup_pending (lookup_pending),
-    .lookup_en      (lookup_en),
+    .lookup_new_inst_areg    ('{decoder_raddr0, decoder_raddr1}),
+    .lookup_new_inst_en      (lookup_new_inst_en),
+    .lookup_new_inst_preg    (lookup_new_inst_preg),
+
+    .lookup_iq_preg    (lookup_iq_preg),
+    .lookup_iq_en      (lookup_iq_en),
+    .lookup_iq_pending (lookup_iq_pending),
 
     .complete       (complete),
     .commit         (commit)
@@ -297,8 +305,7 @@ module DecodeIssueUnitL7 #(
 
         // Insert
         .ins_msg_pc              (F_reg.pc),
-        .ins_msg_decoder_raddr0  (decoder_raddr0),
-        .ins_msg_decoder_raddr1  (decoder_raddr1),
+        .ins_msg_preg            (lookup_new_inst_preg),
         .ins_msg_decoder_uop     (decoder_uop),
         .ins_msg_decoder_waddr   (decoder_waddr),
         .ins_msg_imm             (imm),
@@ -315,10 +322,9 @@ module DecodeIssueUnitL7 #(
         .Ex                      (Ex[i]),
 
         // Rename Table Access 
-        .rt_lookup_areg          (lookup_areg[i]),
-        .rt_lookup_preg          (lookup_preg[i]),
-        .rt_lookup_pending       (lookup_pending[i]),
-        .rt_lookup_en            (lookup_en[i]),
+        .rt_lookup_preg          (lookup_iq_preg[i]),
+        .rt_lookup_pending       (lookup_iq_pending[i]),
+        .rt_lookup_en            (lookup_iq_en[i]),
 
         // Register File Access 
         .rf_raddr                (raddr[i]),

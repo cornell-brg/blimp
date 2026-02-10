@@ -35,10 +35,13 @@ module M2RenameTable #(
   // Lookup
   // ---------------------------------------------------------------------
 
-  input  logic                  [4:0] lookup_areg    [p_num_lookup_ports][2],
-  output logic [p_phys_addr_bits-1:0] lookup_preg    [p_num_lookup_ports][2],
-  output logic                        lookup_pending [p_num_lookup_ports][2],
-  input  logic                        lookup_en      [p_num_lookup_ports][2],
+  input  logic                  [4:0] lookup_new_inst_areg [2],
+  input  logic                        lookup_new_inst_en   [2],
+  output logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [2],
+
+  input  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_lookup_ports][2],
+  input  logic                        lookup_iq_en      [p_num_lookup_ports][2],
+  output logic                        lookup_iq_pending [p_num_lookup_ports][2],
 
   // ---------------------------------------------------------------------
   // Complete (clear pending)
@@ -81,6 +84,14 @@ module M2RenameTable #(
 
   logic got_complete_pend [31:1];
   logic got_free          [p_num_phys_regs-1:1];
+
+  logic unused_lookup_new_inst_en [2];
+
+  always_comb begin
+    for( int k = 0; k < 2; k++ ) begin: UNUSED_LOOKUP_NEW_INST_EN
+      unused_lookup_new_inst_en[k] = lookup_new_inst_en[k];
+    end
+  end
 
   genvar i;
   generate
@@ -181,20 +192,20 @@ module M2RenameTable #(
   assign alloc_ppreg = ( alloc_areg != 0 ) ? rename_table[alloc_areg].preg
                                            : 0;
   
-  // Only allocate when we have an entry to give
-  assign alloc_rdy = |preg_alloc_sel_in;
+  // Only allocate when we have an entry to give and that entry is not pending
+  assign alloc_rdy = |preg_alloc_sel_in & ( alloc_areg == 0 || !rename_table[alloc_areg].pending );
 
   // ---------------------------------------------------------------------
   // Lookup
   // ---------------------------------------------------------------------
 
   logic got_complete_lookup [p_num_lookup_ports][2];
-  logic unused_lookup_en    [p_num_lookup_ports][2];
+  logic unused_iq_lookup_en [p_num_lookup_ports][2];
 
   always_comb begin
-    for( int j = 0; j < p_num_lookup_ports; j++ ) begin: UNUSED_LOOKUP_EN_OUTER
-      for( int k = 0; k < 2; k++ ) begin: UNUSED_LOOKUP_EN_INNER
-        unused_lookup_en[j][k] = lookup_en[j][k];
+    for( int j = 0; j < p_num_lookup_ports; j++ ) begin: UNUSED_IQ_LOOKUP_EN_OUTER
+      for( int k = 0; k < 2; k++ ) begin: UNUSED_IQ_LOOKUP_EN_INNER
+        unused_iq_lookup_en[j][k] = lookup_iq_en[j][k];
       end
     end
   end
@@ -208,7 +219,7 @@ module M2RenameTable #(
     for( int j = 0; j < p_num_be_lanes; j++ ) begin: GOT_COMPLETE_OUTER
       for( int k = 0; k < p_num_lookup_ports; k++ ) begin: GOT_COMPLETE_MIDDLE
         for( int l = 0; l < 2; l++ ) begin: GOT_COMPLETE_INNER
-          if( complete_preg[j] == lookup_preg[k][l] ) got_complete_lookup[k][l] = 1'b1;
+          if( complete_preg[j] == lookup_iq_preg[k][l] ) got_complete_lookup[k][l] = 1'b1;
         end
       end
     end
@@ -217,16 +228,30 @@ module M2RenameTable #(
   always_comb begin
     for( int k = 0; k < p_num_lookup_ports; k++ ) begin: LOOKUP_SET_PENDING_OUTER
       for( int l = 0; l < 2; l++ ) begin: LOOKUP_SET_PENDING_INNER
-        if( lookup_areg[k][l] == '0 ) begin
-          lookup_preg[k][l]    = '0;
-          lookup_pending[k][l] = 0;
+        if( lookup_iq_preg[k][l] == '0 ) begin
+          lookup_iq_pending[k][l] = 0;
         end else begin
-          lookup_preg[k][l]    = rename_table[lookup_areg[k][l]].preg;
           if( got_complete_lookup[k][l] )
-            lookup_pending[k][l] = 1'b0; // Bypass
-          else
-            lookup_pending[k][l] = rename_table[lookup_areg[k][l]].pending;
+            lookup_iq_pending[k][l] = 1'b0; // Bypass
+          else begin
+            lookup_iq_pending[k][l] = '0;
+            for ( int m = 1; m < 32; m++ ) begin: LOOKUP_PENDING_SEARCH
+              if( lookup_iq_preg[k][l] == rename_table[m].preg ) begin
+                lookup_iq_pending[k][l] = rename_table[m].pending;
+              end
+            end
+          end
         end
+      end
+    end
+  end
+  
+  always_comb begin
+    for( int l = 0; l < 2; l++ ) begin: LOOKUP_PREG_FOR_AREG
+      if( lookup_new_inst_areg[l] == '0 ) begin
+        lookup_new_inst_preg[l] = '0;
+      end else begin
+        lookup_new_inst_preg[l] = rename_table[lookup_new_inst_areg[l]].preg;
       end
     end
   end
@@ -257,83 +282,83 @@ module M2RenameTable #(
   // Linetracing
   // ---------------------------------------------------------------------
 
-`ifndef SYNTHESIS
+// `ifndef SYNTHESIS
 
-  string test_trace;
-  int    alloc_len;
-  int    lookup_len;
-  int    complete_len;
-  int    free_len;
+//   string test_trace;
+//   int    alloc_len;
+//   int    lookup_len;
+//   int    complete_len;
+//   int    free_len;
 
-  initial begin
-    test_trace = $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg);
-    alloc_len  = test_trace.len();
+//   initial begin
+//     test_trace = $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg);
+//     alloc_len  = test_trace.len();
 
-    test_trace = $sformatf("%x > %x", lookup_areg[0][0], lookup_preg[0][0]);
-    lookup_len = test_trace.len();
+//     test_trace = $sformatf("%x > %x", lookup_areg[0][0], lookup_preg[0][0]);
+//     lookup_len = test_trace.len();
 
-    test_trace   = $sformatf("%x", complete_preg);
-    complete_len = test_trace.len();
+//     test_trace   = $sformatf("%x", complete_preg);
+//     complete_len = test_trace.len();
 
-    test_trace = $sformatf("%x", free_ppreg);
-    free_len   = test_trace.len();
-  end
+//     test_trace = $sformatf("%x", free_ppreg);
+//     free_len   = test_trace.len();
+//   end
 
-  function string trace( int trace_level );
-    trace = "[";
-    if( alloc_en & alloc_rdy ) begin
-      if( trace_level > 0 )
-        trace = {trace, $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg)};
-      else
-        trace = {trace, $sformatf("%x", alloc_areg)};
-    end
-    else begin
-      if( trace_level > 0 )
-        trace = {trace, {(alloc_len){" "}}};
-      else
-        trace = {trace, {(2){" "}}};
-    end
+//   function string trace( int trace_level );
+//     trace = "[";
+//     if( alloc_en & alloc_rdy ) begin
+//       if( trace_level > 0 )
+//         trace = {trace, $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg)};
+//       else
+//         trace = {trace, $sformatf("%x", alloc_areg)};
+//     end
+//     else begin
+//       if( trace_level > 0 )
+//         trace = {trace, {(alloc_len){" "}}};
+//       else
+//         trace = {trace, {(2){" "}}};
+//     end
 
-    trace = {trace, "] ["};
+//     trace = {trace, "] ["};
     
-    for( int j = 0; j < p_num_lookup_ports; j++ ) begin
-      for( int k = 0; k < 2; k++ ) begin
-        if( j != 0 || k != 0 )
-          trace = {trace, ", "};
-        if( lookup_en[j][k] ) begin
-          if( trace_level > 0 )
-            trace = {trace, $sformatf("%x > %x", lookup_areg[j][k], lookup_preg[j][k])};
-          else
-            trace = {trace, $sformatf("%x", lookup_areg[j][k])};
-        end
-        else begin
-          if( trace_level > 0 )
-            trace = {trace, {(lookup_len){" "}}};
-          else
-            trace = {trace, {(2){" "}}};
-        end
-      end
-    end
+//     for( int j = 0; j < p_num_lookup_ports; j++ ) begin
+//       for( int k = 0; k < 2; k++ ) begin
+//         if( j != 0 || k != 0 )
+//           trace = {trace, ", "};
+//         if( lookup_en[j][k] ) begin
+//           if( trace_level > 0 )
+//             trace = {trace, $sformatf("%x > %x", lookup_areg[j][k], lookup_preg[j][k])};
+//           else
+//             trace = {trace, $sformatf("%x", lookup_areg[j][k])};
+//         end
+//         else begin
+//           if( trace_level > 0 )
+//             trace = {trace, {(lookup_len){" "}}};
+//           else
+//             trace = {trace, {(2){" "}}};
+//         end
+//       end
+//     end
 
-    trace = {trace, "] ["};
+//     trace = {trace, "] ["};
 
-    for( int i = 0; i < p_num_be_lanes; i++ ) begin
-      if( complete_val[i] )
-        trace = {trace, $sformatf("%x ", complete_preg[i])};
-      else
-        trace = {trace, {(complete_len){" "}}};
-    end
+//     for( int i = 0; i < p_num_be_lanes; i++ ) begin
+//       if( complete_val[i] )
+//         trace = {trace, $sformatf("%x ", complete_preg[i])};
+//       else
+//         trace = {trace, {(complete_len){" "}}};
+//     end
 
-    for( int i = 0; i < p_num_be_lanes; i++ ) begin
-      if( free_val[i] )
-        trace = {trace, $sformatf("%x ", free_ppreg[i])};
-      else
-        trace = {trace, {(free_len){" "}}};
-    end
+//     for( int i = 0; i < p_num_be_lanes; i++ ) begin
+//       if( free_val[i] )
+//         trace = {trace, $sformatf("%x ", free_ppreg[i])};
+//       else
+//         trace = {trace, {(free_len){" "}}};
+//     end
 
-    trace = {trace, "]"};
-  endfunction
-`endif
+//     trace = {trace, "]"};
+//   endfunction
+// `endif
 
 endmodule
 

@@ -22,9 +22,9 @@ import UArch::*;
 module InstRouterIQUnit #(
   parameter p_isa_subset = p_tinyrv1
 ) (
-  input  rv_uop                    uop,
-  input  logic                     uop_val,
-  output logic                     iq_compat_op
+  input  rv_uop uop,
+  input  logic  uop_val,
+  output logic  iq_compat_op
 );
   logic val_uop;
   
@@ -81,7 +81,7 @@ endmodule
 module IQPicker #(
   parameter p_num_pipes     = 8,
   parameter p_iq_entry_bits = 4,
-  parameter p_iq_idx_width  = $clog2( p_num_pipes )
+  parameter p_iq_idx_width  = $clog2( p_num_pipes + 1 )
 ) (
   input  logic                      iq_compat_op   [p_num_pipes],
   input  logic [p_iq_entry_bits:0]  iq_avail_slots [p_num_pipes],

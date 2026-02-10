@@ -47,8 +47,7 @@ module IssueQueueInOrderTestSuite #(
   //----------------------------------------------------------------------
 
   logic [31:0]               dut_ins_msg_pc;
-  logic [4:0]                dut_ins_msg_decoder_raddr0;
-  logic [4:0]                dut_ins_msg_decoder_raddr1;
+  logic [p_addr_bits-1:0]    dut_ins_msg_preg [2];
   rv_uop                     dut_ins_msg_decoder_uop;
   logic [4:0]                dut_ins_msg_decoder_waddr;
   logic [31:0]               dut_ins_msg_imm;
@@ -66,7 +65,6 @@ module IssueQueueInOrderTestSuite #(
     .p_phys_addr_bits (p_addr_bits)
   ) Ex ();
 
-  logic             [4:0] dut_rt_lookup_areg    [2];
   logic [p_addr_bits-1:0] dut_rt_lookup_preg    [2];
   logic                   dut_rt_lookup_pending [2];
   logic                   dut_rt_lookup_en      [2];
@@ -88,8 +86,7 @@ module IssueQueueInOrderTestSuite #(
     .rst     (rst),
 
     .ins_msg_pc               (dut_ins_msg_pc),
-    .ins_msg_decoder_raddr0   (dut_ins_msg_decoder_raddr0),
-    .ins_msg_decoder_raddr1   (dut_ins_msg_decoder_raddr1),
+    .ins_msg_preg             (dut_ins_msg_preg),
     .ins_msg_decoder_uop      (dut_ins_msg_decoder_uop),
     .ins_msg_decoder_waddr    (dut_ins_msg_decoder_waddr),
     .ins_msg_imm              (dut_ins_msg_imm),
@@ -104,7 +101,6 @@ module IssueQueueInOrderTestSuite #(
 
     .Ex                       (Ex),
 
-    .rt_lookup_areg           (dut_rt_lookup_areg),
     .rt_lookup_preg           (dut_rt_lookup_preg),
     .rt_lookup_pending        (dut_rt_lookup_pending),
     .rt_lookup_en             (dut_rt_lookup_en),
@@ -123,8 +119,8 @@ module IssueQueueInOrderTestSuite #(
   // the TestMCaller instead of TestCaller for compatibility
    typedef struct packed {
     logic [31:0]               pc;
-    logic [4:0]                decoder_raddr0;
-    logic [4:0]                decoder_raddr1;
+    logic [p_addr_bits-1:0]    preg0;
+    logic [p_addr_bits-1:0]    preg1;
     rv_uop                     decoder_uop;
     logic [4:0]                decoder_waddr;
     logic [31:0]               imm;
@@ -138,8 +134,8 @@ module IssueQueueInOrderTestSuite #(
   t_ins_msg ins_msg;
 
   assign dut_ins_msg_pc               = ins_msg.pc;
-  assign dut_ins_msg_decoder_raddr0   = ins_msg.decoder_raddr0;
-  assign dut_ins_msg_decoder_raddr1   = ins_msg.decoder_raddr1;
+  assign dut_ins_msg_preg[0]          = ins_msg.preg0;
+  assign dut_ins_msg_preg[1]          = ins_msg.preg1;
   assign dut_ins_msg_decoder_uop      = ins_msg.decoder_uop;
   assign dut_ins_msg_decoder_waddr    = ins_msg.decoder_waddr;
   assign dut_ins_msg_imm              = ins_msg.imm;
@@ -168,8 +164,8 @@ module IssueQueueInOrderTestSuite #(
 
   task send(
     logic [31:0]               pc,
-    logic [4:0]                decoder_raddr0,
-    logic [4:0]                decoder_raddr1,
+    logic [p_addr_bits-1:0]    preg0,
+    logic [p_addr_bits-1:0]    preg1,
     rv_uop                     decoder_uop,
     logic [4:0]                decoder_waddr,
     logic [31:0]               imm,
@@ -180,8 +176,8 @@ module IssueQueueInOrderTestSuite #(
     logic [p_addr_bits-1:0]    alloc_ppreg
   );
     msg_to_send.pc               = pc;
-    msg_to_send.decoder_raddr0   = decoder_raddr0;
-    msg_to_send.decoder_raddr1   = decoder_raddr1;
+    msg_to_send.preg0            = preg0;
+    msg_to_send.preg1            = preg1;
     msg_to_send.decoder_uop      = decoder_uop;
     msg_to_send.decoder_waddr    = decoder_waddr;
     msg_to_send.imm              = imm;
@@ -296,56 +292,50 @@ module IssueQueueInOrderTestSuite #(
   //----------------------------------------------------------------------
   // Rename Table Blackbox
   //----------------------------------------------------------------------
-  // Reference model: maps each areg -> {preg, pending}.  Initialized to
-  // identity (preg == areg) with all regs ready.  The always_comb responds
-  // combinationally to whatever areg the DUT is currently looking up.
+  // Reference model: tracks pending status for each physical register.
+  // Initialized with all regs ready (not pending). The always_comb responds
+  // combinationally to whatever preg the DUT is currently looking up.
 
-  logic [p_addr_bits-1:0] rt_ref_preg    [p_num_regs-1:1];
-  logic                   rt_ref_pending [p_num_regs-1:1];
+  logic rt_ref_pending [p_num_regs-1:0];
 
   initial begin
     for (int i = 0; i < p_num_regs; i++) begin
-      rt_ref_preg[i]    = i[p_addr_bits-1:0];
       rt_ref_pending[i] = 1'b0;
     end
   end
 
-  // Drive preg/pending by indexing the reference table with the DUT's areg
+  // Drive pending by indexing the reference table with the DUT's preg
   always_comb begin
     for (int i = 0; i < 2; i++) begin
-      dut_rt_lookup_preg[i]    = rt_ref_preg[dut_rt_lookup_areg[i]];
-      dut_rt_lookup_pending[i] = rt_ref_pending[dut_rt_lookup_areg[i]];
+      dut_rt_lookup_pending[i] = rt_ref_pending[dut_rt_lookup_preg[i]];
     end
   end
 
-  // Set a single rename table entry
-  task rt_set(
-    input logic             [4:0] areg,
+  // Set pending status for a single physical register
+  task rt_set_pending(
     input logic [p_addr_bits-1:0] preg,
     input logic                   pending
   );
-    rt_ref_preg[areg]    = preg;
-    rt_ref_pending[areg] = pending;
+    rt_ref_pending[preg] = pending;
   endtask
 
-  // Reset reference table back to identity / all ready
+  // Reset reference table back to all ready
   task rt_reset();
-    for (int i = 1; i <= p_num_regs; i++) begin
-      rt_ref_preg[i]    = i[p_addr_bits-1:0];
+    for (int i = 0; i < p_num_regs; i++) begin
       rt_ref_pending[i] = 1'b0;
     end
   endtask
 
-  // Check DUT lookup outputs against expected areg/en values.
-  // Only checks areg when the corresponding en is expected high.
+  // Check DUT lookup outputs against expected preg/en values.
+  // Only checks preg when the corresponding en is expected high.
   task rt_check(
-    input logic [4:0] exp_areg [2],
-    input logic       exp_en   [2]
+    input logic [p_addr_bits-1:0] exp_preg [2],
+    input logic                   exp_en   [2]
   );
     for (int i = 0; i < 2; i++) begin
       `CHECK_EQ(dut_rt_lookup_en[i], exp_en[i]);
       if (exp_en[i]) begin
-        `CHECK_EQ(dut_rt_lookup_areg[i], exp_areg[i]);
+        `CHECK_EQ(dut_rt_lookup_preg[i], exp_preg[i]);
       end
     end
   endtask
@@ -427,7 +417,7 @@ module IssueQueueInOrderTestSuite #(
 
     // -----------------------------------------------------------------
     // Test 1: ADD, both sources ready, op1 and op2 from regfile
-    //   rename table: identity, all ready (default)
+    //   rename table: all pregs ready (default)
     //   regfile[3] = 2, regfile[7] = 1
     // -----------------------------------------------------------------
 
@@ -436,8 +426,8 @@ module IssueQueueInOrderTestSuite #(
 
     fork
       begin
-        //        pc      raddr0 raddr1 uop    waddr imm   op2s op3s seq  preg ppreg
-        send( 32'h200, 5'd3, 5'd7, OP_ADD, 5'd5, 32'd0, 1'b0, 1'b0, 5'd0, 6'd8, 6'd3 );
+        //        pc      preg0 preg1 uop    waddr imm   op2s op3s seq  preg ppreg
+        send( 32'h200, 6'd3, 6'd7, OP_ADD, 5'd5, 32'd0, 1'b0, 1'b0, 5'd0, 6'd8, 6'd3 );
       end
       begin
         X_Ostream.recv( '{
@@ -460,7 +450,7 @@ module IssueQueueInOrderTestSuite #(
 
     fork
       begin
-        send( 32'h204, 5'd3, 5'd0, OP_ADD, 5'd6, 32'd10, 1'b1, 1'b0, 5'd1, 6'd9, 6'd5 );
+        send( 32'h204, 6'd3, 6'd0, OP_ADD, 5'd6, 32'd10, 1'b1, 1'b0, 5'd1, 6'd9, 6'd5 );
       end
       begin
         X_Ostream.recv( '{
@@ -478,23 +468,23 @@ module IssueQueueInOrderTestSuite #(
 
     // -----------------------------------------------------------------
     // Test 3: Source pending, woken by clearing pending in rename table
-    //   areg 3 → preg 12, pending;  regfile[12] = 3
-    //   areg 7 → preg  7, ready;    regfile[7]  = 1
+    //   preg 12 is pending;  regfile[12] = 3
+    //   preg  7 is ready;    regfile[7]  = 1
     //   Instruction stalls until pending is cleared.
     // -----------------------------------------------------------------
 
-    rt_set( 3, 6'd12, 1'b1 );
+    rt_set_pending( 6'd12, 1'b1 );
     rf_set( 12, 32'd3 );
 
     fork
       begin
-        send( 32'h208, 5'd3, 5'd7, OP_ADD, 5'd4, 32'd0, 1'b0, 1'b0, 5'd2, 6'd10, 6'd6 );
+        send( 32'h208, 6'd12, 6'd7, OP_ADD, 5'd4, 32'd0, 1'b0, 1'b0, 5'd2, 6'd10, 6'd6 );
       end
       begin
         // Wait for insert to land, then clear pending
         repeat( 3 ) @( posedge clk );
         #1;
-        rt_set( 3, 6'd12, 1'b0 );
+        rt_set_pending( 6'd12, 1'b0 );
       end
       begin
         X_Ostream.recv( '{
@@ -511,19 +501,19 @@ module IssueQueueInOrderTestSuite #(
     join
 
     // -----------------------------------------------------------------
-    // Test 4: Source pending, woken by completion on matching preg
-    //   areg 3 → preg 12, pending (re-set);  regfile[12] = 3
-    //   Completion on lane 0 for preg 12 triggers got_complete_lookup.
+    // Test 4: Source pending, woken by clearing pending via completion
+    //   preg 12 is pending (re-set);  regfile[12] = 3
+    //   Completion on lane 0 for preg 12, then clear pending.
     // -----------------------------------------------------------------
 
-    rt_set( 3, 6'd12, 1'b1 );
+    rt_set_pending( 6'd12, 1'b1 );
 
     fork
       begin
-        send( 32'h20c, 5'd3, 5'd7, OP_ADD, 5'd2, 32'd0, 1'b0, 1'b0, 5'd3, 6'd11, 6'd7 );
+        send( 32'h20c, 6'd12, 6'd7, OP_ADD, 5'd2, 32'd0, 1'b0, 1'b0, 5'd3, 6'd11, 6'd7 );
       end
       begin
-        // Wait for insert, then fire completion for preg 12
+        // Wait for insert, then fire completion for preg 12 and clear pending
         repeat( 3 ) @( posedge clk );
         #1;
         complete(
@@ -534,6 +524,7 @@ module IssueQueueInOrderTestSuite #(
           '{6'd12, 6'dx},     // preg    [p_num_be_lanes]
           '{1'b1,  1'b0}      // val     [p_num_be_lanes]
         );
+        rt_set_pending( 6'd12, 1'b0 );
       end
       begin
         X_Ostream.recv( '{
