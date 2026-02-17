@@ -35,12 +35,12 @@ module BlimpV9TestSuite_sra #(
 endmodule
 
 module BlimpV9_sra_test;
-  BlimpV9TestSuite_sra #(1)                 suite_1();
-  BlimpV9TestSuite_sra #(2, 8, 5, 36, 1, 1) suite_2();
-  BlimpV9TestSuite_sra #(3, 4, 3, 33, 1, 1) suite_3();
-  BlimpV9TestSuite_sra #(4,32, 4, 50, 3, 1) suite_4();
-  BlimpV9TestSuite_sra #(5, 2, 2, 48, 1, 3) suite_5();
-  BlimpV9TestSuite_sra #(6, 4, 6, 42, 3, 3) suite_6();
+  BlimpV9TestSuite_sra #(1)                    suite_1();
+  BlimpV9TestSuite_sra #(2, 8, 5, 36, 2, 1, 1) suite_2();
+  BlimpV9TestSuite_sra #(3, 4, 3, 33, 2, 1, 1) suite_3();
+  BlimpV9TestSuite_sra #(4,32, 4, 50, 2, 3, 1) suite_4();
+  BlimpV9TestSuite_sra #(5, 2, 2, 48, 2, 1, 3) suite_5();
+  BlimpV9TestSuite_sra #(6, 4, 6, 42, 2, 3, 3) suite_6();
   int s;
 
   initial begin

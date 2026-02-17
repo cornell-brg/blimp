@@ -7,7 +7,7 @@ can be composed to form different versions of Blimp processors. This
 enables the design of these components to occur iteratively, adding on
 functionality as the complexity of the processor progressed.
 
-Currently, 8 versions of the processor are implemented. The table below
+Currently, 10 versions of the processor are implemented. The table below
 details the level of each unit that each processor version supports:
 
 .. admonition:: Instruction Routing/Arbitration
@@ -92,6 +92,14 @@ details the level of each unit that each processor version supports:
    * - V9
      - 4
      - 6
+     - 1, 2, 3, 4,
+       5, 6, 7
+     - 4
+     - 2
+
+   * - V10
+     - 4
+     - 7
      - 1, 2, 3, 4,
        5, 6, 7
      - 4
@@ -276,4 +284,28 @@ based on the number of backend superscalar lanes (configurable at the toplevel).
    :align: center
    :width: 70%
    :alt: A picture of the Version 9 processor composition
+   :class: bottompadding
+
+Version 10
+--------------------------------------------------------------------------
+
+The Version 10 processor supports superscalar issue within the decode-issue unit
+itself. As such, the high-level view of the processor without looking into the
+units is identical to v9. all changes are internal to the DIU itself.
+Superscalar issue is implemented using in-order issue queues accompanied by a
+more intelligent instruction router which routes to the issue queue with fewer
+enqueued instructions if multiple pipes can support the next instruction to
+enqueue on the issue queues. Each issue queue thus contains instructions which
+are waiting to execute. Since these queues are in-order, the entire queue is
+blocked if the next instruction to dequeue is still waiting for its source
+operands to be ready, which is tracked by looking up the register status in the
+rename table and reading the source operands when ready from the register file.
+Bypassing from the complete interface is also supported to allow for 1-cycle
+issue latency. Any pipes supporting control-flow instrutions use a "bypass"
+queue to keep the 1-cycle branch-resolution latency constraint.
+
+.. image:: img/versions-v10.png
+   :align: center
+   :width: 70%
+   :alt: A picture of the Version 10 processor composition
    :class: bottompadding

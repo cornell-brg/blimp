@@ -112,8 +112,10 @@ module SeqNumGenL4 #(
   // Allocation
   //----------------------------------------------------------------------
 
-  // Can only allocate if we're not about to wrap around
-  assign alloc_val = !( curr_head_ptr + 1 == curr_tail_ptr );
+  // Can only allocate if we're not about to wrap around and next sequence
+  // number to allocate is free
+  assign alloc_val = !( curr_head_ptr + 1 == curr_tail_ptr ) & 
+                      ( seq_num_list[curr_head_ptr] == FREE );
 
   assign is_alloc = alloc_val & alloc_rdy;
   assign alloc_seq_num = ( squash.val ) ? squash.seq_num + 1
