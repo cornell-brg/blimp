@@ -5,7 +5,6 @@
 
 `include "test/TestUtils.v"
 `include "hw/common/MRRArb.v"
-`include "hw/common/test/intf/MRRArbIntf.v"
 `include "hw/common/test/coverage/MRRArbCoverage.v"
 
 import TestEnv::*;
@@ -132,6 +131,12 @@ module MRRArbTestSuite #(
 
   initial begin
     mrrarb_cov_obj = new( intf );
+  end
+
+  `else
+  
+  initial begin 
+    $display("VERILATOR"); 
   end
 
   `endif /* VERILATOR */
