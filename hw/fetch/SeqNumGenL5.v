@@ -1,8 +1,9 @@
 //========================================================================
 // SeqNumGenL5.v
 //========================================================================
-// A module for generating and managing sequence numbers with squashing
-// and support for superscalar backend
+// A module for generating and managing sequence numbers with squashing and
+// support for superscalar backend. p_num_fe_lanes sequence numbers will be
+// allocated at once
 
 `ifndef HW_FETCH_SEQNUMGENL5_V
 `define HW_FETCH_SEQNUMGENL5_V
@@ -25,8 +26,8 @@ module SeqNumGenL5 #(
   //----------------------------------------------------------------------
 
   output logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes],
-  output logic                      alloc_val     [p_num_fe_lanes],
-  input  logic                      alloc_rdy     [p_num_fe_lanes],
+  output logic                      alloc_val,
+  input  logic                      alloc_rdy,
 
   //----------------------------------------------------------------------
   // Commit Interface to free sequence numbers

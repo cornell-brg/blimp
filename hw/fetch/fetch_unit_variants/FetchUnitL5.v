@@ -59,6 +59,9 @@ module FetchUnitL5
   
   localparam p_flight_bits  = $clog2(p_max_in_flight) + 1;
 
+  logic [31:0] target_base_bm;
+  assign target_base_bm = {(32-$clog2(p_num_fe_lanes)){1'b1}, $clog2(p_num_fe_lanes){1'b0}};
+
   //----------------------------------------------------------------------
   // Request
   //----------------------------------------------------------------------
@@ -103,15 +106,14 @@ module FetchUnitL5
     if( squash.val )
       num_in_flight_next = 0;
 
-    // Add in-flight fetch block (4 messages) for each request to imem that goes
-    // out (and isn't immediately squashed)
+    // Add in-flight fetch block (p_num_fe_lanes messages) for each request to
+    // imem that goes out (and isn't immediately squashed)
     if( memreq_xfer_all & (!D_xfer_all | should_drop) )
-      num_in_flight_next = num_in_flight_next + 4;
+      num_in_flight_next = num_in_flight_next + p_num_fe_lanes;
 
-    // Remove an in-flight fetch block (4 messages) for each response that comes
-    // back (and isn't immediately squashed)
+    // response that comes back (and isn't immediately squashed)
     if( D_xfer_all & !memreq_xfer_all & !should_drop )
-      num_in_flight_next = num_in_flight_next - 4;
+      num_in_flight_next = num_in_flight_next - p_num_fe_lanes;
   end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -140,7 +142,7 @@ module FetchUnitL5
     // Remove a fetch block from number of instructions to squash as long as
     // there are some instructions exiting the fetch blcok
     if( resp_all & ( num_to_squash_next > 0 ) )
-      num_to_squash_next = num_to_squash_next - 4;
+      num_to_squash_next = num_to_squash_next - p_num_fe_lanes;
   end
 
   assign should_drop = squash.val | ( num_to_squash > 0 );
@@ -157,16 +159,16 @@ module FetchUnitL5
       if ( rst )
         curr_fetch_block_base <= 32'(p_rst_addr);
       else if ( squash.val & memreq_xfer[i] )
-        curr_fetch_block_base <= squash.target + 4;
+        curr_fetch_block_base <= (squash.target & target_base_bm) + (p_num_fe_lanes << 2);
       else if ( squash.val )
-        curr_fetch_block_base <= squash.target;
+        curr_fetch_block_base <= (squash.target & target_base_bm);
       else if ( memreq_xfer[i] )
         curr_fetch_block_base <= curr_fetch_block_base_next;
     end
   end
 
   always_comb begin
-    curr_fetch_block_base_next = mem[0].req_msg.addr + 4;
+    curr_fetch_block_base_next = mem[0].req_msg.addr + (p_num_fe_lanes << 2);
   end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -176,7 +178,7 @@ module FetchUnitL5
   always_comb begin
     for (int i = 0; i < p_num_fe_lanes; i++ ) begin
       if ( squash.val )
-        mem[i].req_msg.addr = squash.target + 32'(i << 2);
+        mem[i].req_msg.addr = (squash.target & target_base_bm) + 32'(i << 2);
       else
         mem[i].req_msg.addr = curr_fetch_block_base + 32'(i << 2);
     end
@@ -204,10 +206,13 @@ module FetchUnitL5
   // Allocation
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  logic                      alloc_val     [p_num_fe_lanes];
-  logic                      alloc_rdy     [p_num_fe_lanes];
+  logic                      alloc_val;
+  logic                      alloc_rdy;
   logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes];
 
+
+  // TODO: implement SeqNumGenL5 to allocate p_num_fe_lanes seq numbers at once
+  // (not ready if can't allocate all at once)
   SeqNumGenL5 #(
     .p_seq_num_bits  (p_seq_num_bits),
     .p_reclaim_width (p_reclaim_width),
@@ -230,8 +235,10 @@ module FetchUnitL5
   logic resp_empty [p_num_fe_lanes];
   always_comb begin
     resp_all = 1'b1;
+    alloc_rdy = 1'b1;
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
       resp_all &= !resp_empty[i];
+      alloc_rdy &= !resp_empty[i] & D[i].rdy & !should_drop;
     end
   end
 
@@ -262,9 +269,8 @@ module FetchUnitL5
 
       assign resp_push       = mem[i].resp_val & !resp_full;
       assign mem[i].resp_rdy = !resp_full;
-      assign resp_pop        = ((D[i].rdy & alloc_val[i]) | should_drop) & !resp_empty[i];
-      assign D[i].val        = !resp_empty[i] & alloc_val[i] & !should_drop;
-      assign alloc_rdy[i]    = !resp_empty[i] & D[i].rdy & !should_drop;
+      assign resp_pop        = ((D[i].rdy & alloc_val) | should_drop) & !resp_empty[i];
+      assign D[i].val        = !resp_empty[i] & alloc_val & !should_drop;
 
       always_comb begin
         D[i].inst    = fifo_rdata.data;

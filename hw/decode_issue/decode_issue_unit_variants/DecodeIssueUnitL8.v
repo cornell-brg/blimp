@@ -40,6 +40,12 @@ module DecodeIssueUnitL8 #(
                                                          OP_BLT_VEC  |
                                                          OP_BGE_VEC  |
                                                          OP_BLTU_VEC |
+                                                         OP_BGEU_VEC,
+  parameter rv_op_vec p_brx_subset                     = OP_BEQ_VEC  |
+                                                         OP_BNE_VEC  |
+                                                         OP_BLT_VEC  |
+                                                         OP_BGE_VEC  |
+                                                         OP_BLTU_VEC |
                                                          OP_BGEU_VEC
 ) (
   input  logic clk,
@@ -100,6 +106,9 @@ module DecodeIssueUnitL8 #(
 
   logic should_squash;
 
+  // TODO: If squash sub originating from CTRL XU, invalidate (val = 0) all
+  // instructions in registers up to and including that branch causing the
+  // squash in CTRL XU
   genvar i;
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: F_REG_GEN
@@ -189,9 +198,8 @@ module DecodeIssueUnitL8 #(
     end
   end
 
-  // TODO: implement M3RenameTable with multiple allocation ports instead of
-  // just replicating the logic for each FE lane
-
+  // TODO: implement M3RenameTable with multiple allocation ports for each FE
+  // lane
   M3RenameTable #(
     .p_num_phys_regs    (p_num_phys_regs),
     .p_num_lookup_ports (p_num_pipes),
@@ -265,16 +273,58 @@ module DecodeIssueUnitL8 #(
   //----------------------------------------------------------------------
   // Squashing
   //----------------------------------------------------------------------
+  
+  MSeqAge #(
+    .p_num_be_lanes (p_num_be_lanes)
+  ) seq_age (
+    .*
+  );
 
-  // TODO: need to get oldest jump instruction in current instruction window if
-  // multiple jump instructions
+  // Track oldest JAL(R), BRX, and instruction in general
+  logic [$clog2(p_num_fe_lanes+1)-1:0] oldest_jal_idx;
+  logic [p_seq_num_bits-1:0]           oldest_jal_seq_num;
+  logic [p_seq_num_bits-1:0]           oldest_insn_seq_num;
+  logic [$clog2(p_num_fe_lanes+1)-1:0] oldest_brx_idx;
+  logic [p_seq_num_bits-1:0]           oldest_brx_seq_num;
 
+  always_comb begin
+    oldest_jal_idx      = '0;
+    oldest_jal_seq_num  = F_reg[0].seq_num;
+    oldest_insn_seq_num = F_reg[0].seq_num;
+    oldest_brx_idx      = '0;
+    oldest_brx_seq_num  = F_reg[0].seq_num;
+    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+
+      // Update oldest insn
+      if( seq_age.is_older(oldest_insn_seq_num, F_reg[i].seq_num) ) begin
+        oldest_insn_seq_num = F_reg[i].seq_num;
+      end
+
+      // Update oldest BRX insn
+      if( in_subset(p_brx_subset, num_ops'(1 << decoder_uop[i])) &&
+          seq_age.is_older(oldest_brx_seq_num, F_reg[i].seq_num) ) begin
+        oldest_brx_idx     = $clog2(p_num_fe_lanes+1)'(i);
+        oldest_brx_seq_num = F_reg[i].seq_num;
+      end
+
+      // Update oldest JAL seq num in IW if the latest found JAL(R) is older
+      if( (decoder_jal[i] == 2'd1 || decoder_jal[i] == 2'd2) &&
+          seq_age.is_older(oldest_jal_seq_num, F_reg[i].seq_num) ) begin
+        oldest_jal_idx     = $clog2(p_num_fe_lanes+1)'(i);
+        oldest_jal_seq_num = F_reg[i].seq_num;
+      end
+    end
+  end
+
+  // Jump based on oldest JAL(R) instruction in current IW if there is one
+  // present
   logic [31:0] jump_target;
   logic [31:0] jump_base;
+
   always_comb begin
-    case( decoder_jal )
-      2'd1:    jump_target = F_reg.pc + imm;                   // JAL
-      2'd2:    jump_target = (jump_base + imm) & 32'hFFFFFFFE; // JALR
+    case( decoder_jal[oldest_jal_idx] )
+      2'd1:    jump_target = F_reg[oldest_jal_idx].pc + imm[oldest_jal_idx];   // JAL
+      2'd2:    jump_target = (jump_base + imm[oldest_jal_idx]) & 32'hFFFFFFFE; // JALR
       default: jump_target = 'x;
     endcase
   end
@@ -289,54 +339,70 @@ module DecodeIssueUnitL8 #(
       squash_sent <= 1'b1;
   end
 
-  assign squash_pub.val     = (decoder_jal != 0) & F_reg.val & !squash_sent & alloc_rdy;
+  assign squash_pub.val     = (decoder_jal[oldest_jal_idx] != 0) & 
+                               F_reg[oldest_jal_idx].val & 
+                               !squash_sent & alloc_rdy_all;
   assign squash_pub.target  = jump_target;
-  assign squash_pub.seq_num = F_reg.seq_num;
+  assign squash_pub.seq_num = F_reg[oldest_jal_idx].seq_num;
 
   //----------------------------------------------------------------------
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
-  
-  MSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
-  ) seq_age (
-    .*
-  );
 
-  // TODO: should squash should check oldest instruction in IW
-
+  // Squash should check oldest instruction in IW
   assign should_squash = squash_sub.val & 
-                         seq_age.is_older( squash_sub.seq_num, F_reg.seq_num );
+                         seq_age.is_older( squash_sub.seq_num, oldest_insn_seq_num );
 
   //----------------------------------------------------------------------
   // Route the instruction to issue queue based on uop
   //----------------------------------------------------------------------
 
-  logic                        iq_rdy         [p_num_pipes];
-  logic [$clog2(p_iq_depth):0] iq_avail_slots [p_num_pipes];
-  logic                        iq_val         [p_num_pipes];
+  logic                                iq_rdy         [p_num_pipes];
+  logic [$clog2(p_iq_depth):0]         iq_avail_slots [p_num_pipes];
+  logic [$clog2(p_num_fe_lanes+1)-1:0] iq_route_idx   [p_num_pipes];
+  logic                                iq_val         [p_num_pipes];
 
-  // TODO: Need multi-instruction arbiter for multiple FE lanes, only issue
-  // instructions up to and including the branch
 
-  InstRouterIQ #(
-    .p_num_pipes     (p_num_pipes),
-    .p_pipe_subsets  (p_pipe_subsets),
-    .p_iq_depth      (p_iq_depth)
-  ) inst_router (
+  // Only insns up to and including this IW's oldest branch (if there is a BRX
+  // insn in this IW) are valid insns to issue
+  logic xbar_insn_val [p_num_fe_lanes];
+  always_comb begin
+    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+      xbar_insn_val[i] = F_reg[i].val & decoder_val[i] & !should_squash & alloc_rdy_all &
+                         (in_subset(p_brx_subset, decoder_uop[oldest_brx_idx]) ?
+                          (seq_age.is_older(F_reg[i].seq_num, oldest_brx_seq_num) | 
+                           F_reg[i].seq_num == oldest_brx_seq_num) : 1'b1);
+    end
+  end
+
+  logic [p_seq_num_bits-1:0] insn_seq_nums [p_num_fe_lanes];
+  always_comb begin
+    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+      insn_seq_nums[i] = F_reg[i].seq_num;
+    end
+  end
+
+  // TODO: Implement InstXbarIQ
+  InstXbarIQ #(
+    .p_num_pipes       (p_num_pipes),
+    .p_pipe_subsets    (p_pipe_subsets),
+    .p_num_input_lanes (p_num_fe_lanes),
+    .p_iq_depth        (p_iq_depth)
+  ) inst_xbar (
     .uop            (decoder_uop),
-    .val            (F_reg.val & decoder_val & !should_squash & alloc_rdy),
+    .seq_num        (insn_seq_nums),
+    .val            (xbar_insn_val),
     .iq_rdy         (iq_rdy),
     .iq_avail_slots (iq_avail_slots),
+    .iq_route_idx   (iq_route_idx),
     .iq_val         (iq_val),
     .xfer           (IQ_xfer)
   );
 
-  // TODO: not ready to receive new IW unless all instructions in current IW are
-  // transferred to IQs
-
+  // TODO: not ready to receive new IW unless all VALID instructions in current
+  // IW are transferred to IQs or squashing
   assign F.rdy = (IQ_xfer_all & alloc_rdy & decoder_val) | 
-                 should_squash                       | 
+                 should_squash                           | 
                  (!F_reg.val);
 
   //----------------------------------------------------------------------
@@ -356,16 +422,16 @@ module DecodeIssueUnitL8 #(
         .rst                     (rst),
 
         // Insert
-        .ins_msg_pc              (F_reg.pc),
+        .ins_msg_pc              (F_reg[iq_route_idx[i]].pc),
         .ins_msg_preg            (lookup_new_inst_preg),
-        .ins_msg_decoder_uop     (decoder_uop),
-        .ins_msg_decoder_waddr   (decoder_waddr),
-        .ins_msg_imm             (imm),
-        .ins_msg_decoder_op2_sel (decoder_op2_sel),
-        .ins_msg_decoder_op3_sel (decoder_op3_sel),
-        .ins_msg_seq_num         (F_reg.seq_num),
-        .ins_msg_alloc_preg      (alloc_preg),
-        .ins_msg_alloc_ppreg     (alloc_ppreg),
+        .ins_msg_decoder_uop     (decoder_uop[iq_route_idx[i]]),
+        .ins_msg_decoder_waddr   (decoder_waddr[iq_route_idx[i]]),
+        .ins_msg_imm             (imm[iq_route_idx[i]]),
+        .ins_msg_decoder_op2_sel (decoder_op2_sel[iq_route_idx[i]]),
+        .ins_msg_decoder_op3_sel (decoder_op3_sel[iq_route_idx[i]]),
+        .ins_msg_seq_num         (F_reg[iq_route_idx[i]].seq_num),
+        .ins_msg_alloc_preg      (alloc_preg[iq_route_idx[i]]),
+        .ins_msg_alloc_ppreg     (alloc_ppreg[iq_route_idx[i]]),
         .ins_en                  (iq_val[i]),
         .ins_rdy                 (iq_rdy[i]),
         .avail_slots             (iq_avail_slots[i]),
@@ -405,22 +471,22 @@ module DecodeIssueUnitL8 #(
   // Linetracing
   //----------------------------------------------------------------------
 
-`ifndef SYNTHESIS  
-  function int ceil_div_4( int val );
-    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-  endfunction
+// `ifndef SYNTHESIS  
+//   function int ceil_div_4( int val );
+//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+//   endfunction
 
-  function string trace(
-    // verilator lint_off UNUSEDSIGNAL
-    int trace_level
-    // verilator lint_on UNUSEDSIGNAL
-  );
-    if( F_reg.val & F.rdy )
-      trace = $sformatf("%x: %-30s", F_reg.seq_num, disassemble(F_reg.inst, F_reg.pc) );
-    else
-      trace = {(32 + ceil_div_4( p_seq_num_bits )){" "}};
-  endfunction
-`endif
+//   function string trace(
+//     // verilator lint_off UNUSEDSIGNAL
+//     int trace_level
+//     // verilator lint_on UNUSEDSIGNAL
+//   );
+//     if( F_reg.val & F.rdy )
+//       trace = $sformatf("%x: %-30s", F_reg.seq_num, disassemble(F_reg.inst, F_reg.pc) );
+//     else
+//       trace = {(32 + ceil_div_4( p_seq_num_bits )){" "}};
+//   endfunction
+// `endif
 
 endmodule
 
