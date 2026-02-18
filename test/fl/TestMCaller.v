@@ -76,7 +76,7 @@ module TestMCaller #(
   string test_trace;
   int trace_len;
   initial begin
-    test_trace = $sformatf("%x:%x", call_msg, ret_msg);
+    test_trace = $sformatf("%p:%p", call_msg, ret_msg);
     trace_len = test_trace.len();
   end
 
@@ -94,11 +94,11 @@ module TestMCaller #(
       if( en & rdy )
         trace = {trace, $sformatf("%x:%x", call_msg[i], ret_msg[i])};
       else if( rdy )
-        trace = {trace, {(trace_len){" "}}};
+        trace = {trace, {((trace_len)/4){" "}}};
       else if( en ) // Violate calling convention
-        trace = {trace, {(trace_len){"X"}}};
+        trace = {trace, {((trace_len)/4){"X"}}};
       else
-        trace = {trace, {(trace_len-1){" "}}, "."};
+        trace = {trace, {((trace_len-1)/4){" "}}, "."};
       end
   endfunction
 endmodule

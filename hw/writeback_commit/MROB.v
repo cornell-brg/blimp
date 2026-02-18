@@ -220,6 +220,7 @@ module MROB #(
   // Linetracing
   //----------------------------------------------------------------------
 
+  // VCS coverage off
 `ifndef SYNTHESIS
   function int ceil_div_4( int val );
     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
@@ -268,6 +269,7 @@ module MROB #(
     end
   endfunction
 `endif
+  // VCS coverage on
 
 endmodule
 

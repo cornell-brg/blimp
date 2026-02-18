@@ -264,7 +264,7 @@ endmodule
 `define CHECK_EQ( __dut, __ref )                                \
   if ( __ref !== ( __ref ^ __dut ^ __ref ) ) begin              \
     if ( t.verbose )                                            \
-      $display( "\n%sERROR%s (cycle=%0d): %s != %s (%b != %b)", \
+      $display( "\n%sERROR%s (cycle=%0d): %s != %s (%x != %x)", \
                 `RED, `RESET, t.cycles, `"__dut`", `"__ref`",   \
                 __dut, __ref );                                 \
     else                                                        \

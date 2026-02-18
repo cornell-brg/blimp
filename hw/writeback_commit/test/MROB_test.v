@@ -207,38 +207,40 @@ module MROBTestSuite #(
   //----------------------------------------------------------------------
   // test_case_basic
   //----------------------------------------------------------------------
+  // Enqueuing a message to the MROB should also dequeue that message if
+  // the indices are in-order
 
   task test_case_basic();
     t.test_case_begin( "test_case_basic" );
     if( !t.run_test ) return;
 
     fork
-        //    msg                idx        val
+        //    msg                      idx                   val
       begin
-        send( '{'hdeadbeef, 'x}, '{'d0, 'x}, '{'1, '0} );
+        send( '{0:'hdead, default:'x}, '{0:'d0, default:'x}, '{0:'1, default:'0} );
       end
       begin
-        recv( '{'hdeadbeef, 'x}, '{'d0, 'x}, '{'1, '0} );
-      end
-    join
-
-    fork
-        //    msg                        idx          val
-      begin
-        send( '{'h11111111, 'h22222222}, '{'d1, 'd2}, '{'1, '1} );
-      end
-      begin
-        recv( '{'h11111111, 'h22222222}, '{'d1, 'd2}, '{'1, '1} );
+        recv( '{0:'hdead, default:'x}, '{0:'d0, default:'x}, '{0:'1, default:'0} );
       end
     join
 
     fork
-        //    msg                idx        val
+        //    msg                                idx             val
       begin
-        send( '{'h01234567, 'x}, '{'d3, 'x}, '{'1, '0} );
+        send( '{0:'h1111, 1:'h2222, default:'x}, '{0:'d1, 1:'d2, default:'x}, '{0:'1, 1:'1, default:'0} );
       end
       begin
-        recv( '{'h01234567, 'x}, '{'d3, 'x}, '{'1, '0} );
+        recv( '{0:'h1111, 1:'h2222, default:'x}, '{0:'d1, 1:'d2, default:'x}, '{0:'1, 1:'1, default:'0} );
+      end
+    join
+
+    fork
+        //    msg                      idx                   val
+      begin
+        send( '{0:'h1234, default:'x}, '{0:'d3, default:'x}, '{0:'1, default:'0} );
+      end
+      begin
+        recv( '{0:'h1234, default:'x}, '{0:'d3, default:'x}, '{0:'1, default:'0} );
       end
     join
 
@@ -248,17 +250,36 @@ module MROBTestSuite #(
   //----------------------------------------------------------------------
   // test_case_capacity
   //----------------------------------------------------------------------
+  // Enqueuing messages (to reach capacity) in-order should yield
+  // dequeuing of those messages in the same order
+
+  logic [ p_msg_bits-1:0] test_cap_msg [p_num_lanes];
+  logic [p_addr_bits-1:0] test_cap_idx [p_num_lanes];
+  logic                   test_cap_val [p_num_lanes];
 
   task test_case_capacity();
     t.test_case_begin( "test_case_capacity" );
     if( !t.run_test ) return;
 
-    for( int i = 0; i < p_depth; i = i + 2 ) begin
-      send( '{p_msg_bits'(i), p_msg_bits'(i+1)}, '{p_addr_bits'(i), p_addr_bits'(i+1)}, '{1, 1} );
+    for( int i = 0; i < p_depth; i = i + p_num_lanes ) begin
+      // Enqueue using all lanes
+      for( int j = 0; j < p_num_lanes; j = j + 1 ) begin
+        test_cap_msg[j] = p_msg_bits'(i+j);
+        test_cap_idx[j] = p_addr_bits'(i+j);
+        // Do not overwrite an instruction that has already been written
+        test_cap_val[j] = ( (i+j) < p_depth );
+      end
+      send( test_cap_msg, test_cap_idx, test_cap_val );
     end
 
-    for( int i = 0; i < p_depth; i = i + 2 ) begin
-      recv( '{p_msg_bits'(i), p_msg_bits'(i+1)}, '{p_addr_bits'(i), p_addr_bits'(i+1)}, '{1, 1} );
+    for( int i = 0; i < p_depth; i = i + p_num_lanes ) begin
+      // Dequeue using all lanes
+      for( int j = 0; j < p_num_lanes; j = j + 1 ) begin
+        test_cap_msg[j] = p_msg_bits'(i+j);
+        test_cap_idx[j] = p_addr_bits'(i+j);
+        test_cap_val[j] = ( (i+j) < p_depth );
+      end
+      recv( test_cap_msg, test_cap_idx, test_cap_val );
     end
 
     t.test_case_end();
@@ -267,23 +288,42 @@ module MROBTestSuite #(
   //----------------------------------------------------------------------
   // test_case_out_of_order
   //----------------------------------------------------------------------
+  // Enqueuing a number of messages out-of-order should result with 
+  // dequeuing of the same messages in-order
+
+  logic [ p_msg_bits-1:0] test_ooo_enq_msg [4];
+
+  logic [ p_msg_bits-1:0] test_ooo_deq_msg [p_num_lanes];
+  logic [p_addr_bits-1:0] test_ooo_deq_idx [p_num_lanes];
+  logic                   test_ooo_deq_val [p_num_lanes];
 
   task test_case_out_of_order();
     t.test_case_begin( "test_case_out_of_order" );
     if( !t.run_test ) return;
 
+    test_ooo_enq_msg[0] = 'h1234;
+    test_ooo_enq_msg[1] = 'h8765;
+    test_ooo_enq_msg[2] = 'h0000;
+    test_ooo_enq_msg[3] = 'hFFFF;
+
     fork
       begin
-        //   msg                        idx          val
-        send('{'hFFFFFFFF, 'x},         '{'d3, 'x},  '{'1, '0});
-        send('{'h87654321, 'x},         '{'d1, 'x},  '{'1, '0});
-        send('{'h00000000, 'h12345678}, '{'d2, 'd0}, '{'1, '1});
+        //    msg                                                          idx                          val
+        send( '{0:test_ooo_enq_msg[3],                        default:'x}, '{0:'d3,        default:'x}, '{0:'1,       default:'0} );
+        send( '{0:test_ooo_enq_msg[1],                        default:'x}, '{0:'d1,        default:'x}, '{0:'1,       default:'0} );
+        send( '{0:test_ooo_enq_msg[2], 1:test_ooo_enq_msg[0], default:'x}, '{0:'d2, 1:'d0, default:'x}, '{0:'1, 1:'1, default:'0} );
       end
 
       begin
-        //   msg                        idx          val
-        recv('{'h12345678, 'h87654321}, '{'d0, 'd1}, '{'1, '1});
-        recv('{'h00000000, 'hFFFFFFFF}, '{'d2, 'd3}, '{'1, '1});
+        for( int i = 0; i < 4; i = i + p_num_lanes ) begin
+          // Must dequeue using all lanes
+          for( int j = 0; j < p_num_lanes; j = j + 1 ) begin
+            test_ooo_deq_msg[j] = test_ooo_enq_msg[(i+j)%4];
+            test_ooo_deq_idx[j] = p_addr_bits'(i+j);
+            test_ooo_deq_val[j] = ( (i+j) < 4 );
+          end
+          recv( test_ooo_deq_msg, test_ooo_deq_idx, test_ooo_deq_val );
+        end
       end
     join
 
@@ -293,18 +333,26 @@ module MROBTestSuite #(
   //----------------------------------------------------------------------
   // test_case_wrap_around
   //----------------------------------------------------------------------
+  // Enqueuing until the dequeue pointer reaches the depth of the MROB
+  // should result in the dequeue pointer wrapping back around to the 
+  // start
+
+  logic [ p_msg_bits-1:0] test_wrap_msg [p_num_lanes];
+  logic [p_addr_bits-1:0] test_wrap_idx [p_num_lanes];
+  logic                   test_wrap_val [p_num_lanes];
+
+  logic [p_addr_bits-1:0] lane0_addr;
+  logic [p_addr_bits-1:0] lane1_addr;
 
   task test_case_wrap_around();
     t.test_case_begin( "test_case_wrap_around" );
     if( !t.run_test ) return;
 
-    //   msg                        idx           val
-    send('{'h11111111, 'h22222222}, '{'d0, 'd1},  '{'1, '1});
-    send('{'h33333333, 'x},         '{'d2, 'x},   '{'1, '0});
-    recv('{'h11111111, 'h22222222}, '{'d0, 'd1},  '{'1, '1});
-    recv('{'h33333333, 'x},         '{'d2, 'x},   '{'1, '0});
-    send('{'h44444444, 'h55555555}, '{'d3, 'd0},  '{'1, '1});
-    recv('{'h44444444, 'h55555555}, '{'d3, 'd0},  '{'1, '1});
+    for( int i = 0; i < 10; i = i + 2 ) begin
+      //    msg                                                  idx                                                                        val
+      send( '{0:p_msg_bits'(i), 1:p_msg_bits'(i+1), default:'x}, '{0:p_addr_bits'((i)%p_depth), 1:p_addr_bits'((i+1)%p_depth), default:'x}, '{0:1, 1:1, default:0} );
+      recv( '{0:p_msg_bits'(i), 1:p_msg_bits'(i+1), default:'x}, '{0:p_addr_bits'((i)%p_depth), 1:p_addr_bits'((i+1)%p_depth), default:'x}, '{0:1, 1:1, default:0} );
+    end
 
     t.test_case_end();
   endtask
@@ -329,7 +377,11 @@ endmodule
 //========================================================================
 
 module MROB_test;
-  MROBTestSuite #(1) suite_1();
+  MROBTestSuite #(1)             suite_1();
+  MROBTestSuite #(2, 16)         suite_2();
+  MROBTestSuite #(3, 32,  6)     suite_3();
+  MROBTestSuite #(4, 32,  8,  3) suite_4();
+  MROBTestSuite #(5, 32, 16,  4) suite_5();
 
   int s;
 
@@ -338,6 +390,10 @@ module MROB_test;
     s = get_test_suite();
 
     if ((s <= 0) || (s == 1)) suite_1.run_test_suite();
+    if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
+    if ((s <= 0) || (s == 3)) suite_3.run_test_suite();
+    if ((s <= 0) || (s == 4)) suite_4.run_test_suite();
+    if ((s <= 0) || (s == 5)) suite_5.run_test_suite();
 
     test_bench_end();
   end
