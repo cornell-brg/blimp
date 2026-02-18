@@ -4,6 +4,7 @@
 // A testbench for our MROB
 
 `include "hw/writeback_commit/MROB.v"
+`include "hw/writeback_commit/test/coverage/MROBCoverage.v"
 `include "test/fl/TestMCaller.v"
 `include "test/TestUtils.v"
 
@@ -32,6 +33,18 @@ module MROBTestSuite #(
 
   logic clk, rst;
   TestUtils t( .* );
+
+  //----------------------------------------------------------------------
+  // Instantiate interface to drive DUT and coverage class
+  //----------------------------------------------------------------------
+
+  MROBTestIntf #(
+    .p_msg_bits  (p_msg_bits),
+    .p_depth     (p_depth),
+    .p_num_lanes (p_num_lanes)
+  ) intf (
+    .clk (clk)
+  );
 
   //----------------------------------------------------------------------
   // Instantiate design under test
@@ -71,6 +84,40 @@ module MROBTestSuite #(
     .deq_en      (dut_deq_en),
     .deq_rdy     (dut_deq_rdy)
   );
+
+  // Connect DUT to interface
+  assign intf.rst         = rst;
+
+  assign intf.ins_idx     = dut_ins_idx;
+  assign intf.ins_msg     = dut_ins_msg;
+  assign intf.ins_msg_val = dut_ins_msg_val;
+  assign intf.ins_en      = dut_ins_en;
+  assign intf.ins_rdy     = dut_ins_rdy;
+  assign intf.avail_slots = dut_avail_slots;
+
+  assign intf.deq_idx     = dut_deq_idx;
+  assign intf.deq_msg     = dut_deq_msg;
+  assign intf.deq_msg_val = dut_deq_msg_val;
+  assign intf.deq_en      = dut_deq_en;
+  assign intf.deq_rdy     = dut_deq_rdy;
+
+  //----------------------------------------------------------------------
+  // Declare and instantiate coverage object
+  //----------------------------------------------------------------------
+
+  `ifndef VERILATOR
+
+  MROBCoverage #(
+    .p_msg_bits  (p_msg_bits),
+    .p_depth     (p_depth),
+    .p_num_lanes (p_num_lanes)
+  ) mrob_cov_obj;
+
+  initial begin
+    mrob_cov_obj = new( intf );
+  end
+
+  `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // Insertion
@@ -377,11 +424,13 @@ endmodule
 //========================================================================
 
 module MROB_test;
-  MROBTestSuite #(1)             suite_1();
-  MROBTestSuite #(2, 16)         suite_2();
-  MROBTestSuite #(3, 32,  6)     suite_3();
-  MROBTestSuite #(4, 32,  8,  3) suite_4();
-  MROBTestSuite #(5, 32, 16,  4) suite_5();
+  //              suite msg        num
+  //              num   bits depth lanes
+  MROBTestSuite #(1)                     suite_1();
+  MROBTestSuite #(2,    16)              suite_2();
+  MROBTestSuite #(3,    32,   6)         suite_3();
+  MROBTestSuite #(4,    32,   8,   3)    suite_4();
+  MROBTestSuite #(5,    32,  16,   4)    suite_5();
 
   int s;
 

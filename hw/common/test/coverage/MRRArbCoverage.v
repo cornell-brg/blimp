@@ -5,7 +5,7 @@
 
 // Interface between the DUT and coverage class --------------------------
 
-interface MRRArbIntf #(
+interface MRRArbTestIntf #(
   parameter p_width = 4,
   parameter p_max_m = 4
 ) (
@@ -35,9 +35,9 @@ class MRRArbCoverage #(
   parameter p_max_m = 4
 );
 
-  // Declare a MRRArbIntf to interface with the MRRArb
+  // Declare a MRRArbTestIntf to interface with the MRRArb
 
-  virtual MRRArbIntf #(p_width, p_max_m) vintf;
+  virtual MRRArbTestIntf #(p_width, p_max_m) vintf;
 
   localparam MAX_M = (1 << ($clog2(p_max_m)+1)) - 1;
   localparam MAX_REQ = $countones($unsigned((1 << p_width) - 1));
@@ -138,9 +138,9 @@ class MRRArbCoverage #(
 
   endgroup
 
-  // Function to create an instance of this class: MRRArbCoverage
+  // Function to create an instance of this class
 
-  function new(virtual MRRArbIntf #(p_width, p_max_m) vintf);
+  function new( virtual MRRArbTestIntf #(p_width, p_max_m) vintf );
     this.vintf = vintf;
     if (p_width > 1)
       mrrarb_cg_multi_bit = new();

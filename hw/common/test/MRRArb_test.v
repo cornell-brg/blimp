@@ -36,7 +36,7 @@ module MRRArbTestSuite #(
   // Instantiate interface to drive DUT and coverage class
   //----------------------------------------------------------------------
 
-  MRRArbIntf #(
+  MRRArbTestIntf #(
     .p_width (p_width),
     .p_max_m (p_max_m)
   ) intf (
@@ -71,6 +71,23 @@ module MRRArbTestSuite #(
   assign intf.req      = dut_req;
   assign intf.gnt      = dut_gnt;
   assign intf.head_ptr = DUT.head_ptr;
+
+  //----------------------------------------------------------------------
+  // Declare and instantiate coverage object
+  //----------------------------------------------------------------------
+
+  `ifndef VERILATOR
+
+  MRRArbCoverage #(
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) mrrarb_cov_obj;
+
+  initial begin
+    mrrarb_cov_obj = new( intf );
+  end
+
+  `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // check
@@ -117,29 +134,6 @@ module MRRArbTestSuite #(
 
     end
   endtask
-
-  //----------------------------------------------------------------------
-  // Declare and instantiate coverage object
-  //----------------------------------------------------------------------
-
-  `ifndef VERILATOR
-
-  MRRArbCoverage #(
-    .p_width (p_width),
-    .p_max_m (p_max_m)
-  ) mrrarb_cov_obj;
-
-  initial begin
-    mrrarb_cov_obj = new( intf );
-  end
-
-  `else
-  
-  initial begin 
-    $display("VERILATOR"); 
-  end
-
-  `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // test_case_1_basic
