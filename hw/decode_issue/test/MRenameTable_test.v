@@ -202,8 +202,8 @@ module MRenameTableTestSuite #(
   endgenerate
 
   TestMPub #(
-    .t_msg    (t_complete_msg),
-    .num_msgs (p_num_be_lanes)
+    .t_msg      (t_complete_msg),
+    .p_num_msgs (p_num_be_lanes)
   ) complete_pub (
     .msg (complete_msg),
     .val (complete_msg_val),
@@ -260,8 +260,8 @@ module MRenameTableTestSuite #(
   endgenerate
 
   TestMPub #(
-    .t_msg    (t_commit_msg),
-    .num_msgs (p_num_be_lanes)
+    .t_msg      (t_commit_msg),
+    .p_num_msgs (p_num_be_lanes)
   ) commit_pub (
     .msg (commit_msg),
     .val (commit_msg_val),

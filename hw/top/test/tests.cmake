@@ -15,6 +15,7 @@ set(BLIMP_VERSIONS
   BlimpV8
   BlimpV9
   BlimpV10
+  BlimpV11
 )
 
 # ------------------------------------------------------------------------
@@ -314,4 +315,65 @@ set(BlimpV10_TESTS
   BlimpV10_test/BlimpV10_remu_test.v
 
   BlimpV10_test/BlimpV10_mixed_test.v
+)
+
+
+# ------------------------------------------------------------------------
+# BlimpV11
+# ------------------------------------------------------------------------
+
+set(BlimpV11_TESTS
+  BlimpV11_test/BlimpV11_add_test.v
+  BlimpV11_test/BlimpV11_addi_test.v
+  BlimpV11_test/BlimpV11_lw_test.v
+  BlimpV11_test/BlimpV11_sw_test.v
+  BlimpV11_test/BlimpV11_jal_test.v
+  BlimpV11_test/BlimpV11_jalr_test.v
+  BlimpV11_test/BlimpV11_bne_test.v
+
+  BlimpV11_test/BlimpV11_sub_test.v
+  BlimpV11_test/BlimpV11_and_test.v
+  BlimpV11_test/BlimpV11_or_test.v
+  BlimpV11_test/BlimpV11_xor_test.v
+  BlimpV11_test/BlimpV11_slt_test.v
+  BlimpV11_test/BlimpV11_sltu_test.v
+  BlimpV11_test/BlimpV11_sra_test.v
+  BlimpV11_test/BlimpV11_srl_test.v
+  BlimpV11_test/BlimpV11_sll_test.v
+
+  BlimpV11_test/BlimpV11_andi_test.v
+  BlimpV11_test/BlimpV11_ori_test.v
+  BlimpV11_test/BlimpV11_xori_test.v
+  BlimpV11_test/BlimpV11_slti_test.v
+  BlimpV11_test/BlimpV11_sltiu_test.v
+  BlimpV11_test/BlimpV11_srai_test.v
+  BlimpV11_test/BlimpV11_srli_test.v
+  BlimpV11_test/BlimpV11_slli_test.v
+  BlimpV11_test/BlimpV11_lui_test.v
+  BlimpV11_test/BlimpV11_auipc_test.v
+
+  BlimpV11_test/BlimpV11_beq_test.v
+  BlimpV11_test/BlimpV11_blt_test.v
+  BlimpV11_test/BlimpV11_bge_test.v
+  BlimpV11_test/BlimpV11_bltu_test.v
+  BlimpV11_test/BlimpV11_bgeu_test.v
+
+  BlimpV11_test/BlimpV11_lb_test.v
+  BlimpV11_test/BlimpV11_lh_test.v
+  BlimpV11_test/BlimpV11_lbu_test.v
+  BlimpV11_test/BlimpV11_lhu_test.v
+  BlimpV11_test/BlimpV11_sb_test.v
+  BlimpV11_test/BlimpV11_sh_test.v
+  BlimpV11_test/BlimpV11_fence_test.v
+
+  BlimpV11_test/BlimpV11_mul_test.v
+  BlimpV11_test/BlimpV11_mulh_test.v
+  BlimpV11_test/BlimpV11_mulhu_test.v
+  BlimpV11_test/BlimpV11_mulhsu_test.v
+  BlimpV11_test/BlimpV11_div_test.v
+  BlimpV11_test/BlimpV11_divu_test.v
+  BlimpV11_test/BlimpV11_rem_test.v
+  BlimpV11_test/BlimpV11_remu_test.v
+
+  BlimpV11_test/BlimpV11_mixed_test.v
 )

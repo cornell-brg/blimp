@@ -21,7 +21,7 @@ module FetchUnitL5
   parameter p_num_fe_lanes  = 2,
   parameter p_num_be_lanes  = 2
 )
-( 
+(
   input  logic    clk,
   input  logic    rst,
 
@@ -35,7 +35,7 @@ module FetchUnitL5
   // F <-> D Interface
   //----------------------------------------------------------------------
 
-  F__DIntf.F_intf D [p_num_be_lanes],
+  F__DIntf.F_intf D [p_num_fe_lanes],
 
   //----------------------------------------------------------------------
   // Commit Interface
@@ -49,18 +49,87 @@ module FetchUnitL5
 
   SquashNotif.sub squash
 );
-  
+
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Local Parameters
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   localparam p_rst_addr     = 32'h200;
   localparam p_seq_num_bits = D[0].p_seq_num_bits;
-  
+
   localparam p_flight_bits  = $clog2(p_max_in_flight) + 1;
+  localparam p_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
 
   logic [31:0] target_base_bm;
-  assign target_base_bm = {(32-$clog2(p_num_fe_lanes)){1'b1}, $clog2(p_num_fe_lanes){1'b0}};
+  assign target_base_bm = {{(32-$clog2(p_num_fe_lanes)){1'b1}}, {$clog2(p_num_fe_lanes){1'b0}}} << 2;
+  logic [31:0] target_offset_bm;
+  assign target_offset_bm = {{(32-$clog2(p_num_fe_lanes)){1'b0}}, {$clog2(p_num_fe_lanes){1'b1}}};
+
+  //----------------------------------------------------------------------
+  // Interface Signal Arrays
+  //----------------------------------------------------------------------
+
+  genvar i;
+
+  // Memory request signals (driven by this module)
+  logic        mem_req_val      [p_num_fe_lanes];
+  logic [31:0] mem_req_msg_addr [p_num_fe_lanes];
+
+  // Memory request signals (driven by external)
+  logic        mem_req_rdy      [p_num_fe_lanes];
+
+  // Memory response signals (driven by external)
+  logic        mem_resp_val      [p_num_fe_lanes];
+  t_op         mem_resp_msg_op   [p_num_fe_lanes];
+  logic [31:0] mem_resp_msg_addr [p_num_fe_lanes];
+  logic  [3:0] mem_resp_msg_strb [p_num_fe_lanes];
+  logic [31:0] mem_resp_msg_data [p_num_fe_lanes];
+
+  // Memory response signals (driven by this module)
+  logic        mem_resp_rdy      [p_num_fe_lanes];
+
+  // D interface signals (driven by this module)
+  logic                      D_val        [p_num_fe_lanes];
+  logic               [31:0] D_inst       [p_num_fe_lanes];
+  logic               [31:0] D_pc         [p_num_fe_lanes];
+  logic [p_seq_num_bits-1:0] D_seq_num    [p_num_fe_lanes];
+  logic                      D_insn_valid [p_num_fe_lanes];
+
+  // D interface signals (driven by external)
+  logic                      D_rdy     [p_num_fe_lanes];
+
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: MEM_INTF_CONNECT
+      // Outputs to mem interface
+      assign mem[i].req_val        = mem_req_val[i];
+      assign mem[i].req_msg.addr   = mem_req_msg_addr[i];
+      assign mem[i].req_msg.op     = MEM_MSG_READ;
+      assign mem[i].req_msg.opaque = 'x;
+      assign mem[i].req_msg.strb   = '0;
+      assign mem[i].req_msg.data   = 'x;
+      assign mem[i].resp_rdy       = mem_resp_rdy[i];
+
+      // Inputs from mem interface
+      assign mem_req_rdy[i]       = mem[i].req_rdy;
+      assign mem_resp_val[i]      = mem[i].resp_val;
+      assign mem_resp_msg_op[i]   = mem[i].resp_msg.op;
+      assign mem_resp_msg_addr[i] = mem[i].resp_msg.addr;
+      assign mem_resp_msg_strb[i] = mem[i].resp_msg.strb;
+      assign mem_resp_msg_data[i] = mem[i].resp_msg.data;
+    end
+
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: D_INTF_CONNECT
+      // Outputs to D interface
+      assign D[i].val        = D_val[i];
+      assign D[i].inst       = D_inst[i];
+      assign D[i].pc         = D_pc[i];
+      assign D[i].seq_num    = D_seq_num[i];
+      assign D[i].insn_valid = D_insn_valid[i];
+
+      // Inputs from D interface
+      assign D_rdy[i] = D[i].rdy;
+    end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Request
@@ -73,17 +142,23 @@ module FetchUnitL5
   // All ports are tied together to keep fetch blocks aligned
   logic memreq_xfer_all;
   logic memreq_xfer [p_num_fe_lanes];
+  logic memresp_val_all;
   logic D_xfer_all;
-  logic D_xfer [p_num_fe_lanes]
+  logic D_xfer [p_num_fe_lanes];
+  logic D_rdy_all;
 
   always_comb begin
     memreq_xfer_all = 1'b1;
+    memresp_val_all = 1'b1;
     D_xfer_all      = 1'b1;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      memreq_xfer[i]  = mem[i].req_val & mem[i].req_rdy;
-      memreq_xfer_all &= memreq_xfer[i];
-      D_xfer[i]       = D[i].val & D[i].rdy;
-      D_xfer_all      &= D_xfer[i];
+    D_rdy_all       = 1'b1;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      memreq_xfer[j]  = mem_req_val[j] & mem_req_rdy[j];
+      memreq_xfer_all &= memreq_xfer[j];
+      memresp_val_all &= mem_resp_val[j];
+      D_xfer[j]       = D_val[j] & D_rdy[j];
+      D_xfer_all      &= D_xfer[j];
+      D_rdy_all       &= D_rdy[j];
     end
   end
 
@@ -120,7 +195,6 @@ module FetchUnitL5
   // Keep track of the in-flight requests to squash
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  logic                     resp_all;
   logic [p_flight_bits-1:0] num_to_squash;
   logic [p_flight_bits-1:0] num_to_squash_next;
 
@@ -140,12 +214,38 @@ module FetchUnitL5
       num_to_squash_next = num_to_squash_next + num_in_flight;
 
     // Remove a fetch block from number of instructions to squash as long as
-    // there are some instructions exiting the fetch blcok
-    if( resp_all & ( num_to_squash_next > 0 ) )
+    // there are insns at the front of all mem resp queues and we actually have
+    // some to squash
+    if( !resp_empty & ( num_to_squash_next > 0 ) )
       num_to_squash_next = num_to_squash_next - p_num_fe_lanes;
   end
 
   assign should_drop = squash.val | ( num_to_squash > 0 );
+  logic should_drop_prev;
+  always_ff @( posedge clk ) begin
+    if( rst )
+      should_drop_prev <= 1'b0;
+    else
+      should_drop_prev <= should_drop;
+  end
+
+  logic do_squash_restart;
+  assign do_squash_restart = should_drop_prev & !should_drop;
+
+  logic do_squash_restart_reg;
+  always_ff @( posedge clk ) begin
+    if( rst )
+      do_squash_restart_reg <= 1'b0;
+    
+    // If we are waiting to do a squash restart and we are transferring on this
+    // cycle, then we know we are doing the restart on this cycle and can reset
+    else if( do_squash_restart_reg & D_xfer_all )
+      do_squash_restart_reg <= 1'b0;
+
+    // Only update if we are not waiting for a squash restart to occur
+    else if( !do_squash_restart_reg )
+      do_squash_restart_reg <= do_squash_restart;
+  end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Keep track of the current request address
@@ -155,20 +255,18 @@ module FetchUnitL5
   logic [31:0] curr_fetch_block_base_next;
 
   always_ff @( posedge clk ) begin
-    for (int i = 0; i < p_num_fe_lanes; i++ ) begin
-      if ( rst )
-        curr_fetch_block_base <= 32'(p_rst_addr);
-      else if ( squash.val & memreq_xfer[i] )
-        curr_fetch_block_base <= (squash.target & target_base_bm) + (p_num_fe_lanes << 2);
-      else if ( squash.val )
-        curr_fetch_block_base <= (squash.target & target_base_bm);
-      else if ( memreq_xfer[i] )
-        curr_fetch_block_base <= curr_fetch_block_base_next;
-    end
+    if ( rst )
+      curr_fetch_block_base <= 32'(p_rst_addr);
+    else if ( squash.val & memreq_xfer_all )
+      curr_fetch_block_base <= (squash.target & target_base_bm) + (p_num_fe_lanes << 2);
+    else if ( squash.val )
+      curr_fetch_block_base <= (squash.target & target_base_bm);
+    else if ( memreq_xfer_all )
+      curr_fetch_block_base <= curr_fetch_block_base_next;
   end
 
   always_comb begin
-    curr_fetch_block_base_next = mem[0].req_msg.addr + (p_num_fe_lanes << 2);
+    curr_fetch_block_base_next = mem_req_msg_addr[0] + (p_num_fe_lanes << 2);
   end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -176,11 +274,11 @@ module FetchUnitL5
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   always_comb begin
-    for (int i = 0; i < p_num_fe_lanes; i++ ) begin
+    for (int j = 0; j < p_num_fe_lanes; j++ ) begin
       if ( squash.val )
-        mem[i].req_msg.addr = (squash.target & target_base_bm) + 32'(i << 2);
+        mem_req_msg_addr[j] = (squash.target & target_base_bm) + 32'(j << 2);
       else
-        mem[i].req_msg.addr = curr_fetch_block_base + 32'(i << 2);
+        mem_req_msg_addr[j] = curr_fetch_block_base + 32'(j << 2);
     end
   end
 
@@ -189,12 +287,19 @@ module FetchUnitL5
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   always_comb begin
-    for ( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      mem[i].req_val        = (num_in_flight + num_to_squash < p_max_in_flight);
-      mem[i].req_msg.op     = MEM_MSG_READ;
-      mem[i].req_msg.opaque = 'x;
-      mem[i].req_msg.strb   = '0;
-      mem[i].req_msg.data   = 'x;
+    for ( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      mem_req_val[j] = (num_in_flight + num_to_squash < p_max_in_flight);
+    end
+  end
+
+  // Get lane index we need to restart valid instructions from after latest
+  // squash
+  logic [p_lane_idx_bits-1:0] squash_restart_offset;
+  always_ff @(posedge clk) begin
+    if( rst ) begin
+      squash_restart_offset <= '0;
+    end else if( squash.val ) begin
+      squash_restart_offset <= p_lane_idx_bits'((squash.target >> 2) & target_offset_bm);
     end
   end
 
@@ -206,16 +311,14 @@ module FetchUnitL5
   // Allocation
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  logic                      alloc_val;
-  logic                      alloc_rdy;
   logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes];
+  logic                      alloc_rdy     [p_num_fe_lanes];
+  logic                      alloc_val     [p_num_fe_lanes];
 
-
-  // TODO: implement SeqNumGenL5 to allocate p_num_fe_lanes seq numbers at once
-  // (not ready if can't allocate all at once)
   SeqNumGenL5 #(
     .p_seq_num_bits  (p_seq_num_bits),
     .p_reclaim_width (p_reclaim_width),
+    .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
   ) seq_num_gen (
     .*
@@ -232,66 +335,94 @@ module FetchUnitL5
     logic [31:0]            data;
   } mem_msg_t;
 
-  logic resp_empty [p_num_fe_lanes];
+  logic resp_push, resp_pop, resp_full, resp_empty;
+  mem_msg_t fifo_rdata [p_num_fe_lanes];
+  mem_msg_t fifo_wdata [p_num_fe_lanes];
+
+  // Pack/unpack unpacked arrays into flat bit vectors for FIFO
+  logic [p_num_fe_lanes*$bits(mem_msg_t)-1:0] fifo_wdata_packed;
+  logic [p_num_fe_lanes*$bits(mem_msg_t)-1:0] fifo_rdata_packed;
+
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: FIFO_PACK
+      assign fifo_wdata_packed[i*$bits(mem_msg_t) +: $bits(mem_msg_t)] = fifo_wdata[i];
+      assign fifo_rdata[i] = fifo_rdata_packed[i*$bits(mem_msg_t) +: $bits(mem_msg_t)];
+    end
+  endgenerate
+
+  // Pack all mem resps into one fifo
+  Fifo #(
+    .p_entry_bits (p_num_fe_lanes*$bits(mem_msg_t)),
+    .p_depth      (8)
+  ) resp_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (resp_push),
+    .pop   (resp_pop),
+    .empty (resp_empty),
+    .full  (resp_full),
+    .wdata (fifo_wdata_packed),
+    .rdata (fifo_rdata_packed)
+  );
+
+  logic alloc_ok [p_num_fe_lanes];
+  logic alloc_ok_all;
   always_comb begin
-    resp_all = 1'b1;
-    alloc_rdy = 1'b1;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      resp_all &= !resp_empty[i];
-      alloc_rdy &= !resp_empty[i] & D[i].rdy & !should_drop;
+    alloc_ok_all = 1'b1;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      alloc_ok_all &= alloc_ok[j];
     end
   end
 
-  genvar i;
+  assign resp_push = memresp_val_all & !resp_full;
+  assign resp_pop  = ((D_rdy_all & alloc_ok_all) | should_drop) & !resp_empty;
+
+  // Mem resp signals
   generate
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      logic resp_push, resp_pop, resp_full;
-      mem_msg_t fifo_rdata, fifo_wdata;
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: RESP_LANE
 
-      Fifo #(
-        .p_entry_bits ($bits(mem_msg_t)),
-        .p_depth      (8)
-      ) resp_fifo (
-        .clk   (clk),
-        .rst   (rst),
-        .push  (resp_push),
-        .pop   (resp_pop),
-        .empty (resp_empty[i]),
-        .full  (resp_full),
-        .wdata (fifo_wdata),
-        .rdata (fifo_rdata)
-      );
+      // If requesting allocation on this lane, then we need to have a valid
+      // allocation, otherwise fine
+      assign alloc_ok[i] = alloc_rdy[i] ? alloc_val[i] : 1'b1;
 
-      assign fifo_wdata.op   = mem[i].resp_msg.op;
-      assign fifo_wdata.addr = mem[i].resp_msg.addr;
-      assign fifo_wdata.strb = mem[i].resp_msg.strb;
-      assign fifo_wdata.data = mem[i].resp_msg.data;
+      assign fifo_wdata[i].op   = mem_resp_msg_op[i];
+      assign fifo_wdata[i].addr = mem_resp_msg_addr[i];
+      assign fifo_wdata[i].strb = mem_resp_msg_strb[i];
+      assign fifo_wdata[i].data = mem_resp_msg_data[i];
 
-      assign resp_push       = mem[i].resp_val & !resp_full;
-      assign mem[i].resp_rdy = !resp_full;
-      assign resp_pop        = ((D[i].rdy & alloc_val) | should_drop) & !resp_empty[i];
-      assign D[i].val        = !resp_empty[i] & alloc_val & !should_drop;
+      assign mem_resp_rdy[i] = !resp_full;
+      assign D_val[i]        = !resp_empty & alloc_ok[i] & !should_drop;
 
       always_comb begin
-        D[i].inst    = fifo_rdata.data;
-        D[i].pc      = fifo_rdata.addr;
-        D[i].seq_num = alloc_seq_num[i];
+        if( do_squash_restart | do_squash_restart_reg) begin
+          D_insn_valid[i] = !resp_empty & alloc_ok[i] & i >= squash_restart_offset;
+          alloc_rdy[i]    = !resp_empty & D_rdy[i] & i >= squash_restart_offset;
+        end else begin
+          D_insn_valid[i] = !resp_empty & alloc_ok[i] & !should_drop;
+          alloc_rdy[i]    = !resp_empty & D_rdy[i] & !should_drop;
+        end
+      end
+
+      always_comb begin
+        D_inst[i]    = fifo_rdata[i].data;
+        D_pc[i]      = fifo_rdata[i].addr;
+        D_seq_num[i] = alloc_seq_num[i];
       end
 
       // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       // Unused signals
       // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-      logic                      unused_resp_op;
-      logic                [3:0] unused_resp_strb;
-      logic [p_seq_num_bits-1:0] unused_squash_seq_num;
+      // logic                      unused_resp_op;
+      // logic                [3:0] unused_resp_strb;
+      // logic [p_seq_num_bits-1:0] unused_squash_seq_num;
 
-      always_comb begin
-        unused_resp_op   = fifo_rdata.op;
-        unused_resp_strb = fifo_rdata.strb;
+      // always_comb begin
+      //   unused_resp_op   = fifo_rdata.op;
+      //   unused_resp_strb = fifo_rdata.strb;
 
-        unused_squash_seq_num = squash.seq_num;
-      end
+      //   unused_squash_seq_num = squash.seq_num;
+      // end
     end
   endgenerate
 
@@ -314,7 +445,7 @@ module FetchUnitL5
 //       trace = {trace, " > "};
 
 //       if( D_xfer )
-//         trace = {trace, $sformatf("%h (%h) %s ", 
+//         trace = {trace, $sformatf("%h (%h) %s ",
 //                                   mem.resp_msg.addr, alloc_seq_num,
 //                                   (should_drop ? "X" : " "))};
 //       else

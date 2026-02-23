@@ -25,9 +25,11 @@ module SeqNumGenL5 #(
   // Allocation Interface
   //----------------------------------------------------------------------
 
+  // allocate seq num for each ready lane, alloc_val is set for lanes that are
+  // ready and successfully allocated
   output logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes],
-  output logic                      alloc_val,
-  input  logic                      alloc_rdy,
+  output logic                      alloc_val     [p_num_fe_lanes],
+  input  logic                      alloc_rdy     [p_num_fe_lanes],
 
   //----------------------------------------------------------------------
   // Commit Interface to free sequence numbers
@@ -73,7 +75,7 @@ module SeqNumGenL5 #(
 
   logic seq_num_list [p_num_entries];
   logic [p_seq_num_bits-1:0] curr_head_ptr, curr_tail_ptr;
-  logic is_alloc;
+  logic is_alloc [p_num_fe_lanes];
   logic [p_num_be_lanes-1:0] is_free;
 
   generate
@@ -86,8 +88,10 @@ module SeqNumGenL5 #(
           // Allocation
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-          if( is_alloc & ( curr_head_ptr == i ) )
-            seq_num_list[i] <= ALLOC;
+          for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+            if( alloc_val[j] & ( p_seq_num_bits'(curr_head_ptr + j) == i ) )
+              seq_num_list[i] <= ALLOC;
+          end
 
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
           // Freeing
@@ -99,7 +103,7 @@ module SeqNumGenL5 #(
           end
 
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-          // Squashing
+          // Squashing - free all insn seq nums younger than squash insn's
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
           if( squash.val & seq_age.is_older( squash.seq_num, p_seq_num_bits'(i) ) )
@@ -110,18 +114,50 @@ module SeqNumGenL5 #(
     end
   endgenerate
 
+  logic [p_seq_num_bits-1:0] entries_allocated;
+  assign entries_allocated = curr_head_ptr - curr_tail_ptr;
+
   //----------------------------------------------------------------------
   // Allocation
   //----------------------------------------------------------------------
 
-  // Can only allocate if we're not about to wrap around and next sequence
-  // number to allocate is free
-  assign alloc_val = !( curr_head_ptr + 1 == curr_tail_ptr ) & 
-                      ( seq_num_list[curr_head_ptr] == FREE );
+  // Track how many entries we need to allocate in this cycle
+  logic [p_seq_num_bits-1:0] alloc_rdy_cntr;
 
-  assign is_alloc = alloc_val & alloc_rdy;
-  assign alloc_seq_num = ( squash.val ) ? squash.seq_num + 1
-                                        : curr_head_ptr;
+  // Check that alloc_rdy_cntr consecutive entries from head are free
+  logic alloc_entries_free;
+  always_comb begin
+    alloc_entries_free = 1'b1;
+    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
+      if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr + k)] != FREE )
+        alloc_entries_free = 1'b0;
+    end
+  end
+
+  // Can only allocate if there's enough space for all entries we need to
+  // allocate and all those entries are free
+  logic can_alloc;
+  assign can_alloc = ( entries_allocated <= p_num_entries - 1 - alloc_rdy_cntr ) &
+                       alloc_entries_free;
+
+  // Allocate consecutive sequence numbers starting from head pointer for each
+  // ready lane
+  always_comb begin
+    alloc_rdy_cntr = '0;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_SEQ_NUM_ASSIGN
+      alloc_seq_num[j] = '0;
+      if( alloc_rdy[j] ) begin
+        alloc_seq_num[j] = ( squash.val ) ? squash.seq_num + p_seq_num_bits'(1 + alloc_rdy_cntr)
+                                          : p_seq_num_bits'(curr_head_ptr + alloc_rdy_cntr);
+        alloc_rdy_cntr = alloc_rdy_cntr + 1;
+      end
+      
+      // Valid allocation for this lane if we can allocate and this lane is
+      // requesting allocation
+      alloc_val[j] = can_alloc & alloc_rdy[j];
+    end
+  end
+
   logic [p_seq_num_bits-1:0] curr_head_ptr_next;
 
   always_ff @( posedge clk ) begin
@@ -135,8 +171,13 @@ module SeqNumGenL5 #(
   always_comb begin
     curr_head_ptr_next = curr_head_ptr;
 
+    // On a squash, head pointer goes to insn after squashed insn
     if( squash.val ) curr_head_ptr_next = squash.seq_num + 1;
-    if( is_alloc   ) curr_head_ptr_next = curr_head_ptr_next + 1;
+
+    // If allocating (possibly also during a squash), head pointer moves forward
+    // by number of entries allocated (starting from new squash head pointer if
+    // squash happens)
+    if( can_alloc  ) curr_head_ptr_next = curr_head_ptr_next + alloc_rdy_cntr;
   end
 
   //----------------------------------------------------------------------
@@ -167,10 +208,9 @@ module SeqNumGenL5 #(
   // Reclaiming
   //----------------------------------------------------------------------
 
-  logic [p_seq_num_bits-1:0] entries_allocated;
-  assign entries_allocated = curr_head_ptr - curr_tail_ptr;
-
+  // verilator lint_off SPLITVAR
   logic [p_reclaim_width-1:0] reclaim_valid /* verilator split_var */;
+  // verilator lint_on SPLITVAR
   logic [p_reclaim_width-1:0] reclaim_select;
 
   generate
@@ -186,10 +226,19 @@ module SeqNumGenL5 #(
   endgenerate
 
   // Identify the maximum amount to reclaim
-  assign reclaim_select = reclaim_valid & (
-    ((~reclaim_valid) >> 1) | 
-    {1'b1, (p_reclaim_width-1)'(1'b0)}
-  );
+  generate
+    if (p_reclaim_width > 1) begin
+      assign reclaim_select = reclaim_valid & (
+        ((~reclaim_valid) >> 1) | 
+        {1'b1, (p_reclaim_width-1)'(1'b0)}
+      );
+    end else begin
+      assign reclaim_select = reclaim_valid & (
+        ((~reclaim_valid) >> 1) | 
+        {1'b1}
+      );
+    end
+  endgenerate
 
   // Find the maximum amount to reclaim
   logic [p_seq_num_bits-1:0] curr_tail_incr;
@@ -223,36 +272,38 @@ module SeqNumGenL5 #(
   // Linetracing
   //----------------------------------------------------------------------
 
-`ifndef SYNTHESIS
-  function int ceil_div_4( int val );
-    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-  endfunction
+// `ifndef SYNTHESIS
+//   function int ceil_div_4( int val );
+//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+//   endfunction
 
-  function automatic string trace( int trace_level );
-    string alloc_trace, free_trace;
+//   function automatic string trace( int trace_level );
+//     string alloc_trace, free_trace;
 
-    if( is_alloc )
-      alloc_trace = $sformatf("%h", alloc_seq_num);
-    else
-      alloc_trace = {ceil_div_4(p_seq_num_bits){" "}};
+//     if( is_alloc ) begin
+//       alloc_trace = $sformatf("%h", alloc_seq_num[0]);
+//       for( int j = 1; j < p_num_fe_lanes; j = j + 1 )
+//         alloc_trace = $sformatf("%s,%h", alloc_trace, alloc_seq_num[j]);
+//     end else
+//       alloc_trace = {ceil_div_4(p_seq_num_bits){" "}};
 
-    for( int j = 0; j < p_num_be_lanes; j = j + 1 ) begin
-      if( is_free[j] )
-        free_trace = $sformatf("%h", commit_seq_num[j]);
-      else
-        free_trace = {ceil_div_4(p_seq_num_bits){" "}};
-    end
-    if( trace_level > 0 )
-      trace = $sformatf("%h::%h (%s) (%s)",
-        curr_head_ptr,
-        curr_tail_ptr,
-        alloc_trace,
-        free_trace
-      );
-    else
-      trace = $sformatf("%s - %s", alloc_trace, free_trace);
-  endfunction
-`endif
+//     for( int j = 0; j < p_num_be_lanes; j = j + 1 ) begin
+//       if( is_free[j] )
+//         free_trace = $sformatf("%h", commit_seq_num[j]);
+//       else
+//         free_trace = {ceil_div_4(p_seq_num_bits){" "}};
+//     end
+//     if( trace_level > 0 )
+//       trace = $sformatf("%h::%h (%s) (%s)",
+//         curr_head_ptr,
+//         curr_tail_ptr,
+//         alloc_trace,
+//         free_trace
+//       );
+//     else
+//       trace = $sformatf("%s - %s", alloc_trace, free_trace);
+//   endfunction
+// `endif
 
 endmodule
 

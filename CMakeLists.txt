@@ -23,12 +23,15 @@ set(V_TEST_FILES
   hw/decode_issue/test/DecodeIssueUnitL5_test.v
   hw/decode_issue/test/DecodeIssueUnitL6_test.v
   hw/decode_issue/test/DecodeIssueUnitL7_test.v
+  hw/decode_issue/test/DecodeIssueUnitL8_test.v
   hw/decode_issue/test/ImmGen_test.v
   hw/decode_issue/test/IssueQueueInOrder_test.v
+  hw/decode_issue/test/InstXbarIQ_test.v
   hw/decode_issue/test/RegfilePending_test.v
   hw/decode_issue/test/MRegfile_test.v
   hw/decode_issue/test/RenameTable_test.v
   hw/decode_issue/test/MRenameTable_test.v
+  hw/decode_issue/test/M3RenameTable_test.v
   hw/execute/test/ExQueue_test.v
   hw/execute/test/l1/ALUL1_test.v
   hw/execute/test/l1/MultiplierL1_test.v
@@ -44,8 +47,10 @@ set(V_TEST_FILES
   hw/fetch/test/FetchUnitL1_test.v
   hw/fetch/test/FetchUnitL2_test.v
   hw/fetch/test/FetchUnitL3_test.v
+  hw/fetch/test/FetchUnitL5_test.v
   hw/fetch/test/SeqNumGenL2_test.v
   hw/fetch/test/SeqNumGenL3_test.v
+  hw/fetch/test/SeqNumGenL5_test.v
   hw/squash/test/SquashUnitL1_test.v
   hw/squash/test/SquashUnitL1Chain_test.v
   hw/util/test/SeqAge_test.v

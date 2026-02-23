@@ -14,9 +14,9 @@
 `include "defs/ISA.v"
 `include "hw/decode_issue/InstDecoder.v"
 `include "hw/decode_issue/ImmGen.v"
-`include "hw/decode_issue/InstRouterIQ.v"
+`include "hw/decode_issue/InstXbarIQ.v"
 `include "hw/decode_issue/M2Regfile.v"
-`include "hw/decode_issue/M2RenameTable.v"
+`include "hw/decode_issue/M3RenameTable.v"
 `include "hw/decode_issue/IssueQueueInOrder.v"
 `include "hw/util/MSeqAge.v"
 `include "intf/F__DIntf.v"
@@ -83,8 +83,9 @@ module DecodeIssueUnitL8 #(
   SquashNotif.sub squash_sub
 );
 
-  localparam p_seq_num_bits   = F.p_seq_num_bits;
-  localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
+  localparam p_seq_num_bits    = F.p_seq_num_bits;
+  localparam p_phys_addr_bits  = $clog2( p_num_phys_regs );
+  localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
   
   //----------------------------------------------------------------------
   // Pipeline registers for F interface
@@ -95,6 +96,7 @@ module DecodeIssueUnitL8 #(
     logic               [31:0] inst;
     logic               [31:0] pc;
     logic [p_seq_num_bits-1:0] seq_num;
+    logic                      insn_valid;
   } F_input;
 
   F_input F_reg      [p_num_fe_lanes];
@@ -102,11 +104,13 @@ module DecodeIssueUnitL8 #(
   logic   F_xfer     [p_num_fe_lanes];
   logic   F_xfer_all;
   logic   IQ_xfer    [p_num_fe_lanes];
-  logic   IQ_xfer_all;
 
+  /* verilator lint_off UNOPTFLAT */
+  logic IQ_xfer_all_valid;
   logic should_squash;
+  /* verilator lint_on UNOPTFLAT */
 
-  // TODO: If squash sub originating from CTRL XU, invalidate (val = 0) all
+  // If squash sub originating from CTRL XU, invalidate (insn_val = 0) all
   // instructions in registers up to and including that branch causing the
   // squash in CTRL XU
   genvar i;
@@ -114,7 +118,13 @@ module DecodeIssueUnitL8 #(
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: F_REG_GEN
       always_ff @( posedge clk ) begin
         if ( rst )
-          F_reg[i] <= '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+          F_reg[i] <= '{
+            val: 1'b0, 
+            inst: 'x, 
+            pc: 'x, 
+            seq_num: 'x,
+            insn_valid: '0
+          };
         else
           F_reg[i] <= F_reg_next[i];
       end
@@ -122,22 +132,46 @@ module DecodeIssueUnitL8 #(
       always_comb begin
         F_xfer[i] = F[i].val & F[i].rdy;
 
+        // Take in next IW from fetch if we are ready and FU is valid
         if ( F_xfer[i] )
-          F_reg_next = '{ val: 1'b1, inst: F.inst, pc: F.pc, seq_num: F.seq_num };
-        else if ( IQ_xfer | should_squash )
-          F_reg_next = '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+          F_reg_next[i] = '{
+            val: 1'b1,
+            inst: F[i].inst,
+            pc: F[i].pc,
+            seq_num: F[i].seq_num,
+            insn_valid: F[i].insn_valid
+          };
+
+        // Invalidate current IW if all insn's transferred to IQs
+        // or if we need to squash due to a younger branch
+        // or JAL in the IW
+        // verilator lint_off UNSIGNED
+        else if ( IQ_xfer_all_valid |
+          (should_squash & i <= oldest_brx_idx) |
+          (squash_pub.val & i > oldest_jal_idx)
+        )
+        // verilator lint_on UNSIGNED
+          F_reg_next[i] = '{
+            val: 1'b0,
+            inst: 'x,
+            pc: 'x,
+            seq_num: 'x,
+            insn_valid: '0
+          };
         else
-          F_reg_next = F_reg;
+          F_reg_next[i] = F_reg[i];
       end
     end
   endgenerate
 
   always_comb begin
     F_xfer_all  = 1'b1;
-    IQ_xfer_all = 1'b1;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      F_xfer_all &= F_xfer[i];
-      IQ_xfer_all &= IQ_xfer[i];
+    IQ_xfer_all_valid = 1'b1;
+    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
+      F_xfer_all &= F_xfer[k];
+    end
+    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
+      IQ_xfer_all_valid &= (F_reg[k].insn_valid ? IQ_xfer[k] : 1'b1);
     end
   end
 
@@ -179,8 +213,9 @@ module DecodeIssueUnitL8 #(
   logic                        alloc_rdy   [p_num_fe_lanes];
   logic                        alloc_rdy_all;
 
-  logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [2][p_num_fe_lanes];
-  logic                        lookup_new_inst_en   [2][p_num_fe_lanes];
+  logic                  [4:0] lookup_new_inst_areg [p_num_fe_lanes][2];
+  logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
+  logic                        lookup_new_inst_en   [p_num_fe_lanes][2];
 
   logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes][2];
   logic                        lookup_iq_en      [p_num_pipes][2];
@@ -190,16 +225,16 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     alloc_rdy_all = 1'b1;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      lookup_new_inst_en[0][i] = 1'b1;
-      lookup_new_inst_en[1][i] = 1'b1;
-      alloc_rdy_all &= alloc_rdy[i];
-      alloc_en[i] = alloc_rdy_all & decoder_wen[i] & IQ_xfer_all & !should_squash;
+    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
+      lookup_new_inst_areg[k][0] = decoder_raddr0[k];
+      lookup_new_inst_areg[k][1] = decoder_raddr1[k];
+      lookup_new_inst_en[k][0] = 1'b1;
+      lookup_new_inst_en[k][1] = 1'b1;
+      alloc_rdy_all &= alloc_rdy[k];
+      alloc_en[k] = decoder_wen[k] & IQ_xfer_all_valid & !should_squash;
     end
   end
 
-  // TODO: implement M3RenameTable with multiple allocation ports for each FE
-  // lane
   M3RenameTable #(
     .p_num_phys_regs    (p_num_phys_regs),
     .p_num_lookup_ports (p_num_pipes),
@@ -215,7 +250,7 @@ module DecodeIssueUnitL8 #(
     .alloc_en       (alloc_en),
     .alloc_rdy      (alloc_rdy),
 
-    .lookup_new_inst_areg    ('{decoder_raddr0, decoder_raddr1}),
+    .lookup_new_inst_areg    (lookup_new_inst_areg),
     .lookup_new_inst_en      (lookup_new_inst_en),
     .lookup_new_inst_preg    (lookup_new_inst_preg),
 
@@ -231,7 +266,6 @@ module DecodeIssueUnitL8 #(
   logic [31:0]                 complete_wdata       [p_num_be_lanes];
   logic                        complete_wen_and_val [p_num_be_lanes];
 
-  genvar i;
   generate
     for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: COMPLETE_SIGNALS_GEN
       assign complete_preg[i]        = complete[i].preg;
@@ -281,11 +315,11 @@ module DecodeIssueUnitL8 #(
   );
 
   // Track oldest JAL(R), BRX, and instruction in general
-  logic [$clog2(p_num_fe_lanes+1)-1:0] oldest_jal_idx;
-  logic [p_seq_num_bits-1:0]           oldest_jal_seq_num;
-  logic [p_seq_num_bits-1:0]           oldest_insn_seq_num;
-  logic [$clog2(p_num_fe_lanes+1)-1:0] oldest_brx_idx;
-  logic [p_seq_num_bits-1:0]           oldest_brx_seq_num;
+  logic [p_fe_lane_idx_bits-1:0] oldest_jal_idx;
+  logic [p_seq_num_bits-1:0]     oldest_jal_seq_num;
+  logic [p_seq_num_bits-1:0]     oldest_insn_seq_num;
+  logic [p_fe_lane_idx_bits-1:0] oldest_brx_idx;
+  logic [p_seq_num_bits-1:0]     oldest_brx_seq_num;
 
   always_comb begin
     oldest_jal_idx      = '0;
@@ -303,14 +337,14 @@ module DecodeIssueUnitL8 #(
       // Update oldest BRX insn
       if( in_subset(p_brx_subset, num_ops'(1 << decoder_uop[i])) &&
           seq_age.is_older(oldest_brx_seq_num, F_reg[i].seq_num) ) begin
-        oldest_brx_idx     = $clog2(p_num_fe_lanes+1)'(i);
+        oldest_brx_idx     = p_fe_lane_idx_bits'(i);
         oldest_brx_seq_num = F_reg[i].seq_num;
       end
 
       // Update oldest JAL seq num in IW if the latest found JAL(R) is older
       if( (decoder_jal[i] == 2'd1 || decoder_jal[i] == 2'd2) &&
           seq_age.is_older(oldest_jal_seq_num, F_reg[i].seq_num) ) begin
-        oldest_jal_idx     = $clog2(p_num_fe_lanes+1)'(i);
+        oldest_jal_idx     = p_fe_lane_idx_bits'(i);
         oldest_jal_seq_num = F_reg[i].seq_num;
       end
     end
@@ -333,7 +367,7 @@ module DecodeIssueUnitL8 #(
   always_ff @( posedge clk ) begin
     if( rst )
       squash_sent <= 1'b0;
-    else if( F_xfer )
+    else if( F_xfer_all )
       squash_sent <= 1'b0;
     else if( squash_pub.val )
       squash_sent <= 1'b1;
@@ -359,7 +393,9 @@ module DecodeIssueUnitL8 #(
 
   logic                                iq_rdy         [p_num_pipes];
   logic [$clog2(p_iq_depth):0]         iq_avail_slots [p_num_pipes];
-  logic [$clog2(p_num_fe_lanes+1)-1:0] iq_route_idx   [p_num_pipes];
+  /* verilator lint_off UNOPTFLAT */
+  logic [p_fe_lane_idx_bits-1:0]       iq_route_idx   [p_num_pipes];
+  /* verilator lint_on UNOPTFLAT */
   logic                                iq_val         [p_num_pipes];
 
 
@@ -368,8 +404,8 @@ module DecodeIssueUnitL8 #(
   logic xbar_insn_val [p_num_fe_lanes];
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      xbar_insn_val[i] = F_reg[i].val & decoder_val[i] & !should_squash & alloc_rdy_all &
-                         (in_subset(p_brx_subset, decoder_uop[oldest_brx_idx]) ?
+      xbar_insn_val[i] = F_reg[i].val & F_reg[i].insn_valid & decoder_val[i] & !should_squash &
+                         (in_subset(p_brx_subset, num_ops'(1 << decoder_uop[oldest_brx_idx])) ?
                           (seq_age.is_older(F_reg[i].seq_num, oldest_brx_seq_num) | 
                            F_reg[i].seq_num == oldest_brx_seq_num) : 1'b1);
     end
@@ -382,13 +418,15 @@ module DecodeIssueUnitL8 #(
     end
   end
 
-  // TODO: Implement InstXbarIQ
   InstXbarIQ #(
     .p_num_pipes       (p_num_pipes),
     .p_pipe_subsets    (p_pipe_subsets),
     .p_num_input_lanes (p_num_fe_lanes),
-    .p_iq_depth        (p_iq_depth)
+    .p_iq_depth        (p_iq_depth),
+    .p_seq_num_bits    (p_seq_num_bits)
   ) inst_xbar (
+    .clk            (clk),
+    .rst            (rst),
     .uop            (decoder_uop),
     .seq_num        (insn_seq_nums),
     .val            (xbar_insn_val),
@@ -396,14 +434,19 @@ module DecodeIssueUnitL8 #(
     .iq_avail_slots (iq_avail_slots),
     .iq_route_idx   (iq_route_idx),
     .iq_val         (iq_val),
-    .xfer           (IQ_xfer)
+    .xfer           (IQ_xfer),
+    .commit         (commit)
   );
 
-  // TODO: not ready to receive new IW unless all VALID instructions in current
+  // not ready to receive new IW unless all VALID instructions in current
   // IW are transferred to IQs or squashing
-  assign F.rdy = (IQ_xfer_all & alloc_rdy & decoder_val) | 
-                 should_squash                           | 
-                 (!F_reg.val);
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: F_RDY_GEN
+      assign F[i].rdy = (IQ_xfer_all_valid & alloc_rdy[i] & decoder_val[i]) |
+                          should_squash                                     |
+                          (!F_reg[i].val);
+    end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Issue queues (bypass any for control subset)
@@ -423,7 +466,7 @@ module DecodeIssueUnitL8 #(
 
         // Insert
         .ins_msg_pc              (F_reg[iq_route_idx[i]].pc),
-        .ins_msg_preg            (lookup_new_inst_preg),
+        .ins_msg_preg            (lookup_new_inst_preg[iq_route_idx[i]]),
         .ins_msg_decoder_uop     (decoder_uop[iq_route_idx[i]]),
         .ins_msg_decoder_waddr   (decoder_waddr[iq_route_idx[i]]),
         .ins_msg_imm             (imm[iq_route_idx[i]]),
