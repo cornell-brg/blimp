@@ -1,7 +1,7 @@
 Writeback Commit Unit (WCU)
 ==========================================================================
 
-WCU L4
+WritebackCommitUnit L4
 --------------------------------------------------------------------------
 
 The level 4 Writeback Commit Unit (WCU L4) is responsible for arbitrating
@@ -14,7 +14,7 @@ instructions in the same cycle.
 .. image:: img/WritebackCommitUnitL4.png
    :align: center
    :width: 70%
-   :alt: A picture of the Level 4 Writeback Commit Unit supporting superscalar
+   :alt: A picture of the Level 4 Writeback Commit Unit supporting superscalar writeback and commit
    :class: bottompadding
 
 Instruction Arbiter: MRRArb

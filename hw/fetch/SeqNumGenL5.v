@@ -114,8 +114,10 @@ module SeqNumGenL5 #(
     end
   endgenerate
 
-  logic [p_seq_num_bits-1:0] entries_allocated;
-  assign entries_allocated = curr_head_ptr - curr_tail_ptr;
+  logic [p_seq_num_bits:0] entries_allocated;
+  assign entries_allocated = (curr_head_ptr >= curr_tail_ptr)
+    ? ({1'b0, curr_head_ptr} - {1'b0, curr_tail_ptr})
+    : ((p_seq_num_bits+1)'(p_num_entries) - {1'b0, curr_tail_ptr} + {1'b0, curr_head_ptr});
 
   //----------------------------------------------------------------------
   // Allocation
@@ -217,10 +219,10 @@ module SeqNumGenL5 #(
     for( i = 0; i < p_reclaim_width; i++ ) begin: RECLAIM_VAL
       if( i == 0 )
         assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr + i)] == FREE ) &
-                                  (p_seq_num_bits'(i) < entries_allocated                    );
+                                  (p_seq_num_bits'(i) < entries_allocated[p_seq_num_bits-1:0]);
       else
         assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr + i)] == FREE ) &
-                                  (p_seq_num_bits'(i) < entries_allocated                    ) &
+                                  (p_seq_num_bits'(i) < entries_allocated[p_seq_num_bits-1:0]) &
                                   reclaim_valid[i - 1];
     end
   endgenerate

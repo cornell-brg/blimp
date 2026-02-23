@@ -208,7 +208,9 @@ module DecodeIssueUnitL8 #(
     end
   endgenerate
 
+  /* verilator lint_off UNOPTFLAT */
   logic [p_phys_addr_bits-1:0] alloc_preg  [p_num_fe_lanes];
+  /* verilator lint_on UNOPTFLAT */
   logic [p_phys_addr_bits-1:0] alloc_ppreg [p_num_fe_lanes];
   logic                        alloc_rdy   [p_num_fe_lanes];
   logic                        alloc_rdy_all;

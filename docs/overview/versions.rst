@@ -7,7 +7,7 @@ can be composed to form different versions of Blimp processors. This
 enables the design of these components to occur iteratively, adding on
 functionality as the complexity of the processor progressed.
 
-Currently, 10 versions of the processor are implemented. The table below
+Currently, 11 versions of the processor are implemented. The table below
 details the level of each unit that each processor version supports:
 
 .. admonition:: Instruction Routing/Arbitration
@@ -100,6 +100,14 @@ details the level of each unit that each processor version supports:
    * - V10
      - 4
      - 7
+     - 1, 2, 3, 4,
+       5, 6, 7
+     - 4
+     - 2
+
+   * - V11
+     - 5
+     - 8
      - 1, 2, 3, 4,
        5, 6, 7
      - 4
@@ -308,4 +316,40 @@ queue to keep the 1-cycle branch-resolution latency constraint.
    :align: center
    :width: 70%
    :alt: A picture of the Version 10 processor composition
+   :class: bottompadding
+
+Version 11
+--------------------------------------------------------------------------
+
+The Version 11 processor extends the superscalar backend of V10 with a
+superscalar frontend, using FetchUnitL5 and DecodeIssueUnitL8. The fetch unit
+fetches aligned blocks of ``p_num_fe_lanes`` instructions per cycle and
+properly handles squashing into the middle of a fetch block by tracking a
+``squash_restart_offset`` — only lanes at or above the offset in the first
+post-squash fetch block are marked valid, while earlier lanes are invalidated
+and do not receive sequence number allocations.
+
+The DecodeIssueUnitL8 decodes ``p_num_fe_lanes`` instructions in parallel and
+uses an M3RenameTable that forwards destination register allocations within the
+same fetch block: when looking up source operand physical registers for an
+instruction, the rename table checks whether a previous lane in the same block
+has already renamed the same architectural register, and if so, uses the
+newly-allocated physical register instead of the stale mapping. This allows
+back-to-back dependent instructions within a single fetch block to be decoded
+correctly in the same cycle.
+
+Instructions are routed from the ``p_num_fe_lanes`` input lanes to
+``p_num_pipes`` output issue queues through a new InstXbarIQ instruction
+crossbar. The crossbar uses a modified iSLIP matching algorithm with age-based
+priority for inputs (oldest instruction is granted first) and slot-based
+priority for outputs (the pipe with the most available issue queue slots is
+preferred), running multiple iterations per cycle for improved matching
+efficiency. Each input instruction is matched to a compatible output pipe based
+on its opcode, and the crossbar produces per-pipe routing indices that select
+which lane's decoded instruction to enqueue.
+
+.. image:: img/versions-v11.png
+   :align: center
+   :width: 70%
+   :alt: A picture of the Version 11 processor composition
    :class: bottompadding
