@@ -66,6 +66,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insns();
       for (int i = 0; i < p_num_recv_msgs; i++) begin
         fork
           begin
+            // $display("sending");
             recv(
               recv_pc[i],
               recv_seq_num[i],
@@ -83,6 +84,8 @@ task automatic test_case_1_fetch_block_no_ctrl_insns();
       wait fork;
     end
   join
+
+  #100;
 
   t.test_case_end();
 endtask

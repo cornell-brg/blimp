@@ -948,6 +948,13 @@ module M3RenameTable_test;
     .p_num_lookup_ports (1)
   ) suite_7();
 
+  // 2 fe lanes, 2 be lanes, 4 lookup ports
+  M3RenameTableTestSuite #(
+    .p_suite_num        (8),
+    .p_num_lookup_ports (4),
+    .p_num_phys_regs    (33)
+  ) suite_8();
+
   int s;
 
   initial begin
@@ -961,6 +968,7 @@ module M3RenameTable_test;
     if ((s <= 0) || (s == 5)) suite_5.run_test_suite();
     if ((s <= 0) || (s == 6)) suite_6.run_test_suite();
     if ((s <= 0) || (s == 7)) suite_7.run_test_suite();
+    if ((s <= 0) || (s == 8)) suite_8.run_test_suite();
 
     test_bench_end();
   end

@@ -177,12 +177,12 @@ module BlimpV11 #(
     .p_num_be_lanes  (p_num_be_lanes),
     .p_iq_depth      (p_iq_depth),
     .p_pipe_subsets ({
-      p_alu_subset, // ALU0
-      p_alu_subset, // ALU1
-      p_m_subset,   // M-Extension for MUL0
-      p_m_subset,   // M-Extension for MUL1
-      p_mem_subset, // Memory
-      p_ctrl_subset // Control Flow
+      p_ctrl_subset, // Control Flow
+      p_mem_subset,  // Memory
+      p_m_subset,    // M-Extension for MUL1
+      p_m_subset,    // M-Extension for MUL0
+      p_alu_subset,  // ALU1
+      p_alu_subset   // ALU0
     }),
     .p_ctrl_subset   (p_ctrl_subset)
   ) DIU (

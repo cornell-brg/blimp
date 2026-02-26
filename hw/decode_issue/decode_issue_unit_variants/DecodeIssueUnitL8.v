@@ -46,7 +46,8 @@ module DecodeIssueUnitL8 #(
                                                          OP_BLT_VEC  |
                                                          OP_BGE_VEC  |
                                                          OP_BLTU_VEC |
-                                                         OP_BGEU_VEC
+                                                         OP_BGEU_VEC,
+  parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1
 ) (
   input  logic clk,
   input  logic rst,
@@ -83,13 +84,20 @@ module DecodeIssueUnitL8 #(
   SquashNotif.sub squash_sub
 );
 
-  localparam p_seq_num_bits    = F.p_seq_num_bits;
+  localparam p_seq_num_bits    = F[0].p_seq_num_bits;
   localparam p_phys_addr_bits  = $clog2( p_num_phys_regs );
   localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
   
   //----------------------------------------------------------------------
   // Pipeline registers for F interface
   //----------------------------------------------------------------------
+
+  /* verilator lint_off UNOPTFLAT */
+  logic [p_fe_lane_idx_bits-1:0]       iq_route_idx   [p_num_pipes];
+  /* verilator lint_on UNOPTFLAT */
+  logic IQ_xfer    [p_num_fe_lanes];
+  logic alloc_rdy_all;
+  logic oldest_ctrl_insn_srcs_ready;
 
   typedef struct packed {
     logic                      val;
@@ -103,12 +111,30 @@ module DecodeIssueUnitL8 #(
   F_input F_reg_next [p_num_fe_lanes];
   logic   F_xfer     [p_num_fe_lanes];
   logic   F_xfer_all;
-  logic   IQ_xfer    [p_num_fe_lanes];
+  logic   xbar_insn_val [p_num_fe_lanes]; 
 
-  /* verilator lint_off UNOPTFLAT */
-  logic IQ_xfer_all_valid;
-  logic should_squash;
-  /* verilator lint_on UNOPTFLAT */
+  logic F_rdy_all;
+  always_comb begin
+    F_rdy_all = 1'b1;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      F_rdy_all &= ((!F_reg[j].val | !F_reg[j].insn_valid ? 1'b1 : IQ_xfer[j] & alloc_rdy_all) & oldest_ctrl_insn_srcs_ready);
+    end
+  end
+
+  // Track oldest JAL(R), BRX, and instruction in general
+  logic [p_fe_lane_idx_bits-1:0] oldest_jal_idx;
+  logic [p_seq_num_bits-1:0]     oldest_jal_seq_num;
+  logic                          oldest_jal_found;
+
+  logic [p_fe_lane_idx_bits-1:0] oldest_brx_idx;
+  logic [p_seq_num_bits-1:0]     oldest_brx_seq_num;
+  logic                          oldest_brx_found;
+
+  logic [p_fe_lane_idx_bits-1:0] oldest_ctrl_insn_idx;
+  logic [p_seq_num_bits-1:0]     oldest_ctrl_insn_seq_num;
+  logic                          oldest_ctrl_insn_found;
+  logic                          oldest_ctrl_insn_is_brx;
+
 
   // If squash sub originating from CTRL XU, invalidate (insn_val = 0) all
   // instructions in registers up to and including that branch causing the
@@ -129,10 +155,12 @@ module DecodeIssueUnitL8 #(
           F_reg[i] <= F_reg_next[i];
       end
 
-      always_comb begin
-        F_xfer[i] = F[i].val & F[i].rdy;
+      assign F[i].rdy = F_rdy_all;
+      assign F_xfer[i] = F[i].val & F[i].rdy;
 
-        // Take in next IW from fetch if we are ready and FU is valid
+      always_comb begin
+
+        // Take in next IW from fetch on F interface handshake
         if ( F_xfer[i] )
           F_reg_next[i] = '{
             val: 1'b1,
@@ -142,13 +170,21 @@ module DecodeIssueUnitL8 #(
             insn_valid: F[i].insn_valid
           };
 
-        // Invalidate current IW if all insn's transferred to IQs
-        // or if we need to squash due to a younger branch
-        // or JAL in the IW
+        // Otherwise, invalidate this insn if ANY of the following:
+        // 1) Oldest control instruction is a JAL(R) that is valid
+        // 2) Oldest control instruction is a BRX that is valid and it is
+        //    younger than or equal to this insn
+        // 3) There is a squash coming from CTRL XU and the oldest BRX (which is
+        //    the one causing the squash) is older than this insn
+        // 4) This insn is being transferred to the issue queue
+        //
         // verilator lint_off UNSIGNED
-        else if ( IQ_xfer_all_valid |
-          (should_squash & i <= oldest_brx_idx) |
-          (squash_pub.val & i > oldest_jal_idx)
+        else if ( 
+          (oldest_ctrl_insn_found && !oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid) ||
+          (oldest_ctrl_insn_found && oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid && 
+            !seq_age.is_older(F_reg[oldest_ctrl_insn_idx].seq_num, F_reg[i].seq_num)) ||
+          (oldest_ctrl_insn_found && oldest_ctrl_insn_is_brx && squash_sub.val && seq_age.is_older(oldest_ctrl_insn_seq_num, F_reg[i].seq_num )) ||
+          IQ_xfer[i]
         )
         // verilator lint_on UNSIGNED
           F_reg_next[i] = '{
@@ -166,12 +202,8 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     F_xfer_all  = 1'b1;
-    IQ_xfer_all_valid = 1'b1;
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
       F_xfer_all &= F_xfer[k];
-    end
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      IQ_xfer_all_valid &= (F_reg[k].insn_valid ? IQ_xfer[k] : 1'b1);
     end
   end
 
@@ -213,17 +245,18 @@ module DecodeIssueUnitL8 #(
   /* verilator lint_on UNOPTFLAT */
   logic [p_phys_addr_bits-1:0] alloc_ppreg [p_num_fe_lanes];
   logic                        alloc_rdy   [p_num_fe_lanes];
-  logic                        alloc_rdy_all;
 
   logic                  [4:0] lookup_new_inst_areg [p_num_fe_lanes][2];
   logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
   logic                        lookup_new_inst_en   [p_num_fe_lanes][2];
 
-  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes][2];
-  logic                        lookup_iq_en      [p_num_pipes][2];
-  logic                        lookup_iq_pending [p_num_pipes][2];
+  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes+1][2];
+  logic                        lookup_iq_en      [p_num_pipes+1][2];
+  logic                        lookup_iq_pending [p_num_pipes+1][2];
 
+  /* verilator lint_off UNOPTFLAT */
   logic alloc_en [p_num_fe_lanes];
+  /* verilator lint_on UNOPTFLAT */
 
   always_comb begin
     alloc_rdy_all = 1'b1;
@@ -233,13 +266,16 @@ module DecodeIssueUnitL8 #(
       lookup_new_inst_en[k][0] = 1'b1;
       lookup_new_inst_en[k][1] = 1'b1;
       alloc_rdy_all &= alloc_rdy[k];
-      alloc_en[k] = decoder_wen[k] & IQ_xfer_all_valid & !should_squash;
+      alloc_en[k] = F_reg[k].val && 
+                    F_reg[k].insn_valid && 
+                    decoder_val[k] && 
+                    IQ_xfer[k];
     end
   end
 
   M3RenameTable #(
     .p_num_phys_regs    (p_num_phys_regs),
-    .p_num_lookup_ports (p_num_pipes),
+    .p_num_lookup_ports (p_num_pipes+1),
     .p_num_fe_lanes     (p_num_fe_lanes),
     .p_num_be_lanes     (p_num_be_lanes)
   ) rename_table (
@@ -316,38 +352,76 @@ module DecodeIssueUnitL8 #(
     .*
   );
 
-  // Track oldest JAL(R), BRX, and instruction in general
-  logic [p_fe_lane_idx_bits-1:0] oldest_jal_idx;
-  logic [p_seq_num_bits-1:0]     oldest_jal_seq_num;
-  logic [p_seq_num_bits-1:0]     oldest_insn_seq_num;
-  logic [p_fe_lane_idx_bits-1:0] oldest_brx_idx;
-  logic [p_seq_num_bits-1:0]     oldest_brx_seq_num;
 
   always_comb begin
-    oldest_jal_idx      = '0;
-    oldest_jal_seq_num  = F_reg[0].seq_num;
-    oldest_insn_seq_num = F_reg[0].seq_num;
-    oldest_brx_idx      = '0;
-    oldest_brx_seq_num  = F_reg[0].seq_num;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
 
-      // Update oldest insn
-      if( seq_age.is_older(oldest_insn_seq_num, F_reg[i].seq_num) ) begin
-        oldest_insn_seq_num = F_reg[i].seq_num;
-      end
+    // Oldest JAL(R)
+    oldest_jal_idx      = '0;
+    oldest_jal_found    = 1'b0;
+    oldest_jal_seq_num  = F_reg[0].seq_num;
+
+    // Oldest branch
+    oldest_brx_idx      = '0;
+    oldest_brx_found    = 1'b0;
+    oldest_brx_seq_num  = F_reg[0].seq_num;
+
+    // Oldest instruction
+    oldest_ctrl_insn_idx     = '0;
+    oldest_ctrl_insn_seq_num = F_reg[0].seq_num;
+    oldest_ctrl_insn_found   = 1'b0;
+    oldest_ctrl_insn_is_brx  = 1'b0;
+
+    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
 
       // Update oldest BRX insn
       if( in_subset(p_brx_subset, num_ops'(1 << decoder_uop[i])) &&
-          seq_age.is_older(oldest_brx_seq_num, F_reg[i].seq_num) ) begin
+          (seq_age.is_older(oldest_brx_seq_num, F_reg[i].seq_num) | 
+          (F_reg[i].seq_num == oldest_brx_seq_num && F_reg[i].val))) begin
         oldest_brx_idx     = p_fe_lane_idx_bits'(i);
         oldest_brx_seq_num = F_reg[i].seq_num;
+        oldest_brx_found   = 1'b1;
       end
 
       // Update oldest JAL seq num in IW if the latest found JAL(R) is older
-      if( (decoder_jal[i] == 2'd1 || decoder_jal[i] == 2'd2) &&
-          seq_age.is_older(oldest_jal_seq_num, F_reg[i].seq_num) ) begin
+      if( (decoder_jal[i] != 2'd0) &&
+          seq_age.is_older(oldest_jal_seq_num, F_reg[i].seq_num) |
+          (F_reg[i].seq_num == oldest_jal_seq_num && F_reg[i].val)) begin
         oldest_jal_idx     = p_fe_lane_idx_bits'(i);
         oldest_jal_seq_num = F_reg[i].seq_num;
+        oldest_jal_found   = 1'b1;
+      end
+    end
+
+    // If found any control instruction
+    if( oldest_brx_found || oldest_jal_found ) begin
+      oldest_ctrl_insn_found   = 1'b1;
+
+      // If both BRX and JAL(R) found, determine which is older
+      if( oldest_brx_found && oldest_jal_found ) begin
+        if( seq_age.is_older(oldest_brx_seq_num, oldest_jal_seq_num) ) begin
+          oldest_ctrl_insn_idx     = oldest_brx_idx;
+          oldest_ctrl_insn_seq_num = oldest_brx_seq_num;
+          oldest_ctrl_insn_is_brx  = 1'b1;
+        end
+        else begin
+          oldest_ctrl_insn_idx     = oldest_jal_idx;
+          oldest_ctrl_insn_seq_num = oldest_jal_seq_num;
+          oldest_ctrl_insn_is_brx  = 1'b0;
+        end
+      end
+
+      // If only BRX found, that is the oldest control insn
+      else if( oldest_brx_found ) begin
+        oldest_ctrl_insn_idx     = oldest_brx_idx;
+        oldest_ctrl_insn_seq_num = oldest_brx_seq_num;
+        oldest_ctrl_insn_is_brx  = 1'b1;
+      end
+
+      // If only JAL(R) found, that is the oldest control insn
+      else begin
+        oldest_ctrl_insn_idx     = oldest_jal_idx;
+        oldest_ctrl_insn_seq_num = oldest_jal_seq_num;
+        oldest_ctrl_insn_is_brx  = 1'b0;
       end
     end
   end
@@ -375,41 +449,79 @@ module DecodeIssueUnitL8 #(
       squash_sent <= 1'b1;
   end
 
-  assign squash_pub.val     = (decoder_jal[oldest_jal_idx] != 0) & 
-                               F_reg[oldest_jal_idx].val & 
-                               !squash_sent & alloc_rdy_all;
+  // Publish a valid squash if ALL of the following:
+  // 1) There is a JAL(R) in the IW
+  // 2) That JAL(R) is valid
+  // 3) We haven't already sent a squash for that JAL(R)
+  // 4) Able to allocate all destination registers for insns in this IW
+  assign squash_pub.val     = (oldest_jal_found && 
+                               F_reg[oldest_jal_idx].val && 
+                               F_reg[oldest_jal_idx].insn_valid && 
+                               IQ_xfer[oldest_jal_idx] &&
+                               !squash_sent &&
+                               oldest_ctrl_insn_srcs_ready && 
+                               alloc_rdy_all);
   assign squash_pub.target  = jump_target;
-  assign squash_pub.seq_num = F_reg[oldest_jal_idx].seq_num;
-
-  //----------------------------------------------------------------------
-  // Determine whether we need to squash ourself
-  //----------------------------------------------------------------------
-
-  // Squash should check oldest instruction in IW
-  assign should_squash = squash_sub.val & 
-                         seq_age.is_older( squash_sub.seq_num, oldest_insn_seq_num );
+  assign squash_pub.seq_num = oldest_jal_seq_num;
 
   //----------------------------------------------------------------------
   // Route the instruction to issue queue based on uop
   //----------------------------------------------------------------------
 
   logic                                iq_rdy         [p_num_pipes];
-  logic [$clog2(p_iq_depth):0]         iq_avail_slots [p_num_pipes];
-  /* verilator lint_off UNOPTFLAT */
-  logic [p_fe_lane_idx_bits-1:0]       iq_route_idx   [p_num_pipes];
-  /* verilator lint_on UNOPTFLAT */
+  logic [p_iq_entries_bits:0]          iq_avail_slots [p_num_pipes];
   logic                                iq_val         [p_num_pipes];
-
-
-  // Only insns up to and including this IW's oldest branch (if there is a BRX
-  // insn in this IW) are valid insns to issue
-  logic xbar_insn_val [p_num_fe_lanes];
+  
+  // TODO: check if oldest ctrl instruction source operands are ready,
+  // xbar_insn_val for all instructions will not be valid, same for alloc_en for
+  // all instructions and for squash_pub.val. F.rdy for all instructions will
+  // also not be ready in this case.
   always_comb begin
+    oldest_ctrl_insn_srcs_ready = 1'b1;
+    lookup_iq_en[p_num_pipes][0] = 1'b0;
+    lookup_iq_en[p_num_pipes][1] = 1'b0;
+    lookup_iq_preg[p_num_pipes][0] = '0;
+    lookup_iq_preg[p_num_pipes][1] = '0;
+    if( oldest_ctrl_insn_found ) begin
+        lookup_iq_en[p_num_pipes][0] = 1'b1;
+        lookup_iq_preg[p_num_pipes][0] = lookup_new_inst_preg[oldest_ctrl_insn_idx][0];
+      if( oldest_ctrl_insn_is_brx ) begin
+        lookup_iq_en[p_num_pipes][1] = 1'b1;
+        lookup_iq_preg[p_num_pipes][1] = lookup_new_inst_preg[oldest_ctrl_insn_idx][1];
+        oldest_ctrl_insn_srcs_ready = !lookup_iq_pending[p_num_pipes][0] & !lookup_iq_pending[p_num_pipes][1];
+      end else begin
+        lookup_iq_en[p_num_pipes][1] = 1'b0;
+        lookup_iq_preg[p_num_pipes][1] = '0;
+        oldest_ctrl_insn_srcs_ready = !lookup_iq_pending[p_num_pipes][0];
+      end
+    end
+  end
+
+  // This insn can enter crossbar if ALL of the following:
+  // 1) It is valid
+  // 2) The decoder can decode it (decoder_val)
+  // 3) It is older than or the same age as the oldest control instruction in
+  //    the IW (if there is one)
+  logic alloc_rdy_prev_lanes;
+  always_comb begin
+    alloc_rdy_prev_lanes = 1'b1;
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      xbar_insn_val[i] = F_reg[i].val & F_reg[i].insn_valid & decoder_val[i] & !should_squash &
-                         (in_subset(p_brx_subset, num_ops'(1 << decoder_uop[oldest_brx_idx])) ?
-                          (seq_age.is_older(F_reg[i].seq_num, oldest_brx_seq_num) | 
-                           F_reg[i].seq_num == oldest_brx_seq_num) : 1'b1);
+      alloc_rdy_prev_lanes &= alloc_rdy[i];
+      if( F_reg[i].val && F_reg[i].insn_valid && decoder_val[i] ) begin
+        if( oldest_ctrl_insn_found ) begin
+          xbar_insn_val[i] = oldest_ctrl_insn_srcs_ready && 
+                             alloc_rdy_prev_lanes && 
+                             (seq_age.is_older(
+                              F_reg[i].seq_num, 
+                              oldest_ctrl_insn_seq_num
+                             ) || 
+                             F_reg[i].seq_num == oldest_ctrl_insn_seq_num);
+        end else begin
+          xbar_insn_val[i] = alloc_rdy_prev_lanes;
+        end
+      end else begin
+        xbar_insn_val[i] = 1'b0;
+      end
     end
   end
 
@@ -425,7 +537,8 @@ module DecodeIssueUnitL8 #(
     .p_pipe_subsets    (p_pipe_subsets),
     .p_num_input_lanes (p_num_fe_lanes),
     .p_iq_depth        (p_iq_depth),
-    .p_seq_num_bits    (p_seq_num_bits)
+    .p_seq_num_bits    (p_seq_num_bits),
+    .p_num_be_lanes    (p_num_be_lanes)
   ) inst_xbar (
     .clk            (clk),
     .rst            (rst),
@@ -440,16 +553,6 @@ module DecodeIssueUnitL8 #(
     .commit         (commit)
   );
 
-  // not ready to receive new IW unless all VALID instructions in current
-  // IW are transferred to IQs or squashing
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: F_RDY_GEN
-      assign F[i].rdy = (IQ_xfer_all_valid & alloc_rdy[i] & decoder_val[i]) |
-                          should_squash                                     |
-                          (!F_reg[i].val);
-    end
-  endgenerate
-
   //----------------------------------------------------------------------
   // Issue queues (bypass any for control subset)
   //----------------------------------------------------------------------
@@ -461,7 +564,7 @@ module DecodeIssueUnitL8 #(
         .p_num_regs     (p_num_phys_regs),
         .p_seq_num_bits (p_seq_num_bits),
         .p_num_be_lanes (p_num_be_lanes),
-        .p_bypass       (p_pipe_subsets[p_num_pipes-i-1] == p_ctrl_subset)
+        .p_bypass       (p_pipe_subsets[i] == p_ctrl_subset)
       ) issue_queue (
         .clk                     (clk),
         .rst                     (rst),
@@ -498,7 +601,7 @@ module DecodeIssueUnitL8 #(
       );
 
       // assuming exactly one CTRL_XU - possibly improve this?
-      if ( p_pipe_subsets[p_num_pipes-i-1] == p_ctrl_subset ) begin
+      if ( p_pipe_subsets[i] == p_ctrl_subset ) begin
         assign jump_base = rdata[i][0];
       end
     end

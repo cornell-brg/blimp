@@ -47,7 +47,7 @@ module MSeqAge #(
 
   // Keep track of the oldest in-flight sequence number
   logic [p_seq_num_bits-1:0] oldest_seq_num;
-  logic [p_seq_num_bits-1:0] next_oldest_seq_num_m1;
+  logic [p_seq_num_bits-1:0] youngest_commit_seq_num;
   logic                      any_commit;
   assign any_commit = commit_val.or();
 
@@ -55,14 +55,16 @@ module MSeqAge #(
     if( rst )
       oldest_seq_num <= '0;
     else if( any_commit )
-      oldest_seq_num <= next_oldest_seq_num_m1 + 1;
+      oldest_seq_num <= youngest_commit_seq_num + 1;
   end
 
+  // Find youngest sequence number among commits, which will be the next oldest
+  // after these commit (plus one)
   always_comb begin
-    next_oldest_seq_num_m1 = '0;
-    for( int j = 0; j < p_num_be_lanes; j++ ) begin
-      if( commit_val[j] && is_older( commit_seq_num[j], next_oldest_seq_num_m1 ) )
-        next_oldest_seq_num_m1 = commit_seq_num[j];
+    youngest_commit_seq_num = oldest_seq_num;
+    for( int j = 1; j < p_num_be_lanes; j++ ) begin
+      if( commit_val[j] && is_older(youngest_commit_seq_num, commit_seq_num[j]) )
+        youngest_commit_seq_num = commit_seq_num[j];
     end
   end
 

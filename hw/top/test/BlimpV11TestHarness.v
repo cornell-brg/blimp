@@ -60,6 +60,7 @@ module BlimpV11TestHarness #(
     .p_seq_num_bits  (p_seq_num_bits),
     .p_num_phys_regs (p_num_phys_regs),
     .p_num_be_lanes  (p_num_be_lanes),
+    .p_num_fe_lanes  (p_num_fe_lanes),
     .p_iq_depth      (p_iq_depth)
   ) dut (
     .inst_mem   (imem_intf),

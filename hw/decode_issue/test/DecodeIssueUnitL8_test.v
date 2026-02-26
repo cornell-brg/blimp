@@ -503,7 +503,7 @@ module DecodeIssueUnitL8TestSuite #(
     input logic [p_phys_addr_bits-1:0] preg,
     input logic [p_phys_addr_bits-1:0] ppreg,
     input rv_uop                       uop,
-    input logic [p_pipe_idx_bits-1:0] expected_pipe
+    input logic [p_pipe_idx_bits-1:0]  expected_pipe
   );
     // Set message correctly
     pipe_msg.pc      = pc;
@@ -534,9 +534,12 @@ module DecodeIssueUnitL8TestSuite #(
 
       // Find correct pipe
       for( int j = 0; j < p_num_pipes; j = j + 1 ) begin
+        // $display("looking for pipe %0d against pipe %0d with delay %0d", j, expected_pipe, pipe_delays[j]);
+        // $display("pipe subset = %b, vec_of_uop = %b, in subset = %b", p_pipe_subsets[j], vec_of_uop(uop), p_pipe_subsets[j] & vec_of_uop(uop));
         if( p_pipe_idx_bits'(j) == expected_pipe & 
           ( (p_pipe_subsets[j] & vec_of_uop(uop)) > 0 ) & ( pipe_delays[j] == 0 )
         ) begin
+          // $display("pipe found!");
           msgs_to_recv[j]     = pipe_msg;
           msgs_to_recv_val[j] = 1'b1;
 
@@ -716,6 +719,21 @@ module DecodeIssueUnitL8_test;
     }),
     .p_num_be_lanes      (2)
   ) suite_7();
+  DecodeIssueUnitL8TestSuite #(
+    .p_suite_num         (8),
+    .p_num_pipes         (3),
+    .p_seq_num_bits      (3),
+    .p_num_phys_regs     (33),
+    .p_iq_depth          (4),
+    .p_F_send_intv_delay (3),
+    .p_X_recv_intv_delay (3),
+    .p_pipe_subsets      ({
+      p_tinyrv1,
+      p_tinyrv1,
+      p_tinyrv1
+    }),
+    .p_num_be_lanes      (2)
+  ) suite_8();
 
   int s;
 
@@ -730,6 +748,7 @@ module DecodeIssueUnitL8_test;
     if ((s <= 0) || (s == 5)) suite_5.run_test_suite();
     if ((s <= 0) || (s == 6)) suite_6.run_test_suite();
     if ((s <= 0) || (s == 7)) suite_7.run_test_suite();
+    if ((s <= 0) || (s == 8)) suite_8.run_test_suite();
 
     test_bench_end();
   end

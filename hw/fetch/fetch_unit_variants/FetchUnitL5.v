@@ -195,6 +195,8 @@ module FetchUnitL5
   // Keep track of the in-flight requests to squash
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+  logic resp_empty;
+
   logic [p_flight_bits-1:0] num_to_squash;
   logic [p_flight_bits-1:0] num_to_squash_next;
 
@@ -335,7 +337,7 @@ module FetchUnitL5
     logic [31:0]            data;
   } mem_msg_t;
 
-  logic resp_push, resp_pop, resp_full, resp_empty;
+  logic resp_push, resp_pop, resp_full;
   mem_msg_t fifo_rdata [p_num_fe_lanes];
   mem_msg_t fifo_wdata [p_num_fe_lanes];
 
@@ -383,7 +385,7 @@ module FetchUnitL5
 
       // If requesting allocation on this lane, then we need to have a valid
       // allocation, otherwise fine
-      assign alloc_ok[i] = alloc_rdy[i] ? alloc_val[i] : 1'b1;
+      assign alloc_ok[i] = alloc_rdy[i] & alloc_val[i];
 
       assign fifo_wdata[i].op   = mem_resp_msg_op[i];
       assign fifo_wdata[i].addr = mem_resp_msg_addr[i];
@@ -395,10 +397,10 @@ module FetchUnitL5
 
       always_comb begin
         if( do_squash_restart | do_squash_restart_reg) begin
-          D_insn_valid[i] = !resp_empty & alloc_ok[i] & i >= squash_restart_offset;
+          D_insn_valid[i] = !resp_empty & i >= squash_restart_offset;
           alloc_rdy[i]    = !resp_empty & D_rdy[i] & i >= squash_restart_offset;
         end else begin
-          D_insn_valid[i] = !resp_empty & alloc_ok[i] & !should_drop;
+          D_insn_valid[i] = !resp_empty & !should_drop;
           alloc_rdy[i]    = !resp_empty & D_rdy[i] & !should_drop;
         end
       end

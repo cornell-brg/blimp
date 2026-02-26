@@ -71,23 +71,23 @@ task test_case_directed_add_3_pos();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0,  1"    );
-  h.asm( 'h204, "addi x2,  x0,  2"    );
-  h.asm( 'h208, "addi x3,  x0,  3"    );
-  h.asm( 'h20c, "addi x4,  x0,  4"    );
+  h.asm( 'h200, "addi x1,  x0,  1"    ); // x1 = 1
+  h.asm( 'h204, "addi x2,  x0,  2"    ); // x2 = 2
+  h.asm( 'h208, "addi x3,  x0,  3"    ); // x3 = 3
+  h.asm( 'h20c, "addi x4,  x0,  4"    ); // x4 = 4
 
-  h.asm( 'h210, "add  x5,  x1,  x2"   );
-  h.asm( 'h214, "add  x6,  x2,  x3"   );
-  h.asm( 'h218, "add  x7,  x3,  x4"   );
+  h.asm( 'h210, "add  x5,  x1,  x2"   ); // x5 = 3
+  h.asm( 'h214, "add  x6,  x2,  x3"   ); // x6 = 5
+  h.asm( 'h218, "add  x7,  x3,  x4"   ); // x7 = 7
 
-  h.asm( 'h21c, "addi x1,  x0,  2001" );
-  h.asm( 'h220, "addi x2,  x0,  2002" );
-  h.asm( 'h224, "addi x3,  x0,  2003" );
-  h.asm( 'h228, "addi x4,  x0,  2004" );
+  h.asm( 'h21c, "addi x1,  x0,  2001" ); // x1 = 2001
+  h.asm( 'h220, "addi x2,  x0,  2002" ); // x2 = 2002
+  h.asm( 'h224, "addi x3,  x0,  2003" ); // x3 = 2003
+  h.asm( 'h228, "addi x4,  x0,  2004" ); // x4 = 2004
 
-  h.asm( 'h22c, "add  x5,  x1,  x2"   );
-  h.asm( 'h230, "add  x6,  x2,  x3"   );
-  h.asm( 'h234, "add  x7,  x3,  x4"   );
+  h.asm( 'h22c, "add  x5,  x1,  x2"   ); // x5 = 4003
+  h.asm( 'h230, "add  x6,  x2,  x3"   ); // x6 = 4005
+  h.asm( 'h234, "add  x7,  x3,  x4"   ); // x7 = 4007
 
   // Check each executed instruction
 

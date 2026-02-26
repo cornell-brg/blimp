@@ -45,6 +45,7 @@ module SeqNumGenL5 #(
 );
 
   localparam p_num_entries = 2 ** p_seq_num_bits;
+  localparam p_num_fe_lanes_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
 
   logic [p_seq_num_bits-1:0] commit_seq_num [p_num_be_lanes];
   genvar i;
@@ -74,7 +75,8 @@ module SeqNumGenL5 #(
   localparam FREE  = 1'b0;
 
   logic seq_num_list [p_num_entries];
-  logic [p_seq_num_bits-1:0] curr_head_ptr, curr_tail_ptr;
+  // Use one extra bit for head/tail pointers to distinguish full from empty
+  logic [p_seq_num_bits:0] curr_head_ptr, curr_tail_ptr;
   logic is_alloc [p_num_fe_lanes];
   logic [p_num_be_lanes-1:0] is_free;
 
@@ -89,7 +91,7 @@ module SeqNumGenL5 #(
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
           for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-            if( alloc_val[j] & ( p_seq_num_bits'(curr_head_ptr + j) == i ) )
+            if( alloc_val[j] & ( p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + j) == i ) )
               seq_num_list[i] <= ALLOC;
           end
 
@@ -114,53 +116,70 @@ module SeqNumGenL5 #(
     end
   endgenerate
 
+  // With (p_seq_num_bits+1)-bit pointers, entries_allocated is simply the difference
   logic [p_seq_num_bits:0] entries_allocated;
-  assign entries_allocated = (curr_head_ptr >= curr_tail_ptr)
-    ? ({1'b0, curr_head_ptr} - {1'b0, curr_tail_ptr})
-    : ((p_seq_num_bits+1)'(p_num_entries) - {1'b0, curr_tail_ptr} + {1'b0, curr_head_ptr});
+  assign entries_allocated = curr_head_ptr - curr_tail_ptr;
 
   //----------------------------------------------------------------------
   // Allocation
   //----------------------------------------------------------------------
 
   // Track how many entries we need to allocate in this cycle
-  logic [p_seq_num_bits-1:0] alloc_rdy_cntr;
+  logic [p_num_fe_lanes_bits:0] alloc_rdy_cntr;
+
+  // Count how many lanes are requesting allocation (separate block to break
+  // combinational loop with can_alloc)
+  always_comb begin
+    alloc_rdy_cntr = '0;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      if( alloc_rdy[j] )
+        alloc_rdy_cntr = alloc_rdy_cntr + 1;
+    end
+  end
 
   // Check that alloc_rdy_cntr consecutive entries from head are free
   logic alloc_entries_free;
   always_comb begin
     alloc_entries_free = 1'b1;
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr + k)] != FREE )
+      if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
         alloc_entries_free = 1'b0;
     end
   end
 
   // Can only allocate if there's enough space for all entries we need to
   // allocate and all those entries are free
+  // With (p_seq_num_bits+1)-bit pointers, we can use all p_num_entries
   logic can_alloc;
-  assign can_alloc = ( entries_allocated <= p_num_entries - 1 - alloc_rdy_cntr ) &
-                       alloc_entries_free;
+  logic [p_seq_num_bits:0] space_needed;
+  logic [p_seq_num_bits:0] space_available;
+
+  always_comb begin
+    space_needed = entries_allocated + p_seq_num_bits'(alloc_rdy_cntr);
+    space_available = p_num_entries;  // Can use all entries now
+    can_alloc = (space_needed <= space_available) & alloc_entries_free;
+  end
 
   // Allocate consecutive sequence numbers starting from head pointer for each
   // ready lane
+  logic [p_num_fe_lanes_bits:0] alloc_lane_cntr;
   always_comb begin
-    alloc_rdy_cntr = '0;
+    alloc_lane_cntr = '0;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_SEQ_NUM_ASSIGN
       alloc_seq_num[j] = '0;
       if( alloc_rdy[j] ) begin
-        alloc_seq_num[j] = ( squash.val ) ? squash.seq_num + p_seq_num_bits'(1 + alloc_rdy_cntr)
-                                          : p_seq_num_bits'(curr_head_ptr + alloc_rdy_cntr);
-        alloc_rdy_cntr = alloc_rdy_cntr + 1;
+        alloc_seq_num[j] = ( squash.val ) ? squash.seq_num + p_seq_num_bits'(1 + alloc_lane_cntr)
+                                          : p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + alloc_lane_cntr);
+        alloc_lane_cntr = alloc_lane_cntr + 1;
       end
-      
+
       // Valid allocation for this lane if we can allocate and this lane is
       // requesting allocation
       alloc_val[j] = can_alloc & alloc_rdy[j];
     end
   end
 
-  logic [p_seq_num_bits-1:0] curr_head_ptr_next;
+  logic [p_seq_num_bits:0] curr_head_ptr_next;
 
   always_ff @( posedge clk ) begin
     if( rst ) begin
@@ -174,12 +193,13 @@ module SeqNumGenL5 #(
     curr_head_ptr_next = curr_head_ptr;
 
     // On a squash, head pointer goes to insn after squashed insn
-    if( squash.val ) curr_head_ptr_next = squash.seq_num + 1;
+    // Extend squash.seq_num to (p_seq_num_bits+1) bits to match pointer width
+    if( squash.val ) curr_head_ptr_next = {1'b0, squash.seq_num} + 1;
 
     // If allocating (possibly also during a squash), head pointer moves forward
     // by number of entries allocated (starting from new squash head pointer if
     // squash happens)
-    if( can_alloc  ) curr_head_ptr_next = curr_head_ptr_next + alloc_rdy_cntr;
+    if( can_alloc  ) curr_head_ptr_next = curr_head_ptr_next + p_seq_num_bits'(alloc_rdy_cntr);
   end
 
   //----------------------------------------------------------------------
@@ -218,11 +238,11 @@ module SeqNumGenL5 #(
   generate
     for( i = 0; i < p_reclaim_width; i++ ) begin: RECLAIM_VAL
       if( i == 0 )
-        assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr + i)] == FREE ) &
-                                  (p_seq_num_bits'(i) < entries_allocated[p_seq_num_bits-1:0]);
+        assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr[p_seq_num_bits-1:0] + i)] == FREE ) &
+                                  ((p_seq_num_bits+1)'(i) < entries_allocated                              );
       else
-        assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr + i)] == FREE ) &
-                                  (p_seq_num_bits'(i) < entries_allocated[p_seq_num_bits-1:0]) &
+        assign reclaim_valid[i] = ( seq_num_list[p_seq_num_bits'(curr_tail_ptr[p_seq_num_bits-1:0] + i)] == FREE ) &
+                                  ((p_seq_num_bits+1)'(i) < entries_allocated                              ) &
                                   reclaim_valid[i - 1];
     end
   endgenerate
@@ -243,14 +263,14 @@ module SeqNumGenL5 #(
   endgenerate
 
   // Find the maximum amount to reclaim
-  logic [p_seq_num_bits-1:0] curr_tail_incr;
-  logic [p_seq_num_bits-1:0] curr_tail_incr_arr [p_reclaim_width];
+  logic [p_seq_num_bits:0] curr_tail_incr;
+  logic [p_seq_num_bits:0] curr_tail_incr_arr [p_reclaim_width];
 
   generate
     for( i = 0; i < p_reclaim_width; i++ ) begin: RECLAIM_INCR
       always_comb begin
         if( reclaim_select[i] )
-          curr_tail_incr_arr[i] = p_seq_num_bits'(i + 1);
+          curr_tail_incr_arr[i] = (p_seq_num_bits+1)'(i + 1);
         else
           curr_tail_incr_arr[i] = '0;
       end

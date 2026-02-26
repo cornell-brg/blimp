@@ -29,9 +29,9 @@ module M3RenameTable #(
   // Allocation must be successful on all lanes with alloc_en set in order
   // to continue
   input  logic                  [4:0] alloc_areg   [p_num_fe_lanes],
-  // verilator lint_off UNOPTFLAT
+  /* verilator lint_off UNOPTFLAT */
   output logic [p_phys_addr_bits-1:0] alloc_preg   [p_num_fe_lanes],
-  // verilator lint_on UNOPTFLAT
+  /* verilator lint_on UNOPTFLAT */
   output logic [p_phys_addr_bits-1:0] alloc_ppreg  [p_num_fe_lanes],
   input  logic                        alloc_en     [p_num_fe_lanes],
   output logic                        alloc_rdy    [p_num_fe_lanes],
@@ -74,6 +74,17 @@ module M3RenameTable #(
   rt_entry_t rename_table_next [31:1];
   logic      free_list         [p_num_phys_regs-1:1];
   logic      free_list_next    [p_num_phys_regs-1:1];
+  
+  logic [31:1] debug_pending;
+  logic [31:1] debug_pending_next;
+  localparam p_debug_pending_idx_width = $clog2(31);
+  genvar y;
+  generate
+    for( y = 1; y <= 31; y++ ) begin: DEBUG_PENDING
+      assign debug_pending[p_debug_pending_idx_width'(y)] = rename_table[p_debug_pending_idx_width'(y)].pending;
+      assign debug_pending_next[p_debug_pending_idx_width'(y)] = rename_table_next[p_debug_pending_idx_width'(y)].pending;
+    end
+  endgenerate
 
   // ---------------------------------------------------------------------
   // Update Logic
@@ -197,7 +208,7 @@ module M3RenameTable #(
 
             // if allocating preg j on a previous lane, can't select it for this
             // lane
-            if( alloc_en[k] & ( alloc_preg[k] == j ) )
+            if( alloc_areg[k] != 0 && alloc_preg[k] == j )
               preg_alloc_sel_in[j] = 1'b0;
           end
         end
@@ -226,11 +237,21 @@ module M3RenameTable #(
                                               : 0;
       
       // Only allocate on this lane when we have an entry to give and that entry
-      // is not pending
-      assign alloc_rdy[i] = |preg_alloc_sel_in & ( 
-        alloc_areg[i] == 0 || 
-        !rename_table[alloc_areg[i]].pending 
-      );
+      // is not pending, if multiple lanes are allocating the same areg then
+      // choose oldest one
+      logic is_dup_areg;
+      always_comb begin
+        is_dup_areg = 1'b0;
+        for( int k = 0; k < i; k++ ) begin: DUP_AREG
+          if( ( alloc_areg[k] != 0 ) & ( alloc_areg[k] == alloc_areg[i] ) )
+            is_dup_areg = 1'b1;
+        end
+      end
+
+      assign alloc_rdy[i] = |preg_alloc_sel_in & (
+        alloc_areg[i] == 0 ||
+        !rename_table[alloc_areg[i]].pending
+      ) & !is_dup_areg;
     end
   endgenerate
 
@@ -275,8 +296,8 @@ module M3RenameTable #(
           else begin
             lookup_iq_pending[k][l] = '0;
             for ( int m = 1; m < 32; m++ ) begin: LOOKUP_PENDING_SEARCH
-              if( lookup_iq_preg[k][l] == rename_table[m].preg ) begin
-                lookup_iq_pending[k][l] = rename_table[m].pending;
+              if( lookup_iq_preg[k][l] == rename_table_next[m].preg ) begin
+                lookup_iq_pending[k][l] = rename_table_next[m].pending;
               end
             end
           end
@@ -296,7 +317,7 @@ module M3RenameTable #(
         end else begin
           lookup_new_inst_preg[k][l] = rename_table[lookup_new_inst_areg[k][l]].preg;
           for( int m = 0; m < k; m++ ) begin
-            if( alloc_xfer[m] && 
+            if( alloc_rdy[m] && 
                 alloc_areg[m] == lookup_new_inst_areg[k][l]) begin
               lookup_new_inst_preg[k][l] = alloc_preg[m];
             end

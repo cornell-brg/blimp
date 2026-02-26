@@ -72,7 +72,7 @@ module SlotsPE #(
   parameter p_slot_bits = 4
 ) (
   input  logic [p_num_pipes-1:0] req,
-  input  logic [p_slot_bits-1:0] slots [p_num_pipes],
+  input  logic [p_slot_bits:0]   slots [p_num_pipes],
   output logic [p_num_pipes-1:0] gnt,
   output logic                   any_gnt
 );
@@ -108,22 +108,23 @@ module InstXbarIQ #(
   parameter p_num_input_lanes                          = 2,
   parameter p_input_lanes_bits                         = p_num_input_lanes > 1 ? $clog2(p_num_input_lanes) : 1,
   parameter p_iq_depth                                 = 8,
+  parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
   parameter p_seq_num_bits                             = 8,
   parameter p_num_iter                                 = 2,  // Number of iSLIP iterations,
   parameter p_num_be_lanes                             = 2
 ) (
-  input  logic                           clk,
-  input  logic                           rst,
-  input  rv_uop                          uop            [p_num_input_lanes],
-  input  logic [p_seq_num_bits-1:0]      seq_num        [p_num_input_lanes],
-  input  logic                           val            [p_num_input_lanes],
+  input  logic                          clk,
+  input  logic                          rst,
+  input  rv_uop                         uop            [p_num_input_lanes],
+  input  logic [p_seq_num_bits-1:0]     seq_num        [p_num_input_lanes],
+  input  logic                          val            [p_num_input_lanes],
 
-  input  logic                           iq_rdy         [p_num_pipes],
-  input  logic [$clog2(p_iq_depth):0]    iq_avail_slots [p_num_pipes],
+  input  logic                          iq_rdy         [p_num_pipes],
+  input  logic [p_iq_entries_bits:0]    iq_avail_slots [p_num_pipes],
 
   output logic [p_input_lanes_bits-1:0] iq_route_idx   [p_num_pipes],
-  output logic                           iq_val         [p_num_pipes],
-  output logic                           xfer           [p_num_input_lanes],
+  output logic                          iq_val         [p_num_pipes],
+  output logic                          xfer           [p_num_input_lanes],
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
@@ -144,42 +145,42 @@ module InstXbarIQ #(
         always_comb begin
           val_uop[i][j] = 0;
 
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_ADD_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_ADD    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SUB_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SUB    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_AND_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_AND    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_OR_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_OR     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_XOR_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_XOR    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SLT_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SLT    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SLTU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_SLTU   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SRA_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SRA    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SRL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SRL    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SLL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SLL    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LUI_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LUI    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_AUIPC_VEC  ) ) val_uop[i][j] |= ( uop[i] == OP_AUIPC  );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LB_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LB     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LH_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LH     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LW_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LW     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LBU_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LBU    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_LHU_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LHU    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SB_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SB     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SH_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SH     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_SW_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SW     );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_JAL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_JAL    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_JALR_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_JALR   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BEQ_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BEQ    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BNE_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BNE    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BLT_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BLT    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BGE_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BGE    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BLTU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_BLTU   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_BGEU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_BGEU   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_MUL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_MUL    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_MULH_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_MULH   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_MULHSU_VEC ) ) val_uop[i][j] |= ( uop[i] == OP_MULHSU );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_MULHU_VEC  ) ) val_uop[i][j] |= ( uop[i] == OP_MULHU  );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_DIV_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_DIV    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_DIVU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_DIVU   );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_REM_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_REM    );
-          if( in_subset(p_pipe_subsets[p_num_pipes-j-1], OP_REMU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_REMU   );
+          if( in_subset(p_pipe_subsets[j], OP_ADD_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_ADD    );
+          if( in_subset(p_pipe_subsets[j], OP_SUB_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SUB    );
+          if( in_subset(p_pipe_subsets[j], OP_AND_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_AND    );
+          if( in_subset(p_pipe_subsets[j], OP_OR_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_OR     );
+          if( in_subset(p_pipe_subsets[j], OP_XOR_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_XOR    );
+          if( in_subset(p_pipe_subsets[j], OP_SLT_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SLT    );
+          if( in_subset(p_pipe_subsets[j], OP_SLTU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_SLTU   );
+          if( in_subset(p_pipe_subsets[j], OP_SRA_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SRA    );
+          if( in_subset(p_pipe_subsets[j], OP_SRL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SRL    );
+          if( in_subset(p_pipe_subsets[j], OP_SLL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_SLL    );
+          if( in_subset(p_pipe_subsets[j], OP_LUI_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LUI    );
+          if( in_subset(p_pipe_subsets[j], OP_AUIPC_VEC  ) ) val_uop[i][j] |= ( uop[i] == OP_AUIPC  );
+          if( in_subset(p_pipe_subsets[j], OP_LB_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LB     );
+          if( in_subset(p_pipe_subsets[j], OP_LH_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LH     );
+          if( in_subset(p_pipe_subsets[j], OP_LW_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_LW     );
+          if( in_subset(p_pipe_subsets[j], OP_LBU_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LBU    );
+          if( in_subset(p_pipe_subsets[j], OP_LHU_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_LHU    );
+          if( in_subset(p_pipe_subsets[j], OP_SB_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SB     );
+          if( in_subset(p_pipe_subsets[j], OP_SH_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SH     );
+          if( in_subset(p_pipe_subsets[j], OP_SW_VEC     ) ) val_uop[i][j] |= ( uop[i] == OP_SW     );
+          if( in_subset(p_pipe_subsets[j], OP_JAL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_JAL    );
+          if( in_subset(p_pipe_subsets[j], OP_JALR_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_JALR   );
+          if( in_subset(p_pipe_subsets[j], OP_BEQ_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BEQ    );
+          if( in_subset(p_pipe_subsets[j], OP_BNE_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BNE    );
+          if( in_subset(p_pipe_subsets[j], OP_BLT_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BLT    );
+          if( in_subset(p_pipe_subsets[j], OP_BGE_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_BGE    );
+          if( in_subset(p_pipe_subsets[j], OP_BLTU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_BLTU   );
+          if( in_subset(p_pipe_subsets[j], OP_BGEU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_BGEU   );
+          if( in_subset(p_pipe_subsets[j], OP_MUL_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_MUL    );
+          if( in_subset(p_pipe_subsets[j], OP_MULH_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_MULH   );
+          if( in_subset(p_pipe_subsets[j], OP_MULHSU_VEC ) ) val_uop[i][j] |= ( uop[i] == OP_MULHSU );
+          if( in_subset(p_pipe_subsets[j], OP_MULHU_VEC  ) ) val_uop[i][j] |= ( uop[i] == OP_MULHU  );
+          if( in_subset(p_pipe_subsets[j], OP_DIV_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_DIV    );
+          if( in_subset(p_pipe_subsets[j], OP_DIVU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_DIVU   );
+          if( in_subset(p_pipe_subsets[j], OP_REM_VEC    ) ) val_uop[i][j] |= ( uop[i] == OP_REM    );
+          if( in_subset(p_pipe_subsets[j], OP_REMU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_REMU   );
         end
 
         assign iq_compat_op[i][j] = val_uop[i][j] & val[i] & iq_rdy[j] & (iq_avail_slots[j] > 0);
@@ -194,18 +195,18 @@ module InstXbarIQ #(
   // Per-iteration signals
   logic [p_num_input_lanes-1:0] g_req    [p_num_iter][p_num_pipes];
   logic [p_num_input_lanes-1:0] g_result [p_num_iter][p_num_pipes];
-  logic             g_any     [p_num_iter][p_num_pipes];
+  logic                         g_any     [p_num_iter][p_num_pipes];
 
-  logic [p_num_pipes-1:0]        a_req    [p_num_iter][p_num_input_lanes];
-  logic [p_num_pipes-1:0]        a_result [p_num_iter][p_num_input_lanes];
-  logic             a_any     [p_num_iter][p_num_input_lanes];
+  logic [p_num_pipes-1:0] a_req    [p_num_iter][p_num_input_lanes];
+  logic [p_num_pipes-1:0] a_result [p_num_iter][p_num_input_lanes];
+  logic                   a_any    [p_num_iter][p_num_input_lanes];
 
   /* verilator lint_off UNOPTFLAT */
-  logic             input_free  [p_num_iter+1][p_num_input_lanes];
-  logic             output_free [p_num_iter+1][p_num_pipes];
+  logic input_free  [p_num_iter+1][p_num_input_lanes];
+  logic output_free [p_num_iter+1][p_num_pipes];
   /* verilator lint_on UNOPTFLAT */
 
-  logic             match [p_num_iter][p_num_input_lanes][p_num_pipes];
+  logic match [p_num_iter][p_num_input_lanes][p_num_pipes];
 
   // All ports free at iteration 0
   generate
@@ -256,7 +257,7 @@ module InstXbarIQ #(
         // Accept from output with most available slots
         SlotsPE #(
           .p_num_pipes (p_num_pipes),
-          .p_slot_bits ($clog2(p_iq_depth) + 1)
+          .p_slot_bits (p_iq_entries_bits)
         ) u_accept_slot_enc (
           .req    (a_req[it][i]),
           .slots  (iq_avail_slots),
@@ -323,6 +324,9 @@ module InstXbarIQ #(
         end
       end
     end
+  end
+
+  always_comb begin
 
     // Generate transfer signals
     for (int ii = 0; ii < p_num_input_lanes; ii++) begin

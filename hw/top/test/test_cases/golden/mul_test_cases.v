@@ -15,13 +15,13 @@ task test_case_golden_mul_1_regs();
   // Write assembly program into memory
 
   h.asm( 'h200, "addi x1,  x0,  0x01" );
-  h.asm( 'h204, "addi x2,  x0,  0x02" );
+  h.asm( 'h204, "addi x2,  x0,  0x02" ); // x2 = 2
   h.asm( 'h208, "addi x3,  x0,  0x03" );
   h.asm( 'h20c, "addi x4,  x0,  0x04" );
 
   h.asm( 'h210, "mul  x1,  x2,  x3"   );
-  h.asm( 'h214, "mul  x2,  x3,  x4"   );
-  h.asm( 'h218, "mul  x3,  x4,  x1"   );
+  h.asm( 'h214, "mul  x2,  x3,  x4"   ); // x2 = 3*4 = 12
+  h.asm( 'h218, "mul  x3,  x4,  x1"   ); // x3 = 4*6 = 24
   h.asm( 'h21c, "mul  x4,  x1,  x2"   );
 
   h.asm( 'h220, "addi x28, x0,  0x24" );
@@ -29,16 +29,16 @@ task test_case_golden_mul_1_regs();
   h.asm( 'h228, "addi x30, x0,  0x26" );
   h.asm( 'h22c, "addi x31, x0,  0x27" );
 
-  h.asm( 'h230, "mul  x28, x29, x30"  );
+  h.asm( 'h230, "mul  x28, x29, x30"  ); // x28 = 0x25*0x26 = 0x5ca
   h.asm( 'h234, "mul  x29, x30, x31"  );
   h.asm( 'h238, "mul  x30, x31, x28"  );
   h.asm( 'h23c, "mul  x31, x28, x29"  );
 
-  h.asm( 'h240, "mul  x1,  x2,  x2"   );
+  h.asm( 'h240, "mul  x1,  x2,  x2"   ); // x1 = 12*12 = 144
   h.asm( 'h244, "mul  x2,  x2,  x3"   );
   h.asm( 'h248, "mul  x3,  x3,  x3"   );
 
-  h.asm( 'h24c, "addi x1,  x1,  0"    );
+  h.asm( 'h24c, "addi x1,  x1,  0"    ); // x1 = 144
   h.asm( 'h250, "addi x2,  x2,  0"    );
   h.asm( 'h254, "addi x3,  x3,  0"    );
 
