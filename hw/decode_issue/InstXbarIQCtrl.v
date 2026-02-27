@@ -1,14 +1,15 @@
 //========================================================================
-// InstXbarIQ.v
+// InstXbarIQCtrl.v
 //========================================================================
-// A crossbar scheduler for routing multiple instructions from front-end
-// lanes to issue queues. Uses a modified iSLIP algorithm with:
-//   - Age-based priority for inputs (oldest instruction first)
-//   - Slot-based priority for outputs (pipe with most available slots first)
-//   - Multiple iterations for improved matching efficiency
+// A crossbar scheduler for routing instructions from front-end lanes to
+// issue queues with dedicated control instruction routing. Control
+// instructions (matching p_ctrl_subset) are routed directly to the
+// single output pipe whose p_pipe_subset matches p_ctrl_subset, using
+// age-based priority and without depending on iq_rdy. Non-control
+// instructions use the standard modified iSLIP algorithm.
 
-`ifndef HW_DECODE_INSTXBARIQ_V
-`define HW_DECODE_INSTXBARIQ_V
+`ifndef HW_DECODE_INSTXBARIQCTRL_V
+`define HW_DECODE_INSTXBARIQCTRL_V
 
 `include "defs/UArch.v"
 `include "hw/util/MSeqAge.v"
@@ -102,15 +103,23 @@ module SlotsPE #(
 
 endmodule
 
-module InstXbarIQ #(
+module InstXbarIQCtrl #(
   parameter p_num_pipes                                = 8,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1},
+  parameter rv_op_vec p_ctrl_subset                    = OP_JAL_VEC  |
+                                                          OP_JALR_VEC |
+                                                          OP_BEQ_VEC  |
+                                                          OP_BNE_VEC  |
+                                                          OP_BLT_VEC  |
+                                                          OP_BGE_VEC  |
+                                                          OP_BLTU_VEC |
+                                                          OP_BGEU_VEC,
   parameter p_num_input_lanes                          = 2,
   parameter p_input_lanes_bits                         = p_num_input_lanes > 1 ? $clog2(p_num_input_lanes) : 1,
   parameter p_iq_depth                                 = 8,
   parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
   parameter p_seq_num_bits                             = 8,
-  parameter p_num_iter                                 = 2,  // Number of iSLIP iterations,
+  parameter p_num_iter                                 = 2,  // Number of iSLIP iterations
   parameter p_num_be_lanes                             = 2
 ) (
   input  logic                          clk,
@@ -124,13 +133,63 @@ module InstXbarIQ #(
 
   output logic [p_input_lanes_bits-1:0] iq_route_idx   [p_num_pipes],
   output logic                          iq_val         [p_num_pipes],
-  // output logic                          xfer           [p_num_input_lanes],
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
 
   //----------------------------------------------------------------------
-  // Compute opcode compatibility matrix
+  // Detect control instructions on each input
+  //----------------------------------------------------------------------
+
+  logic is_ctrl [p_num_input_lanes];
+
+  always_comb begin
+    for (int ii = 0; ii < p_num_input_lanes; ii++) begin
+      is_ctrl[ii] = in_subset(p_ctrl_subset, num_ops'(1 << uop[ii]));
+    end
+  end
+
+  //----------------------------------------------------------------------
+  // Control instruction routing (age-based, no iq_rdy dependency)
+  //----------------------------------------------------------------------
+
+  logic [p_num_input_lanes-1:0] ctrl_req_vec;
+
+  always_comb begin
+    for (int ii = 0; ii < p_num_input_lanes; ii++) begin
+      ctrl_req_vec[ii] = val[ii] & is_ctrl[ii];
+    end
+  end
+
+  logic [p_num_input_lanes-1:0] ctrl_gnt;
+  logic                         ctrl_any_gnt;
+
+  AgePE #(
+    .p_num_input_lanes (p_num_input_lanes),
+    .p_seq_num_bits    (p_seq_num_bits),
+    .p_num_be_lanes    (p_num_be_lanes)
+  ) u_ctrl_age (
+    .clk     (clk),
+    .rst     (rst),
+    .req     (ctrl_req_vec),
+    .age     (seq_num),
+    .gnt     (ctrl_gnt),
+    .any_gnt (ctrl_any_gnt),
+    .commit  (commit)
+  );
+
+  logic [p_input_lanes_bits-1:0] ctrl_route_idx;
+
+  always_comb begin
+    ctrl_route_idx = '0;
+    for (int ii = 0; ii < p_num_input_lanes; ii++) begin
+      if (ctrl_gnt[ii])
+        ctrl_route_idx = (p_input_lanes_bits)'(ii);
+    end
+  end
+
+  //----------------------------------------------------------------------
+  // Compute opcode compatibility matrix (non-control path only)
   //----------------------------------------------------------------------
 
   logic iq_compat_op [p_num_input_lanes][p_num_pipes];
@@ -183,13 +242,19 @@ module InstXbarIQ #(
           if( in_subset(p_pipe_subsets[j], OP_REMU_VEC   ) ) val_uop[i][j] |= ( uop[i] == OP_REMU   );
         end
 
-        assign iq_compat_op[i][j] = val_uop[i][j] & val[i] & iq_rdy[j] & (iq_avail_slots[j] > 0);
+        // Ctrl pipe: excluded from iSLIP (compat always 0)
+        // Non-ctrl pipes: exclude control instructions
+        if (p_pipe_subsets[j] == p_ctrl_subset) begin : gen_ctrl_compat
+          assign iq_compat_op[i][j] = 1'b0;
+        end else begin : gen_non_ctrl_compat
+          assign iq_compat_op[i][j] = val_uop[i][j] & val[i] & !is_ctrl[i] & iq_rdy[j] & (iq_avail_slots[j] > 0);
+        end
       end
     end
   endgenerate
 
   //----------------------------------------------------------------------
-  // Modified iSLIP matching algorithm (combinational)
+  // Modified iSLIP matching algorithm (non-control instructions)
   //----------------------------------------------------------------------
 
   // Per-iteration signals
@@ -314,29 +379,27 @@ module InstXbarIQ #(
 
     // Generate output signals
     for (int jj = 0; jj < p_num_pipes; jj++) begin
-      iq_val[jj] = 1'b0;
-      iq_route_idx[jj] = '0;
 
-      for (int ii = 0; ii < p_num_input_lanes; ii++) begin
-        if (final_match[ii][jj]) begin
-          iq_val[jj] = 1'b1;
-          iq_route_idx[jj] = (p_input_lanes_bits)'(ii);
+      // Ctrl pipe: route oldest control instruction, no iq_rdy dependency
+      if (p_pipe_subsets[jj] == p_ctrl_subset) begin
+        iq_val[jj]       = ctrl_any_gnt;
+        iq_route_idx[jj] = ctrl_route_idx;
+
+      // Non-ctrl pipes: use iSLIP results
+      end else begin
+        iq_val[jj] = 1'b0;
+        iq_route_idx[jj] = '0;
+
+        for (int ii = 0; ii < p_num_input_lanes; ii++) begin
+          if (final_match[ii][jj]) begin
+            iq_val[jj] = 1'b1;
+            iq_route_idx[jj] = (p_input_lanes_bits)'(ii);
+          end
         end
       end
     end
   end
 
-  // always_comb begin
-
-  //   // Generate transfer signals
-  //   for (int ii = 0; ii < p_num_input_lanes; ii++) begin
-  //     xfer[ii] = 1'b0;
-  //     for (int jj = 0; jj < p_num_pipes; jj++) begin
-  //       xfer[ii] |= final_match[ii][jj];
-  //     end
-  //   end
-  // end
-
 endmodule
 
-`endif // HW_DECODE_INSTXBARIQ_V
+`endif // HW_DECODE_INSTXBARIQCTRL_V

@@ -34,6 +34,7 @@ module M3RenameTable #(
   /* verilator lint_on UNOPTFLAT */
   output logic [p_phys_addr_bits-1:0] alloc_ppreg  [p_num_fe_lanes],
   input  logic                        alloc_en     [p_num_fe_lanes],
+  input  logic                        alloc_commit [p_num_fe_lanes],
   output logic                        alloc_rdy    [p_num_fe_lanes],
 
   // ---------------------------------------------------------------------
@@ -60,6 +61,7 @@ module M3RenameTable #(
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
+  localparam p_num_fe_lanes_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
 
   // ---------------------------------------------------------------------
   // Data Structures
@@ -114,10 +116,13 @@ module M3RenameTable #(
   genvar i;
   generate
     for( i = 1; i < 32; i = i + 1 ) begin: RENAME_UPDATE
+      logic do_commit_rename_reg;
+      logic [p_num_fe_lanes_idx_bits-1:0] do_commit_rename_lane;
+
       always_ff @( posedge clk ) begin
         if( rst ) begin
           rename_table[i] <= '{pending: 1'b0, preg: p_phys_addr_bits'(i)};
-        end else begin
+        end else if( got_complete_pend[i] || (do_commit_rename_reg && alloc_commit[do_commit_rename_lane]) ) begin
           rename_table[i] <= rename_table_next[i];
         end
       end
@@ -138,10 +143,14 @@ module M3RenameTable #(
           rename_table_next[i].pending = 1'b0;
 
         // We just allocated this areg (i), so update preg and set pending
+        do_commit_rename_reg = 1'b0;
+        do_commit_rename_lane = '0;
         for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_UPDATE
           if( alloc_xfer[j] & ( alloc_areg[j] == i )) begin
             rename_table_next[i].pending = 1'b1;
             rename_table_next[i].preg    = alloc_preg[j];
+            do_commit_rename_reg = 1'b1;
+            do_commit_rename_lane = p_num_fe_lanes_idx_bits'(j);
           end
         end
       end
@@ -150,13 +159,16 @@ module M3RenameTable #(
 
   generate
     for( i = 1; i < p_num_phys_regs; i++ ) begin: FREE_UPDATE
+      logic do_commit_free_reg;
+      logic [p_num_fe_lanes_idx_bits-1:0] do_commit_free_lane;
+
       always_ff @( posedge clk ) begin
         if( rst ) begin
           if( i < 32 )
             free_list[i] <= 1'b0;
           else
             free_list[i] <= 1'b1;
-        end else begin
+        end else if( got_free[i] || (do_commit_free_reg && alloc_commit[do_commit_free_lane]) ) begin
           free_list[i] <= free_list_next[i];
         end
       end
@@ -178,9 +190,14 @@ module M3RenameTable #(
 
         // The preg (i) that was just allocated on some lane is no longer free,
         // so remove it from the free list
+        do_commit_free_reg = 1'b0;
+        do_commit_free_lane = '0;
         for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_FREE
-          if( alloc_xfer[j] & ( alloc_preg[j] == i ) )
+          if( alloc_xfer[j] & ( alloc_preg[j] == i ) ) begin
             free_list_next[i] = 1'b0;
+            do_commit_free_reg = 1'b1;
+            do_commit_free_lane = p_num_fe_lanes_idx_bits'(j);
+          end
         end
       end
     end
