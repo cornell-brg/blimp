@@ -241,7 +241,7 @@ module FetchUnitL5
     
     // If we are waiting to do a squash restart and we are transferring on this
     // cycle, then we know we are doing the restart on this cycle and can reset
-    else if( do_squash_restart_reg & D_xfer_all )
+    else if( (do_squash_restart_reg | do_squash_restart) & D_xfer_all )
       do_squash_restart_reg <= 1'b0;
 
     // Only update if we are not waiting for a squash restart to occur
@@ -372,7 +372,14 @@ module FetchUnitL5
   always_comb begin
     alloc_ok_all = 1'b1;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      alloc_ok_all &= alloc_ok[j];
+      if( (do_squash_restart | do_squash_restart_reg) ) begin
+        if( p_lane_idx_bits'(j) >= squash_restart_offset )
+          alloc_ok_all &= alloc_ok[j];
+        else
+          alloc_ok_all &= 1'b1;
+      end else begin
+        alloc_ok_all &= alloc_ok[j];
+      end
     end
   end
 
@@ -383,8 +390,6 @@ module FetchUnitL5
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: RESP_LANE
 
-      // If requesting allocation on this lane, then we need to have a valid
-      // allocation, otherwise fine
       assign alloc_ok[i] = alloc_rdy[i] & alloc_val[i];
 
       assign fifo_wdata[i].op   = mem_resp_msg_op[i];
@@ -393,15 +398,21 @@ module FetchUnitL5
       assign fifo_wdata[i].data = mem_resp_msg_data[i];
 
       assign mem_resp_rdy[i] = !resp_full;
-      assign D_val[i]        = !resp_empty & alloc_ok[i] & !should_drop;
 
       always_comb begin
-        if( do_squash_restart | do_squash_restart_reg) begin
-          D_insn_valid[i] = !resp_empty & i >= squash_restart_offset;
-          alloc_rdy[i]    = !resp_empty & D_rdy[i] & i >= squash_restart_offset;
+        if( (do_squash_restart | do_squash_restart_reg) ) begin
+          D_insn_valid[i] = !resp_empty & (i >= squash_restart_offset);
+          alloc_rdy[i]    = !resp_empty & D_rdy[i] & (i >= squash_restart_offset);
+          /* verilator lint_off CMPCONST */
+          if( p_lane_idx_bits'(i) >= squash_restart_offset )
+            D_val[i]        = !resp_empty & alloc_ok[i];
+          else
+            D_val[i]        = !resp_empty;
+          /* verilator lint_on CMPCONST */
         end else begin
           D_insn_valid[i] = !resp_empty & !should_drop;
           alloc_rdy[i]    = !resp_empty & D_rdy[i] & !should_drop;
+          D_val[i]        = !resp_empty & alloc_ok[i] & !should_drop;
         end
       end
 

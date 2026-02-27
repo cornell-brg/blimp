@@ -75,7 +75,6 @@ module SeqNumGenL5 #(
   localparam FREE  = 1'b0;
 
   logic seq_num_list [p_num_entries];
-  // Use one extra bit for head/tail pointers to distinguish full from empty
   logic [p_seq_num_bits:0] curr_head_ptr, curr_tail_ptr;
   logic is_alloc [p_num_fe_lanes];
   logic [p_num_be_lanes-1:0] is_free;
@@ -91,7 +90,7 @@ module SeqNumGenL5 #(
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
           for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-            if( alloc_val[j] & ( p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + j) == i ) )
+            if( alloc_val[j] & ( alloc_seq_num[j] == i ) )
               seq_num_list[i] <= ALLOC;
           end
 
@@ -194,7 +193,7 @@ module SeqNumGenL5 #(
 
     // On a squash, head pointer goes to insn after squashed insn
     // Extend squash.seq_num to (p_seq_num_bits+1) bits to match pointer width
-    if( squash.val ) curr_head_ptr_next = {1'b0, squash.seq_num} + 1;
+    if( squash.val ) curr_head_ptr_next = squash.seq_num + 1;
 
     // If allocating (possibly also during a squash), head pointer moves forward
     // by number of entries allocated (starting from new squash head pointer if
