@@ -560,7 +560,9 @@ module DecodeIssueUnitL8 #(
       if( F_reg[i].val && F_reg[i].insn_valid && decoder_val[i] ) begin
         if( oldest_ctrl_insn_found ) begin
           iq_ins_en[i] = lane_val[i] && 
-                         oldest_ctrl_insn_srcs_ready && 
+                         ((p_fe_lane_idx_bits'(i) == oldest_ctrl_insn_idx 
+                            && oldest_ctrl_insn_srcs_ready) || 
+                           p_fe_lane_idx_bits'(i) < oldest_ctrl_insn_idx) && 
                          alloc_rdy_prev_lanes && 
                          iq_xfer_prev_lanes && 
                          (seq_age.is_older(
