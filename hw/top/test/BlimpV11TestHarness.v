@@ -11,7 +11,6 @@
 `include "intf/MemIntf.v"
 `include "intf/InstTraceNotif.v"
 `include "test/fl/MemIntfTestServer.v"
-`include "test/fl/MemIntfTestServer_MPort.v"
 `include "test/fl/InstMTraceSub.v"
 `include "fl/fl_vtrace.v"
 
@@ -41,13 +40,17 @@ module BlimpV11TestHarness #(
   `MEM_REQ_DEFINE ( p_opaq_bits );
   `MEM_RESP_DEFINE( p_opaq_bits );
 
+  `MEM_REQ_DEFINE_SS ( p_opaq_bits, p_num_fe_lanes );
+  `MEM_RESP_DEFINE_SS( p_opaq_bits, p_num_fe_lanes );
+
   //----------------------------------------------------------------------
   // Instantiate design under test
   //----------------------------------------------------------------------
 
   MemIntf #(
-    .p_opaq_bits (p_opaq_bits)
-  ) imem_intf[p_num_fe_lanes]();
+    .p_opaq_bits (p_opaq_bits),
+    .p_num_words (p_num_fe_lanes)
+  ) imem_intf();
 
   MemIntf #(
     .p_opaq_bits (p_opaq_bits)
@@ -73,13 +76,13 @@ module BlimpV11TestHarness #(
   // FL Memory
   //----------------------------------------------------------------------
 
-  MemIntfTestServer_MPort #(
-    .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
-    .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
-    .p_num_ports       (p_num_fe_lanes),
+  MemIntfTestServer #(
+    .t_req_msg         (`MEM_REQ_SS ( p_opaq_bits, p_num_fe_lanes )),
+    .t_resp_msg        (`MEM_RESP_SS( p_opaq_bits, p_num_fe_lanes )),
     .p_send_intv_delay (p_mem_send_intv_delay),
     .p_recv_intv_delay (p_mem_recv_intv_delay),
-    .p_opaq_bits       (p_opaq_bits)
+    .p_opaq_bits       (p_opaq_bits),
+    .p_num_words       (p_num_fe_lanes)
   ) fl_imem (
     .dut (imem_intf),
     .*
@@ -97,7 +100,7 @@ module BlimpV11TestHarness #(
   );
 
   logic [31:0] asm_binary;
-  
+
   task asm(
     input logic [31:0] addr,
     input string       inst
@@ -169,7 +172,7 @@ module BlimpV11TestHarness #(
     while( 1 ) begin
       check_traces_success = fl_trace( check_traces_fl_trace );
       if( !check_traces_success ) return;
-      
+
       inst_trace_sub.check_trace(
         check_traces_fl_trace.pc,
         check_traces_fl_trace.waddr,
@@ -190,7 +193,7 @@ module BlimpV11TestHarness #(
     #2;
     trace = "";
 
-    // trace = {trace, fl_mem.trace( t.trace_level )};
+    // trace = {trace, fl_imem.trace( t.trace_level )};
     // trace = {trace, " || "};
     // trace = {trace, dut.trace( t.trace_level )};
     // trace = {trace, " || "};

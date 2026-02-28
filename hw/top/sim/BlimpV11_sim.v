@@ -8,8 +8,7 @@
 `include "hw/top/sim/utils/SimUtils.v"
 `include "intf/MemIntf.v"
 `include "intf/InstTraceNotif.v"
-`include "test/fl/MemIntfTestServer_2Port.v"
-`include "test/fl/MemIntfTestServer_MPort.v"
+`include "test/fl/MemIntfTestServer.v"
 
 import "DPI-C" context function void load_elf ( string elf_file );
 
@@ -35,17 +34,21 @@ module BlimpV11_sim;
   `MEM_REQ_DEFINE ( p_opaq_bits );
   `MEM_RESP_DEFINE( p_opaq_bits );
 
+  `MEM_REQ_DEFINE_SS ( p_opaq_bits, p_num_fe_lanes );
+  `MEM_RESP_DEFINE_SS( p_opaq_bits, p_num_fe_lanes );
+
   //----------------------------------------------------------------------
   // Instantiate processor
   //----------------------------------------------------------------------
 
   MemIntf #(
-    .p_opaq_bits (p_opaq_bits)
-  ) imem_intf[p_num_fe_lanes]();
+    .p_opaq_bits (p_opaq_bits),
+    .p_num_words (p_num_fe_lanes)
+  ) imem_intf();
 
   MemIntf #(
     .p_opaq_bits (p_opaq_bits)
-  ) dmem_intf[2]();
+  ) dmem_intf();
 
   InstTraceNotif inst_trace_notif [p_num_be_lanes]();
 
@@ -58,7 +61,7 @@ module BlimpV11_sim;
     .p_iq_depth      (p_iq_depth)
   ) dut (
     .inst_mem   (imem_intf),
-    .data_mem   (dmem_intf[0]),
+    .data_mem   (dmem_intf),
     .inst_trace (inst_trace_notif),
     .*
   );
@@ -98,19 +101,19 @@ module BlimpV11_sim;
   // FL Memory
   //----------------------------------------------------------------------
 
-  MemIntfTestServer_MPort #(
-    .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
-    .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
-    .p_num_ports       (p_num_fe_lanes),
+  MemIntfTestServer #(
+    .t_req_msg         (`MEM_REQ_SS ( p_opaq_bits, p_num_fe_lanes )),
+    .t_resp_msg        (`MEM_RESP_SS( p_opaq_bits, p_num_fe_lanes )),
     .p_send_intv_delay ( 1 ),
     .p_recv_intv_delay ( 1 ),
-    .p_opaq_bits       (p_opaq_bits)
+    .p_opaq_bits       (p_opaq_bits),
+    .p_num_words       (p_num_fe_lanes)
   ) fl_imem (
     .dut (imem_intf),
     .*
   );
 
-  MemIntfTestServer_2Port #(
+  MemIntfTestServer #(
     .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
     .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
     .p_send_intv_delay ( 1 ),

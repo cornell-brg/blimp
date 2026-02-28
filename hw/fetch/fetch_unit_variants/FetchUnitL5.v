@@ -2,7 +2,8 @@
 // FetchUnitL5.v
 //========================================================================
 // A basic modular fetch unit for fetching instructions with squashing
-// and support for superscalar backend
+// and support for superscalar backend. Uses a single wide memory
+// interface; the response data is unpacked into p_num_fe_lanes items.
 
 `ifndef HW_FETCH_FETCHUNITVARIANTS_FETCHUNITL5_V
 `define HW_FETCH_FETCHUNITVARIANTS_FETCHUNITL5_V
@@ -26,10 +27,10 @@ module FetchUnitL5
   input  logic    rst,
 
   //----------------------------------------------------------------------
-  // Memory Interface
+  // Memory Interface (single wide port)
   //----------------------------------------------------------------------
 
-  MemIntf.client mem [p_num_fe_lanes],
+  MemIntf.client mem,
 
   //----------------------------------------------------------------------
   // F <-> D Interface
@@ -66,27 +67,10 @@ module FetchUnitL5
   assign target_offset_bm = {{(32-$clog2(p_num_fe_lanes)){1'b0}}, {$clog2(p_num_fe_lanes){1'b1}}};
 
   //----------------------------------------------------------------------
-  // Interface Signal Arrays
+  // D Interface Signal Arrays
   //----------------------------------------------------------------------
 
   genvar i;
-
-  // Memory request signals (driven by this module)
-  logic        mem_req_val      [p_num_fe_lanes];
-  logic [31:0] mem_req_msg_addr [p_num_fe_lanes];
-
-  // Memory request signals (driven by external)
-  logic        mem_req_rdy      [p_num_fe_lanes];
-
-  // Memory response signals (driven by external)
-  logic        mem_resp_val      [p_num_fe_lanes];
-  t_op         mem_resp_msg_op   [p_num_fe_lanes];
-  logic [31:0] mem_resp_msg_addr [p_num_fe_lanes];
-  logic  [3:0] mem_resp_msg_strb [p_num_fe_lanes];
-  logic [31:0] mem_resp_msg_data [p_num_fe_lanes];
-
-  // Memory response signals (driven by this module)
-  logic        mem_resp_rdy      [p_num_fe_lanes];
 
   // D interface signals (driven by this module)
   logic                      D_val        [p_num_fe_lanes];
@@ -99,25 +83,6 @@ module FetchUnitL5
   logic                      D_rdy     [p_num_fe_lanes];
 
   generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: MEM_INTF_CONNECT
-      // Outputs to mem interface
-      assign mem[i].req_val        = mem_req_val[i];
-      assign mem[i].req_msg.addr   = mem_req_msg_addr[i];
-      assign mem[i].req_msg.op     = MEM_MSG_READ;
-      assign mem[i].req_msg.opaque = 'x;
-      assign mem[i].req_msg.strb   = '0;
-      assign mem[i].req_msg.data   = 'x;
-      assign mem[i].resp_rdy       = mem_resp_rdy[i];
-
-      // Inputs from mem interface
-      assign mem_req_rdy[i]       = mem[i].req_rdy;
-      assign mem_resp_val[i]      = mem[i].resp_val;
-      assign mem_resp_msg_op[i]   = mem[i].resp_msg.op;
-      assign mem_resp_msg_addr[i] = mem[i].resp_msg.addr;
-      assign mem_resp_msg_strb[i] = mem[i].resp_msg.strb;
-      assign mem_resp_msg_data[i] = mem[i].resp_msg.data;
-    end
-
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: D_INTF_CONNECT
       // Outputs to D interface
       assign D[i].val        = D_val[i];
@@ -139,28 +104,22 @@ module FetchUnitL5
   // Keep track of the number of in-flight requests
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  // All ports are tied together to keep fetch blocks aligned
-  logic memreq_xfer_all;
-  logic memreq_xfer [p_num_fe_lanes];
-  logic memresp_val_all;
+  logic memreq_xfer;
   logic D_xfer_all;
   logic D_xfer [p_num_fe_lanes];
   logic D_rdy_all;
 
   always_comb begin
-    memreq_xfer_all = 1'b1;
-    memresp_val_all = 1'b1;
-    D_xfer_all      = 1'b1;
-    D_rdy_all       = 1'b1;
+    D_xfer_all = 1'b1;
+    D_rdy_all  = 1'b1;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      memreq_xfer[j]  = mem_req_val[j] & mem_req_rdy[j];
-      memreq_xfer_all &= memreq_xfer[j];
-      memresp_val_all &= mem_resp_val[j];
-      D_xfer[j]       = D_val[j] & D_rdy[j];
-      D_xfer_all      &= D_xfer[j];
-      D_rdy_all       &= D_rdy[j];
+      D_xfer[j]   = D_val[j] & D_rdy[j];
+      D_xfer_all &= D_xfer[j];
+      D_rdy_all  &= D_rdy[j];
     end
   end
+
+  assign memreq_xfer = mem.req_val & mem.req_rdy;
 
   logic [p_flight_bits-1:0] num_in_flight;
   logic [p_flight_bits-1:0] num_in_flight_next;
@@ -183,11 +142,11 @@ module FetchUnitL5
 
     // Add in-flight fetch block (p_num_fe_lanes messages) for each request to
     // imem that goes out (and isn't immediately squashed)
-    if( memreq_xfer_all & (!D_xfer_all | should_drop) )
+    if( memreq_xfer & (!D_xfer_all | should_drop) )
       num_in_flight_next = num_in_flight_next + p_num_fe_lanes;
 
     // response that comes back (and isn't immediately squashed)
-    if( D_xfer_all & !memreq_xfer_all & !should_drop )
+    if( D_xfer_all & !memreq_xfer & !should_drop )
       num_in_flight_next = num_in_flight_next - p_num_fe_lanes;
   end
 
@@ -216,7 +175,7 @@ module FetchUnitL5
       num_to_squash_next = num_to_squash_next + num_in_flight;
 
     // Remove a fetch block from number of instructions to squash as long as
-    // there are insns at the front of all mem resp queues and we actually have
+    // there are insns at the front of the resp fifo and we actually have
     // some to squash
     if( !resp_empty & ( num_to_squash_next > 0 ) )
       num_to_squash_next = num_to_squash_next - p_num_fe_lanes;
@@ -238,7 +197,7 @@ module FetchUnitL5
   always_ff @( posedge clk ) begin
     if( rst )
       do_squash_restart_reg <= 1'b0;
-    
+
     // If we are waiting to do a squash restart and we are transferring on this
     // cycle, then we know we are doing the restart on this cycle and can reset
     else if( (do_squash_restart_reg | do_squash_restart) & D_xfer_all )
@@ -255,44 +214,40 @@ module FetchUnitL5
 
   logic [31:0] curr_fetch_block_base;
   logic [31:0] curr_fetch_block_base_next;
+  logic [31:0] mem_req_addr;
 
   always_ff @( posedge clk ) begin
     if ( rst )
       curr_fetch_block_base <= 32'(p_rst_addr);
-    else if ( squash.val & memreq_xfer_all )
+    else if ( squash.val & memreq_xfer )
       curr_fetch_block_base <= (squash.target & target_base_bm) + (p_num_fe_lanes << 2);
     else if ( squash.val )
       curr_fetch_block_base <= (squash.target & target_base_bm);
-    else if ( memreq_xfer_all )
+    else if ( memreq_xfer )
       curr_fetch_block_base <= curr_fetch_block_base_next;
   end
 
   always_comb begin
-    curr_fetch_block_base_next = mem_req_msg_addr[0] + (p_num_fe_lanes << 2);
+    curr_fetch_block_base_next = mem_req_addr + (p_num_fe_lanes << 2);
   end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  // Determine the correct address to send out
+  // Request signals
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   always_comb begin
-    for (int j = 0; j < p_num_fe_lanes; j++ ) begin
-      if ( squash.val )
-        mem_req_msg_addr[j] = (squash.target & target_base_bm) + 32'(j << 2);
-      else
-        mem_req_msg_addr[j] = curr_fetch_block_base + 32'(j << 2);
-    end
+    if ( squash.val )
+      mem_req_addr = (squash.target & target_base_bm);
+    else
+      mem_req_addr = curr_fetch_block_base;
   end
 
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  // Other request signals
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-  always_comb begin
-    for ( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      mem_req_val[j] = (num_in_flight + num_to_squash < p_max_in_flight);
-    end
-  end
+  assign mem.req_val        = (num_in_flight + num_to_squash < p_max_in_flight);
+  assign mem.req_msg.op     = MEM_MSG_READ;
+  assign mem.req_msg.opaque = 'x;
+  assign mem.req_msg.addr   = mem_req_addr;
+  assign mem.req_msg.strb   = '0;
+  assign mem.req_msg.data   = 'x;
 
   // Get lane index we need to restart valid instructions from after latest
   // squash
@@ -327,34 +282,28 @@ module FetchUnitL5
   );
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  // Other response signals
+  // Response FIFO
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  typedef struct packed {
-    t_op                    op;
-    logic [31:0]            addr;
-    logic [3:0]             strb;
-    logic [31:0]            data;
-  } mem_msg_t;
+  // FIFO stores base address + wide instruction data per fetch block
+  localparam p_fifo_data_bits  = p_num_fe_lanes * 32;
+  localparam p_fifo_entry_bits = 32 + p_fifo_data_bits;
 
   logic resp_push, resp_pop, resp_full;
-  mem_msg_t fifo_rdata [p_num_fe_lanes];
-  mem_msg_t fifo_wdata [p_num_fe_lanes];
+  logic [p_fifo_entry_bits-1:0] fifo_wdata;
+  logic [p_fifo_entry_bits-1:0] fifo_rdata;
 
-  // Pack/unpack unpacked arrays into flat bit vectors for FIFO
-  logic [p_num_fe_lanes*$bits(mem_msg_t)-1:0] fifo_wdata_packed;
-  logic [p_num_fe_lanes*$bits(mem_msg_t)-1:0] fifo_rdata_packed;
+  assign fifo_wdata = {mem.resp_msg.addr, mem.resp_msg.data};
 
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: FIFO_PACK
-      assign fifo_wdata_packed[i*$bits(mem_msg_t) +: $bits(mem_msg_t)] = fifo_wdata[i];
-      assign fifo_rdata[i] = fifo_rdata_packed[i*$bits(mem_msg_t) +: $bits(mem_msg_t)];
-    end
-  endgenerate
+  // Unpack FIFO read data
+  logic [31:0]                 fifo_rdata_addr;
+  logic [p_fifo_data_bits-1:0] fifo_rdata_data;
 
-  // Pack all mem resps into one fifo
+  assign fifo_rdata_addr = fifo_rdata[p_fifo_entry_bits-1 -: 32];
+  assign fifo_rdata_data = fifo_rdata[p_fifo_data_bits-1:0];
+
   Fifo #(
-    .p_entry_bits (p_num_fe_lanes*$bits(mem_msg_t)),
+    .p_entry_bits (p_fifo_entry_bits),
     .p_depth      (8)
   ) resp_fifo (
     .clk   (clk),
@@ -363,9 +312,13 @@ module FetchUnitL5
     .pop   (resp_pop),
     .empty (resp_empty),
     .full  (resp_full),
-    .wdata (fifo_wdata_packed),
-    .rdata (fifo_rdata_packed)
+    .wdata (fifo_wdata),
+    .rdata (fifo_rdata)
   );
+
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  // Other response signals
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   logic alloc_ok [p_num_fe_lanes];
   logic alloc_ok_all;
@@ -383,21 +336,15 @@ module FetchUnitL5
     end
   end
 
-  assign resp_push = memresp_val_all & !resp_full;
-  assign resp_pop  = ((D_rdy_all & alloc_ok_all) | should_drop) & !resp_empty;
+  assign resp_push    = mem.resp_val & !resp_full;
+  assign resp_pop     = ((D_rdy_all & alloc_ok_all) | should_drop) & !resp_empty;
+  assign mem.resp_rdy = !resp_full;
 
-  // Mem resp signals
+  // Per-lane response signals
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: RESP_LANE
 
       assign alloc_ok[i] = alloc_rdy[i] & alloc_val[i];
-
-      assign fifo_wdata[i].op   = mem_resp_msg_op[i];
-      assign fifo_wdata[i].addr = mem_resp_msg_addr[i];
-      assign fifo_wdata[i].strb = mem_resp_msg_strb[i];
-      assign fifo_wdata[i].data = mem_resp_msg_data[i];
-
-      assign mem_resp_rdy[i] = !resp_full;
 
       always_comb begin
         if( (do_squash_restart | do_squash_restart_reg) ) begin
@@ -417,27 +364,22 @@ module FetchUnitL5
       end
 
       always_comb begin
-        D_inst[i]    = fifo_rdata[i].data;
-        D_pc[i]      = fifo_rdata[i].addr;
+        D_inst[i]    = fifo_rdata_data[i*32 +: 32];
+        D_pc[i]      = fifo_rdata_addr + 32'(i << 2);
         D_seq_num[i] = alloc_seq_num[i];
       end
-
-      // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-      // Unused signals
-      // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-      // logic                      unused_resp_op;
-      // logic                [3:0] unused_resp_strb;
-      // logic [p_seq_num_bits-1:0] unused_squash_seq_num;
-
-      // always_comb begin
-      //   unused_resp_op   = fifo_rdata.op;
-      //   unused_resp_strb = fifo_rdata.strb;
-
-      //   unused_squash_seq_num = squash.seq_num;
-      // end
     end
   endgenerate
+
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  // Unused signals
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  logic [p_seq_num_bits-1:0] unused_squash_seq_num;
+
+  always_comb begin
+    unused_squash_seq_num = squash.seq_num;
+  end
 
   //----------------------------------------------------------------------
   // Linetracing

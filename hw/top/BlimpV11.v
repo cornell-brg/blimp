@@ -41,7 +41,7 @@ module BlimpV11 #(
   // Instruction Memory
   //----------------------------------------------------------------------
 
-  MemIntf.client inst_mem [p_num_fe_lanes],
+  MemIntf.client inst_mem,
 
   //----------------------------------------------------------------------
   // Data Memory

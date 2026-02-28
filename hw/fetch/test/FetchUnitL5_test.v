@@ -7,7 +7,7 @@
 `include "intf/F__DIntf.v"
 `include "intf/MemIntf.v"
 `include "intf/SquashNotif.v"
-`include "test/fl/MemIntfTestServer_MPort.v"
+`include "test/fl/MemIntfTestServer.v"
 `include "test/fl/TestOstream.v"
 `include "test/fl/TestPub.v"
 `include "test/fl/TestMPub.v"
@@ -48,16 +48,17 @@ module FetchUnitL5TestSuite #(
   logic clk, rst;
   TestUtils t( .* );
 
-  `MEM_REQ_DEFINE ( p_opaq_bits );
-  `MEM_RESP_DEFINE( p_opaq_bits );
+  `MEM_REQ_DEFINE_SS ( p_opaq_bits, p_num_fe_lanes );
+  `MEM_RESP_DEFINE_SS( p_opaq_bits, p_num_fe_lanes );
 
   //----------------------------------------------------------------------
   // Instantiate design under test
   //----------------------------------------------------------------------
 
   MemIntf #(
-    .p_opaq_bits (p_opaq_bits)
-  ) mem_intf [p_num_fe_lanes] ();
+    .p_opaq_bits (p_opaq_bits),
+    .p_num_words (p_num_fe_lanes)
+  ) mem_intf ();
 
   F__DIntf #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -88,13 +89,13 @@ module FetchUnitL5TestSuite #(
   // FL Memory
   //----------------------------------------------------------------------
 
-  MemIntfTestServer_MPort #(
-    .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
-    .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
+  MemIntfTestServer #(
+    .t_req_msg         (`MEM_REQ_SS ( p_opaq_bits, p_num_fe_lanes )),
+    .t_resp_msg        (`MEM_RESP_SS( p_opaq_bits, p_num_fe_lanes )),
     .p_send_intv_delay (p_mem_send_intv_delay),
     .p_recv_intv_delay (p_mem_recv_intv_delay),
     .p_opaq_bits       (p_opaq_bits),
-    .p_num_ports       (p_num_fe_lanes)
+    .p_num_words       (p_num_fe_lanes)
   ) fl_mem (
     .dut (mem_intf),
     .*
