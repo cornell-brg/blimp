@@ -93,12 +93,12 @@ module DecodeIssueUnitL8 #(
   // Pipeline registers for F interface
   //----------------------------------------------------------------------
 
-  logic [p_fe_lane_idx_bits-1:0]       pipe_to_lane_map   [p_num_pipes];
+  logic [p_fe_lane_idx_bits-1:0] pipe_to_lane_map [p_num_pipes];
   /* verilator lint_off UNOPTFLAT */
-  logic   iq_ins_en [p_num_fe_lanes]; 
+  logic dispatch_en [p_num_fe_lanes]; 
   /* verilator lint_on UNOPTFLAT */
-  logic iq_xfer    [p_num_fe_lanes];
-  logic                        alloc_rdy   [p_num_fe_lanes];
+  logic dispatch_go [p_num_fe_lanes];
+  logic alloc_rdy   [p_num_fe_lanes];
   logic oldest_ctrl_insn_srcs_ready;
 
   typedef struct packed {
@@ -113,13 +113,13 @@ module DecodeIssueUnitL8 #(
   F_input F_reg_next [p_num_fe_lanes];
   logic   F_xfer     [p_num_fe_lanes];
   logic   F_xfer_all;
-  logic                                iq_val         [p_num_pipes];
+  logic   iq_val     [p_num_pipes];
 
   logic F_rdy_all;
   always_comb begin
     F_rdy_all = 1'b1;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      F_rdy_all &= ((!F_reg[j].val | !F_reg[j].insn_valid ? 1'b1 : iq_xfer[j] & alloc_rdy[j]) & oldest_ctrl_insn_srcs_ready);
+      F_rdy_all &= ((!F_reg[j].val | !F_reg[j].insn_valid ? 1'b1 : dispatch_go[j] & alloc_rdy[j]) & oldest_ctrl_insn_srcs_ready);
     end
   end
 
@@ -206,12 +206,12 @@ module DecodeIssueUnitL8 #(
         //   invalidate insn if xfer'd to xbar
         else if (
           (oldest_ctrl_insn_found && (
-            (seq_age.is_older(F_reg[i].seq_num, F_reg[oldest_ctrl_insn_idx].seq_num) && iq_xfer[i]) || 
-            (!oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid && iq_xfer[oldest_ctrl_insn_idx] &&
+            (seq_age.is_older(F_reg[i].seq_num, F_reg[oldest_ctrl_insn_idx].seq_num) && dispatch_go[i]) || 
+            (!oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid && dispatch_go[oldest_ctrl_insn_idx] &&
               !seq_age.is_older(F_reg[oldest_ctrl_insn_idx].seq_num, F_reg[i].seq_num) && i != oldest_ctrl_insn_idx) ||
-            (oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid && iq_xfer[oldest_ctrl_insn_idx] &&
+            (oldest_ctrl_insn_is_brx && F_reg[oldest_ctrl_insn_idx].val && F_reg[oldest_ctrl_insn_idx].insn_valid && dispatch_go[oldest_ctrl_insn_idx] &&
               !seq_age.is_older(F_reg[oldest_ctrl_insn_idx].seq_num, F_reg[i].seq_num))) 
-          ) || squash_sub.val || (!oldest_ctrl_insn_found && iq_xfer[i])
+          ) || squash_sub.val || (!oldest_ctrl_insn_found && dispatch_go[i])
         )
           F_reg_next[i] = '{
             val: 1'b0,
@@ -294,7 +294,7 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      alloc_commit[k] = alloc_en[k] & iq_xfer[k];
+      alloc_commit[k] = alloc_en[k] & dispatch_go[k];
     end
   end
 
@@ -498,21 +498,21 @@ module DecodeIssueUnitL8 #(
     end
   end
 
-  // Squash-free iq_xfer check for lanes before the JAL, used to break the
-  // combinational loop: iq_xfer -> squash_pub -> squash_sub -> iq_ins_en -> iq_xfer
-  logic iq_xfer_upto_jal;
+  // Squash-free dispatch_go check for lanes before the JAL, used to break the
+  // combinational loop: dispatch_go -> squash_pub -> squash_sub -> dispatch_en -> dispatch_go
+  logic dispatch_go_upto_jal;
   logic jal_can_xfer;
   always_comb begin
-    iq_xfer_upto_jal = 1'b1;
+    dispatch_go_upto_jal = 1'b1;
     for (int i = 0; i < p_num_fe_lanes; i++) begin
       if (p_fe_lane_idx_bits'(i) < oldest_jal_idx) begin
         if (F_reg[i].val && F_reg[i].insn_valid && decoder_val[i])
-          iq_xfer_upto_jal &= lane_val[i] && iq_rdy[lane_to_pipe_map[i]];
+          dispatch_go_upto_jal &= lane_val[i] && iq_rdy[lane_to_pipe_map[i]];
       end
     end
     jal_can_xfer = lane_val[oldest_jal_idx] &&
                    (oldest_ctrl_insn_idx == oldest_jal_idx) &&
-                   iq_xfer_upto_jal &&
+                   dispatch_go_upto_jal &&
                    iq_rdy[lane_to_pipe_map[oldest_jal_idx]];
   end
 
@@ -533,7 +533,7 @@ module DecodeIssueUnitL8 #(
   logic [p_iq_entries_bits:0]          iq_avail_slots [p_num_pipes];
   
   // Check if oldest ctrl instruction source operands are ready,
-  // iq_ins_en for all instructions will not be valid, same for alloc_en for
+  // dispatch_en for all instructions will not be valid, same for alloc_en for
   // all instructions and for squash_pub.val. F.rdy for all instructions will
   // also not be ready in this case.
   always_comb begin
@@ -563,10 +563,10 @@ module DecodeIssueUnitL8 #(
   // 3) It is older than or the same age as the oldest control instruction in
   //    the IW (if there is one)
   logic alloc_rdy_prev_lanes;
-  logic iq_xfer_prev_lanes;
+  logic dispatch_go_prev_lanes;
   always_comb begin
     alloc_rdy_prev_lanes = 1'b1;
-    iq_xfer_prev_lanes = 1'b1;
+    dispatch_go_prev_lanes = 1'b1;
     for (int i = 0; i < p_num_fe_lanes; i++) begin
       logic lane_active;
       lane_active = F_reg[i].val && F_reg[i].insn_valid && decoder_val[i];
@@ -574,27 +574,27 @@ module DecodeIssueUnitL8 #(
       if (lane_active)
         alloc_rdy_prev_lanes &= alloc_rdy[i];
 
-      iq_ins_en[i] = 1'b0;
+      dispatch_en[i] = 1'b0;
       if (lane_active) begin
         if (!oldest_ctrl_insn_found) begin
-          iq_ins_en[i] = lane_val[i] && alloc_rdy_prev_lanes && !squash_sub.val;
+          dispatch_en[i] = lane_val[i] && alloc_rdy_prev_lanes && !squash_sub.val;
         end else if (lane_val[i] &&
                      ((p_fe_lane_idx_bits'(i) == oldest_ctrl_insn_idx
                        && oldest_ctrl_insn_srcs_ready) ||
                       p_fe_lane_idx_bits'(i) < oldest_ctrl_insn_idx) &&
                      alloc_rdy_prev_lanes &&
-                     iq_xfer_prev_lanes &&
+                     dispatch_go_prev_lanes &&
                      (seq_age.is_older(F_reg[i].seq_num, oldest_ctrl_insn_seq_num) ||
                       F_reg[i].seq_num == oldest_ctrl_insn_seq_num)) begin
           if (oldest_jal_found && squash_sub.val)
-            iq_ins_en[i] = squash_sub.seq_num == oldest_jal_seq_num; // jal
+            dispatch_en[i] = squash_sub.seq_num == oldest_jal_seq_num;
           else
-            iq_ins_en[i] = !squash_sub.val;
+            dispatch_en[i] = !squash_sub.val;
         end
       end
 
       if (lane_active)
-        iq_xfer_prev_lanes &= iq_xfer[i];
+        dispatch_go_prev_lanes &= dispatch_go[i];
     end
   end
 
@@ -638,7 +638,7 @@ module DecodeIssueUnitL8 #(
   // and whether that pipe is ready to accept an instruction
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      iq_xfer[i] = iq_ins_en[i] && iq_rdy[lane_to_pipe_map[i]];
+      dispatch_go[i] = dispatch_en[i] && iq_rdy[lane_to_pipe_map[i]];
     end
   end
 
@@ -669,7 +669,7 @@ module DecodeIssueUnitL8 #(
         .ins_msg_seq_num         (F_reg[pipe_to_lane_map[i]].seq_num),
         .ins_msg_alloc_preg      (alloc_preg[pipe_to_lane_map[i]]),
         .ins_msg_alloc_ppreg     (alloc_ppreg[pipe_to_lane_map[i]]),
-        .ins_en                  (iq_ins_en[pipe_to_lane_map[i]] && iq_val[i]),
+        .ins_en                  (dispatch_en[pipe_to_lane_map[i]] && iq_val[i]),
         .ins_rdy                 (iq_rdy[i]),
         .avail_slots             (iq_avail_slots[i]),
 
