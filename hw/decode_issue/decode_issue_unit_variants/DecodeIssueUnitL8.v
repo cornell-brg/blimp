@@ -96,8 +96,8 @@ module DecodeIssueUnitL8 #(
   logic [p_fe_lane_idx_bits-1:0]       pipe_to_lane_map   [p_num_pipes];
   /* verilator lint_off UNOPTFLAT */
   logic   iq_ins_en [p_num_fe_lanes]; 
-  logic iq_xfer    [p_num_fe_lanes];
   /* verilator lint_on UNOPTFLAT */
+  logic iq_xfer    [p_num_fe_lanes];
   logic                        alloc_rdy   [p_num_fe_lanes];
   logic oldest_ctrl_insn_srcs_ready;
 
@@ -498,12 +498,29 @@ module DecodeIssueUnitL8 #(
     end
   end
 
-  assign squash_pub.val     = (oldest_jal_found && 
-                               F_reg[oldest_jal_idx].val && 
-                               F_reg[oldest_jal_idx].insn_valid && 
-                               iq_xfer[oldest_jal_idx] &&
+  // Squash-free iq_xfer check for lanes before the JAL, used to break the
+  // combinational loop: iq_xfer -> squash_pub -> squash_sub -> iq_ins_en -> iq_xfer
+  logic iq_xfer_upto_jal;
+  logic jal_can_xfer;
+  always_comb begin
+    iq_xfer_upto_jal = 1'b1;
+    for (int i = 0; i < p_num_fe_lanes; i++) begin
+      if (p_fe_lane_idx_bits'(i) < oldest_jal_idx) begin
+        if (F_reg[i].val && F_reg[i].insn_valid && decoder_val[i])
+          iq_xfer_upto_jal &= lane_val[i] && iq_rdy[lane_to_pipe_map[i]];
+      end
+    end
+    jal_can_xfer = lane_val[oldest_jal_idx] &&
+                   (oldest_ctrl_insn_idx == oldest_jal_idx) &&
+                   iq_xfer_upto_jal &&
+                   iq_rdy[lane_to_pipe_map[oldest_jal_idx]];
+  end
+
+  assign squash_pub.val     = (oldest_jal_found &&
+                               F_reg[oldest_jal_idx].insn_valid &&
+                               jal_can_xfer &&
                                !squash_sent &&
-                               oldest_ctrl_insn_srcs_ready && 
+                               oldest_ctrl_insn_srcs_ready &&
                                alloc_rdy_upto_jal);
   assign squash_pub.target  = jump_target;
   assign squash_pub.seq_num = oldest_jal_seq_num;
@@ -550,46 +567,34 @@ module DecodeIssueUnitL8 #(
   always_comb begin
     alloc_rdy_prev_lanes = 1'b1;
     iq_xfer_prev_lanes = 1'b1;
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      if (F_reg[i].val && F_reg[i].insn_valid && decoder_val[i]) begin
+    for (int i = 0; i < p_num_fe_lanes; i++) begin
+      logic lane_active;
+      lane_active = F_reg[i].val && F_reg[i].insn_valid && decoder_val[i];
+
+      if (lane_active)
         alloc_rdy_prev_lanes &= alloc_rdy[i];
-      end else begin
-        alloc_rdy_prev_lanes &= 1'b1;
-      end
 
-      if( F_reg[i].val && F_reg[i].insn_valid && decoder_val[i] ) begin
-        if( oldest_ctrl_insn_found ) begin
-          if (lane_val[i] && 
-              ((p_fe_lane_idx_bits'(i) == oldest_ctrl_insn_idx 
-                && oldest_ctrl_insn_srcs_ready) || 
-                p_fe_lane_idx_bits'(i) < oldest_ctrl_insn_idx) && 
-              alloc_rdy_prev_lanes && 
-              iq_xfer_prev_lanes && 
-              (seq_age.is_older(
-              F_reg[i].seq_num, 
-              oldest_ctrl_insn_seq_num
-              ) || 
-              F_reg[i].seq_num == oldest_ctrl_insn_seq_num)) begin
-                if (oldest_jal_found && squash_sub.val) begin
-                  iq_ins_en[i] = squash_sub.seq_num == oldest_jal_seq_num; // jal
-                end else begin
-                  iq_ins_en[i] = !squash_sub.val;
-                end
-              end else begin
-                iq_ins_en[i] = 1'b0;
-              end
-        end else begin
+      iq_ins_en[i] = 1'b0;
+      if (lane_active) begin
+        if (!oldest_ctrl_insn_found) begin
           iq_ins_en[i] = lane_val[i] && alloc_rdy_prev_lanes && !squash_sub.val;
+        end else if (lane_val[i] &&
+                     ((p_fe_lane_idx_bits'(i) == oldest_ctrl_insn_idx
+                       && oldest_ctrl_insn_srcs_ready) ||
+                      p_fe_lane_idx_bits'(i) < oldest_ctrl_insn_idx) &&
+                     alloc_rdy_prev_lanes &&
+                     iq_xfer_prev_lanes &&
+                     (seq_age.is_older(F_reg[i].seq_num, oldest_ctrl_insn_seq_num) ||
+                      F_reg[i].seq_num == oldest_ctrl_insn_seq_num)) begin
+          if (oldest_jal_found && squash_sub.val)
+            iq_ins_en[i] = squash_sub.seq_num == oldest_jal_seq_num; // jal
+          else
+            iq_ins_en[i] = !squash_sub.val;
         end
-      end else begin
-        iq_ins_en[i] = 1'b0;
       end
 
-      if (F_reg[i].val && F_reg[i].insn_valid && decoder_val[i]) begin
+      if (lane_active)
         iq_xfer_prev_lanes &= iq_xfer[i];
-      end else begin
-        iq_xfer_prev_lanes &= 1'b1;
-      end
     end
   end
 
