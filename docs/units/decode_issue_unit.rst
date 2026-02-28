@@ -22,17 +22,17 @@ single-cycle branch resolution latency.
    :alt: A picture of the Level 4 Writeback Commit Unit supporting superscalar issue
    :class: bottompadding
 
-Instruction Router for Issue Queues: InstRouterIQ
+Instruction Router for Issue Queues: SSInstRouter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The instruction router for issue queues (InstRouterIQ) is responsible for
+The instruction router for issue queues (SSInstRouter) is responsible for
 directing each decoded instruction to the appropriate issue queue based on
 which pipes support the instruction's micro-op and which queues have the most
 available capacity. This is similar to the previous InstRouter used for
 single-issue routing, but extended to handle the case where multiple issue
 queues may support the same instruction.
 
-The router is composed of two submodules. First, one ``InstRouterIQUnit`` is
+The router is composed of two submodules. First, one ``SSInstRouterUnit`` is
 instantiated per pipe, each parameterized with the ISA subset supported by that
 pipe. Each unit checks whether the incoming micro-op is compatible with its
 pipe's ISA subset using the ``in_subset`` function across all supported RISC-V
@@ -47,7 +47,7 @@ favor of the lowest-indexed pipe. The picker outputs a one-hot grant vector
 as an ``any_gnt`` signal indicating that at least one compatible queue was
 found.
 
-The top-level ``InstRouterIQ`` module asserts the ``xfer`` handshake signal
+The top-level ``SSInstRouter`` module asserts the ``xfer`` handshake signal
 only when a compatible queue is selected and that queue's ``iq_rdy`` signal
 indicates it can accept the instruction. This ensures backpressure is properly
 propagated when all compatible queues are full.
@@ -66,7 +66,7 @@ The queue maintains insert and dequeue pointers (``ins_ptr`` and ``deq_ptr``)
 to manage its circular buffer of entries. On insertion, the instruction's
 decoded fields (micro-op, physical register addresses, immediate, PC, sequence
 number, etc.) are stored at the insert pointer. The ``avail_slots`` output
-communicates the remaining capacity to the InstRouterIQ for load-balancing
+communicates the remaining capacity to the SSInstRouter for load-balancing
 decisions.
 
 On the dequeue side, the queue looks up the source physical registers of the
@@ -95,12 +95,12 @@ The Level 8 Decode-Issue Unit (DIU L8) extends the L7 DIU with superscalar
 frontend decode, processing ``p_num_fe_lanes`` instructions per cycle in
 parallel. As shown in the diagram below, each frontend lane has its own
 ``InstDecoder`` and ``ImmGen`` instance that decode the instruction word and
-generate the immediate value independently. The ``M3RenameTable`` allocates
+generate the immediate value independently. The ``SSRenameTableL3`` allocates
 physical registers for all lanes simultaneously, with inter-lane forwarding of
 destination register mappings to handle intra-block dependencies (described
 further below). Instructions are then routed from the ``p_num_fe_lanes`` input
-lanes to ``p_num_pipes`` output issue queues via a new ``InstXbarIQ``
-instruction crossbar, replacing the single-instruction ``InstRouterIQ`` from
+lanes to ``p_num_pipes`` output issue queues via a new ``SSInstXbar``
+instruction crossbar, replacing the single-instruction ``SSInstRouter`` from
 L7. Each issue queue is the same ``IssueQueueInOrder`` used in L7, with its
 own rename table lookup ports and register file read ports for independent
 operand resolution.
@@ -144,16 +144,16 @@ accept a new fetch block, as depicted in the diagram below.
    :alt: A depiction of how the Level 8 Decode Issue Unit handles squashes from JAL(R) and BRX instructions, showing how fetch blocks are handled properly
    :class: bottompadding
 
-Instruction Crossbar for Issue Queues: InstXbarIQ
+Instruction Crossbar for Issue Queues: SSInstXbar
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The instruction crossbar for issue queues (InstXbarIQ) routes
+The instruction crossbar for issue queues (SSInstXbar) routes
 ``p_num_input_lanes`` decoded instructions to ``p_num_pipes`` issue queues each
 cycle using a modified version of the iSLIP algorithm (`McKeown, 1999
 <https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=748793>`_). The
 original iSLIP algorithm solves the input-output matching problem in crossbar
 switches using iterative rounds of grant and accept phases with round-robin
-arbiters to achieve fair, high-throughput scheduling. InstXbarIQ adapts this
+arbiters to achieve fair, high-throughput scheduling. SSInstXbar adapts this
 for instruction routing by replacing the round-robin arbiters with
 domain-specific priority functions.
 
@@ -168,7 +168,7 @@ two phases:
 
 - **Grant phase (age-based):** Each output pipe examines all compatible,
   unmatched inputs and grants to the oldest one (smallest sequence number),
-  determined by an ``AgePE`` priority element using ``MSeqAge`` for
+  determined by an ``AgePE`` priority element using ``SSSeqAge`` for
   wrap-around-safe age comparison.
 
 - **Accept phase (slot-based):** Each input lane examines all outputs that
@@ -185,10 +185,10 @@ per-pipe ``iq_val`` and ``iq_route_idx`` signals (selecting which lane feeds
 each pipe) and per-lane ``xfer`` signals (indicating that the lane's
 instruction was successfully routed).
 
-Rename Table with Allocated Destination Register Forwarding: M3RenameTable
+Rename Table with Allocated Destination Register Forwarding: SSRenameTableL3
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The M3RenameTable extends the previous rename table to support
+The SSRenameTableL3 extends the previous rename table to support
 ``p_num_fe_lanes`` simultaneous allocations with inter-lane destination
 register forwarding, as shown in the first image above. The core data
 structures — a 31-entry rename table mapping architectural registers to

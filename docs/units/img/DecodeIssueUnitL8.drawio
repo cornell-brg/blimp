@@ -25,7 +25,7 @@
             <mxPoint x="220" y="400.5" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="K9dk5BoEJn1FrsonCRDp-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="M3RenameTable" vertex="1">
+        <mxCell id="K9dk5BoEJn1FrsonCRDp-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="SSRenameTableL3" vertex="1">
           <mxGeometry height="190" width="100" x="410" y="230" as="geometry" />
         </mxCell>
         <mxCell id="K9dk5BoEJn1FrsonCRDp-10" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#7D7D7D;gradientColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="">

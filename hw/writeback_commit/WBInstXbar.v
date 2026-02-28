@@ -1,7 +1,7 @@
 //========================================================================
 // WBInstXbar.v
 //========================================================================
-// Wrapper around InstXbarIQ for writeback arbitration. Maps execution
+// Wrapper around SSInstXbar for writeback arbitration. Maps execution
 // pipes as input lanes and commit lanes as output pipes, with universal
 // opcode compatibility (any pipe can go to any lane). Uses age-based
 // priority to select the oldest instructions first.
@@ -9,7 +9,7 @@
 `ifndef HW_WRITEBACK_WBINSTXBAR_V
 `define HW_WRITEBACK_WBINSTXBAR_V
 
-`include "hw/decode_issue/InstXbarIQ.v"
+`include "hw/decode_issue/SSInstXbar.v"
 
 import UArch::*;
 
@@ -61,10 +61,10 @@ module WBInstXbar #(
   end
 
   //----------------------------------------------------------------------
-  // InstXbarIQ: pipes as input lanes, commit lanes as output pipes
+  // SSInstXbar: pipes as input lanes, commit lanes as output pipes
   //----------------------------------------------------------------------
 
-  InstXbarIQ #(
+  SSInstXbar #(
     .p_num_pipes       (p_num_be_lanes),
     .p_pipe_subsets    ('{default: OP_ADD_VEC}),
     .p_num_input_lanes (p_num_pipes),

@@ -283,8 +283,8 @@ arbiter in the WCU to select multiple completed instructions from XUs, as well
 as a multi-ported ROB to intake multiple instructions from the arbiter as well
 as commit multiple instructions. Modified versions of FU, DIU, and SU are also
 required to support multiple completed and committed instructions with a new
-sequence number generator (SeqNumGenL4), new sequence age tracker (MSeqAge),
-multi-rename table (MRenameTable), and multi-write-ported register file
+sequence number generator (SeqNumGenL4), new sequence age tracker (SSSeqAge),
+multi-rename table (SSRenameTableL1), and multi-write-ported register file
 (MRegisterFile) as the complete and commit interfaces are now parameterized
 based on the number of backend superscalar lanes (configurable at the toplevel).
 
@@ -330,7 +330,7 @@ post-squash fetch block are marked valid, while earlier lanes are invalidated
 and do not receive sequence number allocations.
 
 The DecodeIssueUnitL8 decodes ``p_num_fe_lanes`` instructions in parallel and
-uses an M3RenameTable that forwards destination register allocations within the
+uses an SSRenameTableL3 that forwards destination register allocations within the
 same fetch block: when looking up source operand physical registers for an
 instruction, the rename table checks whether a previous lane in the same block
 has already renamed the same architectural register, and if so, uses the
@@ -339,7 +339,7 @@ back-to-back dependent instructions within a single fetch block to be decoded
 correctly in the same cycle.
 
 Instructions are routed from the ``p_num_fe_lanes`` input lanes to
-``p_num_pipes`` output issue queues through a new InstXbarIQ instruction
+``p_num_pipes`` output issue queues through a new SSInstXbar instruction
 crossbar. The crossbar uses a modified iSLIP matching algorithm with age-based
 priority for inputs (oldest instruction is granted first) and slot-based
 priority for outputs (the pipe with the most available issue queue slots is

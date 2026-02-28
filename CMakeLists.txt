@@ -26,12 +26,12 @@ set(V_TEST_FILES
   hw/decode_issue/test/DecodeIssueUnitL8_test.v
   hw/decode_issue/test/ImmGen_test.v
   hw/decode_issue/test/IssueQueueInOrder_test.v
-  hw/decode_issue/test/InstXbarIQ_test.v
+  hw/decode_issue/test/SSInstXbar_test.v
   hw/decode_issue/test/RegfilePending_test.v
-  hw/decode_issue/test/MRegfile_test.v
+  hw/decode_issue/test/SSRegfileL1_test.v
   hw/decode_issue/test/RenameTable_test.v
-  hw/decode_issue/test/MRenameTable_test.v
-  hw/decode_issue/test/M3RenameTable_test.v
+  hw/decode_issue/test/SSRenameTableL1_test.v
+  hw/decode_issue/test/SSRenameTableL3_test.v
   hw/execute/test/ExQueue_test.v
   hw/execute/test/l1/ALUL1_test.v
   hw/execute/test/l1/MultiplierL1_test.v
@@ -54,7 +54,7 @@ set(V_TEST_FILES
   hw/squash/test/SquashUnitL1_test.v
   hw/squash/test/SquashUnitL1Chain_test.v
   hw/util/test/SeqAge_test.v
-  hw/util/test/MSeqAge_test.v
+  hw/util/test/SSSeqAge_test.v
   hw/util/test/SeqArb_test.v
   hw/writeback_commit/test/WritebackCommitUnitL1_test.v
   hw/writeback_commit/test/WritebackCommitUnitL2_test.v

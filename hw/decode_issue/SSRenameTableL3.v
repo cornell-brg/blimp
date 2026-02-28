@@ -1,18 +1,18 @@
 //========================================================================
-// M3RenameTable.v
+// SSRenameTableL3.v
 //========================================================================
 // A pointer-based rename table, along with the accompanying free list. Also
 // supports superscalar backend through freeing multiple physical registers
 // simultaneously and updating multiple physical registers' pending statuses
 
-`ifndef HW_DECODE_M3RENAMETABLE_V
-`define HW_DECODE_M3RENAMETABLE_V
+`ifndef HW_DECODE_SSRENAMETABLEL3_V
+`define HW_DECODE_SSRENAMETABLEL3_V
 
 `include "hw/common/PriorityEncoder.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 
-module M3RenameTable #(
+module SSRenameTableL3 #(
   parameter p_num_phys_regs    = 36,
   parameter p_phys_addr_bits   = $clog2(p_num_phys_regs),
   parameter p_num_lookup_ports = 2,
@@ -450,4 +450,4 @@ module M3RenameTable #(
 
 endmodule
 
-`endif // HW_DECODE_M3RENAMETABLE_V
+`endif // HW_DECODE_SSRENAMETABLEL3_V

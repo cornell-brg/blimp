@@ -1,13 +1,13 @@
 //========================================================================
-// M2Regfile.v
+// SSRegfileL2.v
 //========================================================================
 // A parametrized register file, with x0 hard-coded to 0. Supports superscalar
 // backend through multiple write ports
 
-`ifndef HW_DECODE_M2REGFILE_V
-`define HW_DECODE_M2REGFILE_V
+`ifndef HW_DECODE_SSREGFILEL2_V
+`define HW_DECODE_SSREGFILEL2_V
 
-module M2Regfile #(
+module SSRegfileL2 #(
   parameter p_entry_bits       = 32,
   parameter p_num_regs         = 32,
   parameter p_num_lookup_ports = 2,
@@ -92,4 +92,4 @@ module M2Regfile #(
   end
 endmodule
 
-`endif // HW_DECODE_M2REGFILE_V
+`endif // HW_DECODE_SSREGFILEL2_V

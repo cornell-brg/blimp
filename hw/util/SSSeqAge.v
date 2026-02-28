@@ -1,16 +1,16 @@
 //========================================================================
-// MSeqAge.v
+// SSSeqAge.v
 //========================================================================
 // A module for monitoring the in-flight instructions, to compare ages between
 // sequence numbers. Determines the oldest instruction on the commit interface
 // when updating
 
-`ifndef HW_UTIL_MSEQAGE_V
-`define HW_UTIL_MSEQAGE_V
+`ifndef HW_UTIL_SSSEQAGE_V
+`define HW_UTIL_SSSEQAGE_V
 
 `include "intf/CommitNotif.v"
 
-module MSeqAge #(
+module SSSeqAge #(
   parameter p_num_be_lanes = 2
 ) (
   input  logic clk,

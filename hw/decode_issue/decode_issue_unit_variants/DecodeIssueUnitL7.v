@@ -14,11 +14,11 @@
 `include "defs/ISA.v"
 `include "hw/decode_issue/InstDecoder.v"
 `include "hw/decode_issue/ImmGen.v"
-`include "hw/decode_issue/InstRouterIQ.v"
-`include "hw/decode_issue/M2Regfile.v"
-`include "hw/decode_issue/M2RenameTable.v"
+`include "hw/decode_issue/SSInstRouter.v"
+`include "hw/decode_issue/SSRegfileL2.v"
+`include "hw/decode_issue/SSRenameTableL2.v"
 `include "hw/decode_issue/IssueQueueInOrder.v"
-`include "hw/util/MSeqAge.v"
+`include "hw/util/SSSeqAge.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
@@ -156,7 +156,7 @@ module DecodeIssueUnitL7 #(
 
   assign lookup_new_inst_en = '{1'b1, 1'b1};
 
-  M2RenameTable #(
+  SSRenameTableL2 #(
     .p_num_phys_regs    (p_num_phys_regs),
     .p_num_lookup_ports (p_num_pipes),
     .p_num_be_lanes     (p_num_be_lanes)
@@ -198,7 +198,7 @@ module DecodeIssueUnitL7 #(
   logic [p_phys_addr_bits-1:0] raddr [p_num_pipes][2];
   logic [31:0]                 rdata [p_num_pipes][2];
 
-  M2Regfile #(
+  SSRegfileL2 #(
     .p_entry_bits       (32),
     .p_num_regs         (p_num_phys_regs),
     .p_num_lookup_ports (p_num_pipes),
@@ -253,7 +253,7 @@ module DecodeIssueUnitL7 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
   ) seq_age (
     .*
@@ -270,7 +270,7 @@ module DecodeIssueUnitL7 #(
   logic [$clog2(p_iq_depth):0] iq_avail_slots [p_num_pipes];
   logic                        iq_val         [p_num_pipes];
 
-  InstRouterIQ #(
+  SSInstRouter #(
     .p_num_pipes     (p_num_pipes),
     .p_pipe_subsets  (p_pipe_subsets),
     .p_iq_depth      (p_iq_depth)

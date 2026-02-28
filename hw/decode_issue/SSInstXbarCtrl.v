@@ -1,20 +1,20 @@
 //========================================================================
-// InstXbarIQCtrl.v
+// SSInstXbarCtrl.v
 //========================================================================
-// Wrapper around InstXbarIQ that separates control instruction routing.
+// Wrapper around SSInstXbar that separates control instruction routing.
 // Control instructions (matching p_ctrl_subset) are routed directly to
 // the single output pipe whose p_pipe_subset matches p_ctrl_subset,
 // using age-based priority and without depending on iq_rdy. Non-control
-// instructions are forwarded to InstXbarIQ for standard iSLIP routing.
+// instructions are forwarded to SSInstXbar for standard iSLIP routing.
 
-`ifndef HW_DECODE_INSTXBARIQCTRL_V
-`define HW_DECODE_INSTXBARIQCTRL_V
+`ifndef HW_DECODE_SSINSTXBARCTRL_V
+`define HW_DECODE_SSINSTXBARCTRL_V
 
-`include "hw/decode_issue/InstXbarIQ.v"
+`include "hw/decode_issue/SSInstXbar.v"
 
 import UArch::*;
 
-module InstXbarIQCtrl #(
+module SSInstXbarCtrl #(
   parameter p_num_pipes                                = 8,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1},
   parameter rv_op_vec p_ctrl_subset                    = OP_JAL_VEC  |
@@ -61,7 +61,7 @@ module InstXbarIQCtrl #(
   end
 
   //----------------------------------------------------------------------
-  // Mask inputs to InstXbarIQ: hide control instructions and ctrl pipe
+  // Mask inputs to SSInstXbar: hide control instructions and ctrl pipe
   //----------------------------------------------------------------------
 
   logic                      xbar_val         [p_num_input_lanes];
@@ -90,13 +90,13 @@ module InstXbarIQCtrl #(
   endgenerate
 
   //----------------------------------------------------------------------
-  // InstXbarIQ handles non-control instruction routing via iSLIP
+  // SSInstXbar handles non-control instruction routing via iSLIP
   //----------------------------------------------------------------------
 
   logic [p_input_lanes_bits-1:0] xbar_route_idx [p_num_pipes];
   logic                          xbar_iq_val    [p_num_pipes];
 
-  InstXbarIQ #(
+  SSInstXbar #(
     .p_num_pipes       (p_num_pipes),
     .p_pipe_subsets    (p_pipe_subsets),
     .p_num_input_lanes (p_num_input_lanes),
@@ -121,7 +121,7 @@ module InstXbarIQCtrl #(
   // Control age-based instruction routing
   //----------------------------------------------------------------------
 
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes(p_num_be_lanes)
   ) seq_age (
     .*
@@ -180,4 +180,4 @@ module InstXbarIQCtrl #(
 
 endmodule
 
-`endif // HW_DECODE_INSTXBARIQCTRL_V
+`endif // HW_DECODE_SSINSTXBARCTRL_V

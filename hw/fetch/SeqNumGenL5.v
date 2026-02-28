@@ -8,7 +8,7 @@
 `ifndef HW_FETCH_SEQNUMGENL5_V
 `define HW_FETCH_SEQNUMGENL5_V
 
-`include "hw/util/MSeqAge.v"
+`include "hw/util/SSSeqAge.v"
 `include "intf/CommitNotif.v"
 `include "intf/SquashNotif.v"
 
@@ -60,7 +60,7 @@ module SeqNumGenL5 #(
   //----------------------------------------------------------------------
   // Need to keep track to know which to free on a squash
 
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
   ) seq_age (
     .*

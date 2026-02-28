@@ -1,5 +1,5 @@
 //========================================================================
-// InstXbarIQ.v
+// SSInstXbar.v
 //========================================================================
 // A crossbar scheduler for routing multiple instructions from front-end
 // lanes to issue queues. Uses a modified iSLIP algorithm with:
@@ -7,11 +7,11 @@
 //   - Slot-based priority for outputs (pipe with most available slots first)
 //   - Multiple iterations for improved matching efficiency
 
-`ifndef HW_DECODE_INSTXBARIQ_V
-`define HW_DECODE_INSTXBARIQ_V
+`ifndef HW_DECODE_SSINSTXBAR_V
+`define HW_DECODE_SSINSTXBAR_V
 
 `include "defs/UArch.v"
-`include "hw/util/MSeqAge.v"
+`include "hw/util/SSSeqAge.v"
 
 import UArch::*;
 
@@ -94,7 +94,7 @@ module SlotsPE #(
 
 endmodule
 
-module InstXbarIQ #(
+module SSInstXbar #(
   parameter p_num_pipes                                = 8,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1},
   parameter p_num_input_lanes                          = 2,
@@ -124,7 +124,7 @@ module InstXbarIQ #(
   // Shared age comparison
   //----------------------------------------------------------------------
 
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes(p_num_be_lanes)
   ) seq_age (
     .*
@@ -329,4 +329,4 @@ module InstXbarIQ #(
 
 endmodule
 
-`endif // HW_DECODE_INSTXBARIQ_V
+`endif // HW_DECODE_SSINSTXBAR_V

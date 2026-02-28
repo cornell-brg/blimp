@@ -1,9 +1,9 @@
 //========================================================================
-// M3RenameTable_test.v
+// SSRenameTableL3_test.v
 //========================================================================
 // A testbench for our multi rename table
 
-`include "hw/decode_issue/M3RenameTable.v"
+`include "hw/decode_issue/SSRenameTableL3.v"
 `include "intf/CommitNotif.v"
 `include "intf/CompleteNotif.v"
 `include "test/fl/TestCaller.v"
@@ -13,11 +13,11 @@
 import TestEnv::*;
 
 //========================================================================
-// M3RenameTableTestSuite
+// SSRenameTableL3TestSuite
 //========================================================================
 // A test suite for the rename table
 
-module M3RenameTableTestSuite #(
+module SSRenameTableL3TestSuite #(
   parameter p_suite_num        = 0,
   parameter p_num_phys_regs    = 36,
   parameter p_num_lookup_ports = 2,
@@ -27,7 +27,7 @@ module M3RenameTableTestSuite #(
 
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
-  string suite_name = $sformatf("%0d: M3RenameTableTestSuite_%0d", 
+  string suite_name = $sformatf("%0d: SSRenameTableL3TestSuite_%0d", 
                                 p_suite_num, p_num_phys_regs);
   
   //----------------------------------------------------------------------
@@ -63,7 +63,7 @@ module M3RenameTableTestSuite #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) commit_notif [p_num_be_lanes] ();
 
-  M3RenameTable #(
+  SSRenameTableL3 #(
     .p_num_phys_regs    (p_num_phys_regs),
     .p_num_lookup_ports (p_num_lookup_ports),
     .p_num_fe_lanes     (p_num_fe_lanes),
@@ -893,31 +893,31 @@ module M3RenameTableTestSuite #(
 endmodule
 
 //========================================================================
-// M3RenameTable_test
+// SSRenameTableL3_test
 //========================================================================
 
-module M3RenameTable_test;
+module SSRenameTableL3_test;
 
   // Defaults (2 fe lanes, 2 be lanes, 2 lookup ports)
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (1)
   ) suite_1();
 
   // 1 fe lane, 1 be lane, 2 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (2),
     .p_num_fe_lanes     (1),
     .p_num_be_lanes     (1)
   ) suite_2();
 
   // 2 fe lanes, 2 be lanes, 4 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (3),
     .p_num_lookup_ports (4)
   ) suite_3();
 
   // 4 fe lanes, 4 be lanes, 4 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (4),
     .p_num_fe_lanes     (4),
     .p_num_be_lanes     (4),
@@ -925,7 +925,7 @@ module M3RenameTable_test;
   ) suite_4();
 
   // 1 fe lane, 4 be lanes, 4 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (5),
     .p_num_fe_lanes     (1),
     .p_num_be_lanes     (4),
@@ -933,7 +933,7 @@ module M3RenameTable_test;
   ) suite_5();
 
   // 4 fe lanes, 1 be lane, 4 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (6),
     .p_num_fe_lanes     (4),
     .p_num_be_lanes     (1),
@@ -941,7 +941,7 @@ module M3RenameTable_test;
   ) suite_6();
 
   // 4 fe lanes, 4 be lanes, 1 lookup port
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (7),
     .p_num_fe_lanes     (4),
     .p_num_be_lanes     (4),
@@ -949,7 +949,7 @@ module M3RenameTable_test;
   ) suite_7();
 
   // 2 fe lanes, 2 be lanes, 4 lookup ports
-  M3RenameTableTestSuite #(
+  SSRenameTableL3TestSuite #(
     .p_suite_num        (8),
     .p_num_lookup_ports (4),
     .p_num_phys_regs    (33)

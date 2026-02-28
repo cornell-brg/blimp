@@ -7,7 +7,7 @@
 `ifndef HW_SQUASH_SQUASHUNITL2_V
 `define HW_SQUASH_SQUASHUNITL2_V
 
-`include "hw/util/MSeqAge.v"
+`include "hw/util/SSSeqAge.v"
 `include "intf/CommitNotif.v"
 `include "intf/SquashNotif.v"
 
@@ -49,7 +49,7 @@ module SquashUnitL2Helper #(
   CommitNotif.sub commit [p_num_be_lanes]
 );
 
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
   ) seq_age (
     .*
