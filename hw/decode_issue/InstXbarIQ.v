@@ -17,27 +17,17 @@ import UArch::*;
 
 module AgePE #(
   parameter p_num_input_lanes = 4,
-  parameter p_seq_num_bits    = 8,
-  parameter p_num_be_lanes    = 2
+  parameter p_seq_num_bits    = 8
 ) (
-  input  logic                         clk,
-  input  logic                         rst,
   input  logic [p_num_input_lanes-1:0] req,
-  input  logic [p_seq_num_bits-1:0]    age [p_num_input_lanes],
+  input  logic [p_seq_num_bits-1:0]    age            [p_num_input_lanes],
+  input  logic [p_seq_num_bits-1:0]    oldest_seq_num,
   output logic [p_num_input_lanes-1:0] gnt,
-  output logic                         any_gnt,
-
-  CommitNotif.sub commit [p_num_be_lanes]
+  output logic                         any_gnt
 );
 
   logic [p_num_input_lanes-1:0] is_oldest;
   logic older;
-
-  MSeqAge #(
-    .p_num_be_lanes(p_num_be_lanes)
-  ) seq_age (
-    .*
-  );
 
   // For each request, check if it's the oldest among all requests
   always_comb begin
@@ -50,9 +40,11 @@ module AgePE #(
             // Check if age[j] is older than age[i]
             // Using signed comparison for wrap-around handling
 
-            older = seq_age.is_older(age[j], age[i]);
+            older = ( age[j] < age[i]      ) ^
+                    ( age[j] < oldest_seq_num ) ^
+                    ( age[i] < oldest_seq_num );
 
-            // If older is true, age[j] is older (smaller seq_num)
+            // If older is true, age[j] is older
             if (older) begin
               is_oldest[i] = 1'b0;
             end
@@ -110,7 +102,7 @@ module InstXbarIQ #(
   parameter p_iq_depth                                 = 8,
   parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
   parameter p_seq_num_bits                             = 8,
-  parameter p_num_iter                                 = 2,  // Number of iSLIP iterations,
+  parameter p_num_iter                                 = 2,
   parameter p_num_be_lanes                             = 2
 ) (
   input  logic                          clk,
@@ -124,10 +116,22 @@ module InstXbarIQ #(
 
   output logic [p_input_lanes_bits-1:0] iq_route_idx   [p_num_pipes],
   output logic                          iq_val         [p_num_pipes],
-  // output logic                          xfer           [p_num_input_lanes],
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
+
+  //----------------------------------------------------------------------
+  // Shared age comparison
+  //----------------------------------------------------------------------
+
+  MSeqAge #(
+    .p_num_be_lanes(p_num_be_lanes)
+  ) seq_age (
+    .*
+  );
+
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+  assign oldest_seq_num = seq_age.oldest_seq_num;
 
   //----------------------------------------------------------------------
   // Compute opcode compatibility matrix
@@ -189,7 +193,7 @@ module InstXbarIQ #(
   endgenerate
 
   //----------------------------------------------------------------------
-  // Modified iSLIP matching algorithm (combinational)
+  // Modified iSLIP matching algorithm
   //----------------------------------------------------------------------
 
   // Per-iteration signals
@@ -230,19 +234,16 @@ module InstXbarIQ #(
           assign g_req[it][j][ii] = iq_compat_op[ii][j] & input_free[it][ii] & output_free[it][j];
         end
 
-        // Grant to oldest (smallest seq_num) requesting input
+        // Grant to oldest requesting input
         AgePE #(
           .p_num_input_lanes (p_num_input_lanes),
-          .p_seq_num_bits    (p_seq_num_bits),
-          .p_num_be_lanes    (p_num_be_lanes)
+          .p_seq_num_bits    (p_seq_num_bits)
         ) u_grant_age_enc (
-          .clk    (clk),
-          .rst    (rst),
-          .req    (g_req[it][j]),
-          .age    (seq_num),
-          .gnt    (g_result[it][j]),
-          .any_gnt(g_any[it][j]),
-          .commit (commit)
+          .req            (g_req[it][j]),
+          .age            (seq_num),
+          .oldest_seq_num (oldest_seq_num),
+          .gnt            (g_result[it][j]),
+          .any_gnt        (g_any[it][j])
         );
       end
 
@@ -325,17 +326,6 @@ module InstXbarIQ #(
       end
     end
   end
-
-  // always_comb begin
-
-  //   // Generate transfer signals
-  //   for (int ii = 0; ii < p_num_input_lanes; ii++) begin
-  //     xfer[ii] = 1'b0;
-  //     for (int jj = 0; jj < p_num_pipes; jj++) begin
-  //       xfer[ii] |= final_match[ii][jj];
-  //     end
-  //   end
-  // end
 
 endmodule
 
