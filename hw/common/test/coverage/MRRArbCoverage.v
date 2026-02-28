@@ -3,6 +3,11 @@
 //========================================================================
 // A coverage class for a particular parametrization of the arbiter
 
+//------------------------------------------------------------------------
+// VCS Coverage
+//------------------------------------------------------------------------
+`ifndef VERILATOR
+
 // Interface between the DUT and coverage class --------------------------
 
 interface MRRArbTestIntf #(
@@ -27,8 +32,6 @@ interface MRRArbTestIntf #(
 endinterface
 
 // Coverage class --------------------------------------------------------
-
-`ifndef VERILATOR
 
 class MRRArbCoverage #(
   parameter p_width = 4,
@@ -132,7 +135,7 @@ class MRRArbCoverage #(
 
     head_ptr: coverpoint $countones(~vintf.head_ptr) {
       bins lsb = { 0 };
-      bins mid = { [1:MAX_HD_PTR-1] };
+      bins mid = { [1:MAX_HD_PTR-1] 
       bins msb = { MAX_HD_PTR };
     }
 
@@ -149,5 +152,83 @@ class MRRArbCoverage #(
   endfunction
 
 endclass
+
+//------------------------------------------------------------------------
+// Verilator Coverage
+//------------------------------------------------------------------------
+`else
+
+module MRRArbCoverage #(
+  parameter p_width = 4,
+  parameter p_max_m = 4
+)(
+  input logic                     clk,
+  input logic                     rst,
+  input logic                     en,
+  input logic [$clog2(p_max_m):0] m,
+  input logic [p_width-1:0]       req,
+  input logic [p_width-1:0]       gnt,
+  
+  // Internal signals
+
+  input logic [p_width-1:0]       head_ptr
+);
+
+  // Localparams
+
+  localparam MAX_M = (1 << ($clog2(p_max_m)+1)) - 1;
+  localparam MAX_REQ = $countones($unsigned((1 << p_width) - 1));
+  localparam MAX_GNT = (p_max_m < p_width) ? p_max_m : p_width;
+  localparam MAX_HD_PTR = $countones($unsigned((1 << p_width) - 2));
+
+  // Coverpoints ---------------------------------------------------------
+
+  // Reset
+  cover property ( @(posedge clk) rst == 0 );
+  cover property ( @(posedge clk) rst == 1 );
+  
+  // Enable
+  cover property ( @(posedge clk) en == 0 );
+  cover property ( @(posedge clk) en == 1 );
+  
+  // M-select
+  cover property ( @(posedge clk) m == 0 );
+  cover property ( @(posedge clk) m == 1 );
+  cover property ( @(posedge clk) (m >= 2) && (m <= p_max_m-1) );
+  cover property ( @(posedge clk) m == p_max_m );
+  /* verilator lint_off CMPCONST */
+  cover property ( @(posedge clk) (m >= p_max_m+1) && (m <= MAX_M) );
+  /* verilator lint_on CMPCONST */
+
+  // Request
+  cover property ( @(posedge clk) $countones(req) == 0 );
+  cover property ( @(posedge clk) $countones(req) == 1 );
+  generate
+    if ( p_width != 1 ) begin : g_req_mid
+      cover property ( @(posedge clk) ($countones(req) >= 2) && ($countones(req) <= MAX_REQ-1) );
+    end
+  endgenerate
+  cover property ( @(posedge clk) $countones(req) == MAX_REQ );
+
+  // Grant
+  cover property ( @(posedge clk) $countones(gnt) == 0 );
+  cover property ( @(posedge clk) $countones(gnt) == 1 );
+  generate
+    if ( p_width != 1 ) begin : g_gnt_mid
+      cover property ( @(posedge clk) ($countones(gnt) >= 2) && ($countones(gnt) <= MAX_GNT-1) );
+    end
+  endgenerate
+  cover property ( @(posedge clk) $countones(gnt) == MAX_GNT );
+  
+  // Head pointer
+  cover property ( @(posedge clk) $countones(~head_ptr) == 0 );
+  generate
+    if ( p_width != 1 ) begin : g_head_ptr_mid
+      cover property ( @(posedge clk) ($countones(~head_ptr) >= 1) && ($countones(~head_ptr) <= MAX_HD_PTR-1) );
+    end
+  endgenerate
+  cover property ( @(posedge clk) $countones(~head_ptr) == MAX_HD_PTR );
+
+endmodule
 
 `endif /* VERILATOR */

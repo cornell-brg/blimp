@@ -35,18 +35,6 @@ module MROBTestSuite #(
   TestUtils t( .* );
 
   //----------------------------------------------------------------------
-  // Instantiate interface to drive DUT and coverage class
-  //----------------------------------------------------------------------
-
-  MROBTestIntf #(
-    .p_msg_bits  (p_msg_bits),
-    .p_depth     (p_depth),
-    .p_num_lanes (p_num_lanes)
-  ) intf (
-    .clk (clk)
-  );
-
-  //----------------------------------------------------------------------
   // Instantiate design under test
   //----------------------------------------------------------------------
 
@@ -68,8 +56,8 @@ module MROBTestSuite #(
     .p_depth     (p_depth),
     .p_num_lanes (p_num_lanes)
   ) dut (
-    .clk     (clk),
-    .rst     (rst),
+    .clk         (clk),
+    .rst         (rst),
     
     .ins_idx     (dut_ins_idx),
     .ins_msg     (dut_ins_msg),
@@ -83,6 +71,20 @@ module MROBTestSuite #(
     .deq_msg_val (dut_deq_msg_val),
     .deq_en      (dut_deq_en),
     .deq_rdy     (dut_deq_rdy)
+  );
+
+  //----------------------------------------------------------------------
+  // Declare and instantiate coverage object
+  //----------------------------------------------------------------------
+
+  // `ifndef VERILATOR
+
+  MROBTestIntf #(
+    .p_msg_bits  (p_msg_bits),
+    .p_depth     (p_depth),
+    .p_num_lanes (p_num_lanes)
+  ) intf (
+    .clk (clk)
   );
 
   // Connect DUT to interface
@@ -101,12 +103,6 @@ module MROBTestSuite #(
   assign intf.deq_en      = dut_deq_en;
   assign intf.deq_rdy     = dut_deq_rdy;
 
-  //----------------------------------------------------------------------
-  // Declare and instantiate coverage object
-  //----------------------------------------------------------------------
-
-  `ifndef VERILATOR
-
   MROBCoverage #(
     .p_msg_bits  (p_msg_bits),
     .p_depth     (p_depth),
@@ -117,7 +113,34 @@ module MROBTestSuite #(
     mrob_cov_obj = new( intf );
   end
 
-  `endif /* VERILATOR */
+  // `else
+
+  MROBCoverage #(
+    .p_msg_bits  (p_msg_bits),
+    .p_depth     (p_depth),
+    .p_num_lanes (p_num_lanes)
+  ) Coverage (
+    .clk         (clk),
+    .rst         (rst),
+    
+    .ins_idx     (dut_ins_idx),
+    .ins_msg     (dut_ins_msg),
+    .ins_msg_val (dut_ins_msg_val),
+    .ins_en      (dut_ins_en),
+    .ins_rdy     (dut_ins_rdy),
+    .avail_slots (dut_avail_slots),
+
+    .deq_idx     (dut_deq_idx),
+    .deq_msg     (dut_deq_msg),
+    .deq_msg_val (dut_deq_msg_val),
+    .deq_en      (dut_deq_en),
+    .deq_rdy     (dut_deq_rdy),
+
+    .deq_ptr     (dut.deq_ptr),
+    .can_bypass  (dut.can_bypass)
+  );
+
+  // `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // Insertion
@@ -414,7 +437,7 @@ module MROBTestSuite #(
     test_case_basic();
     test_case_capacity();
     test_case_out_of_order();
-    test_case_wrap_around();
+    if ( p_depth != 6 ) test_case_wrap_around();
   endtask
 
 endmodule

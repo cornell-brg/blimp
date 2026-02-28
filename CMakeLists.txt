@@ -257,7 +257,7 @@ foreach(V_TEST_FILE_REL_PATH ${V_TEST_FILES})
       target_compile_options(${V_TEST_BIN} PRIVATE --trace --trace-structs)
     endif()
     if(COVERAGE)
-      target_compile_options(${V_TEST_BIN} PRIVATE --coverage)
+      target_compile_options(${V_TEST_BIN} PRIVATE --coverage --assert)
     endif()
   endif()
 

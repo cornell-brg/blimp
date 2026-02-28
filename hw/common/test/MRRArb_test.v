@@ -33,17 +33,6 @@ module MRRArbTestSuite #(
   TestUtils t( .* );
 
   //----------------------------------------------------------------------
-  // Instantiate interface to drive DUT and coverage class
-  //----------------------------------------------------------------------
-
-  MRRArbTestIntf #(
-    .p_width (p_width),
-    .p_max_m (p_max_m)
-  ) intf (
-    .clk (clk)
-  );
-
-  //----------------------------------------------------------------------
   // Instantiate design under test
   //----------------------------------------------------------------------
 
@@ -64,19 +53,25 @@ module MRRArbTestSuite #(
     .gnt (dut_gnt)
   );
 
-  // TODO - temporary assigns to connect DUT to interface
+  //----------------------------------------------------------------------
+  // Setup for code & functional coverage
+  //----------------------------------------------------------------------
+
+  `ifndef VERILATOR
+
+  MRRArbTestIntf #(
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) intf (
+    .clk (clk)
+  );
+
   assign intf.rst      = rst;
   assign intf.en       = dut_en;
   assign intf.m        = dut_m;
   assign intf.req      = dut_req;
   assign intf.gnt      = dut_gnt;
   assign intf.head_ptr = DUT.head_ptr;
-
-  //----------------------------------------------------------------------
-  // Declare and instantiate coverage object
-  //----------------------------------------------------------------------
-
-  `ifndef VERILATOR
 
   MRRArbCoverage #(
     .p_width (p_width),
@@ -86,6 +81,21 @@ module MRRArbTestSuite #(
   initial begin
     mrrarb_cov_obj = new( intf );
   end
+
+  `else
+
+  MRRArbCoverage #(
+    .p_width (p_width),
+    .p_max_m (p_max_m)
+  ) Coverage (
+    .clk      (clk),
+    .rst      (rst),
+    .en       (dut_en),
+    .m        (dut_m),
+    .req      (dut_req),
+    .gnt      (dut_gnt),
+    .head_ptr (DUT.head_ptr)
+  );
 
   `endif /* VERILATOR */
 
