@@ -1,5 +1,5 @@
 //========================================================================
-// InstRouterIQ.v
+// SSInstRouter.v
 //========================================================================
 // A router for instructions in a decode unit, to send instructions to the
 // correct issue queue. This is similar to InstRouter, but with some additional
@@ -7,19 +7,19 @@
 // using the available slot information from the queues to determine where to
 // send instructions.
 
-`ifndef HW_DECODE_INSTROUTERIQ_V
-`define HW_DECODE_INSTROUTERIQ_V
+`ifndef HW_DECODE_SSINSTROUTER_V
+`define HW_DECODE_SSINSTROUTER_V
 
 `include "defs/UArch.v"
 
 import UArch::*;
 
 //------------------------------------------------------------------------
-// InstRouterIQUnit
+// SSInstRouterUnit
 //------------------------------------------------------------------------
 // An individual instruction router for a specific pipe
 
-module InstRouterIQUnit #(
+module SSInstRouterUnit #(
   parameter p_isa_subset = p_tinyrv1
 ) (
   input  rv_uop uop,
@@ -118,10 +118,10 @@ module IQPicker #(
 endmodule
 
 //------------------------------------------------------------------------
-// InstRouterIQ
+// SSInstRouter
 //------------------------------------------------------------------------
 
-module InstRouterIQ #(
+module SSInstRouter #(
   parameter p_num_pipes                                = 8,
   parameter rv_op_vec [p_num_pipes-1:0] p_pipe_subsets = '{default: p_tinyrv1},
   parameter p_iq_depth                                 = 8,
@@ -145,7 +145,7 @@ module InstRouterIQ #(
   genvar i;
   generate
     for( i = 0; i < p_num_pipes; i = i + 1 ) begin: inst_router_units
-      InstRouterIQUnit #(
+      SSInstRouterUnit #(
         .p_isa_subset (p_pipe_subsets[p_num_pipes-i-1])
       ) router_unit (
         .uop           (uop),
@@ -171,4 +171,4 @@ module InstRouterIQ #(
 
 endmodule
 
-`endif // HW_DECODE_INSTROUTERIQ_V
+`endif // HW_DECODE_SSINSTROUTER_V

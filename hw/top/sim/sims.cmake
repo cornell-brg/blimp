@@ -8,6 +8,7 @@ set(BLIMP_SIMS
   BlimpV8_sim.v
   BlimpV9_sim.v
   BlimpV10_sim.v
+  BlimpV11_sim.v
   BlimpVdemo_sim.v
   BlimpVfpga_sim.v
 )

@@ -14,17 +14,17 @@ task test_case_golden_jal_1_regs();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "jal  x1, 0x208"   );
+  h.asm( 'h200, "jal  x1, 0x208"   ); //
   h.asm( 'h204, "addi x2, x0, 1"   );
-  h.asm( 'h208, "addi x3, x0, 2"   );
+  h.asm( 'h208, "addi x3, x0, 2"   ); //
 
-  h.asm( 'h20c, "jal  x2, 0x214"   );
+  h.asm( 'h20c, "jal  x2, 0x214"   ); //
   h.asm( 'h210, "addi x3, x0, 3"   );
-  h.asm( 'h214, "addi x4, x0, 4"   );
+  h.asm( 'h214, "addi x4, x0, 4"   ); //
 
-  h.asm( 'h218, "jal  x3, 0x220"   );
+  h.asm( 'h218, "jal  x3, 0x220"   ); //
   h.asm( 'h21c, "addi x4, x0, 5"   );
-  h.asm( 'h220, "addi x5, x0, 6"   );
+  h.asm( 'h220, "addi x5, x0, 6"   ); //
 
   h.asm( 'h224, "jal  x4, 0x22c"   );
   h.asm( 'h228, "addi x5, x0, 7"   );

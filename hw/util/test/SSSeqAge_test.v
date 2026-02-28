@@ -1,21 +1,21 @@
 //========================================================================
-// MSeqAge_test.v
+// SSSeqAge_test.v
 //========================================================================
 // A testbench for our multi-commit sequence number age logic
 
 `include "test/TestUtils.v"
-`include "hw/util/MSeqAge.v"
+`include "hw/util/SSSeqAge.v"
 `include "intf/CommitNotif.v"
 `include "test/fl/TestMPub.v"
 
 import TestEnv::*;
 
 //========================================================================
-// MSeqAgeTestSuite
+// SSSeqAgeTestSuite
 //========================================================================
 // A test suite for a particular parametrization of the age logic
 
-module MSeqAgeTestSuite #(
+module SSSeqAgeTestSuite #(
   parameter p_suite_num    = 0,
   parameter p_seq_num_bits = 5,
   parameter p_num_be_lanes = 2
@@ -40,7 +40,7 @@ module MSeqAgeTestSuite #(
     .p_seq_num_bits (p_seq_num_bits)
   ) commit_notif [p_num_be_lanes] ();
 
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
   ) dut(
     .commit (commit_notif),
@@ -301,14 +301,14 @@ module MSeqAgeTestSuite #(
 endmodule
 
 //========================================================================
-// MSeqAge_test
+// SSSeqAge_test
 //========================================================================
 
-module MSeqAge_test;
-  MSeqAgeTestSuite #(1)     suite_1();
-  MSeqAgeTestSuite #(2,  6) suite_2();
-  MSeqAgeTestSuite #(3,  8) suite_3();
-  MSeqAgeTestSuite #(4, 32) suite_4();
+module SSSeqAge_test;
+  SSSeqAgeTestSuite #(1)     suite_1();
+  SSSeqAgeTestSuite #(2,  6) suite_2();
+  SSSeqAgeTestSuite #(3,  8) suite_3();
+  SSSeqAgeTestSuite #(4, 32) suite_4();
 
   int s;
 

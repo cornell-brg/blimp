@@ -1,13 +1,13 @@
 //========================================================================
-// MRegfile.v
+// SSRegfileL1.v
 //========================================================================
 // A parametrized register file, with x0 hard-coded to 0. Supports superscalar
 // backend through multiple write ports
 
-`ifndef HW_DECODE_MREGFILE_V
-`define HW_DECODE_MREGFILE_V
+`ifndef HW_DECODE_SSREGFILEL1_V
+`define HW_DECODE_SSREGFILEL1_V
 
-module MRegfile #(
+module SSRegfileL1 #(
   parameter p_entry_bits   = 32,
   parameter p_num_regs     = 32,
   parameter p_num_be_lanes = 2
@@ -92,4 +92,4 @@ module MRegfile #(
   end
 endmodule
 
-`endif // HW_DECODE_MREGFILE_V
+`endif // HW_DECODE_SSREGFILEL1_V

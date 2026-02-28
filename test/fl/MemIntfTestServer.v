@@ -3,9 +3,9 @@
 //========================================================================
 // A FL model of a memory server, to use in testing
 
+`include "fl/fl_peripherals.v"
 `include "hw/util/DelayStream.v"
 `include "intf/MemIntf.v"
-`include "test/FLTestUtils.v"
 `include "types/MemMsg.v"
 
 `ifndef TEST_FL_MEM_INTF_TEST_SERVER_V
@@ -15,6 +15,7 @@ module MemIntfTestServer #(
   parameter type t_req_msg  = `MEM_REQ ( 8 ),
   parameter type t_resp_msg = `MEM_RESP( 8 ),
   parameter p_opaq_bits     = 8,
+  parameter p_num_words     = 1,
 
   parameter p_send_intv_delay = 1,
   parameter p_recv_intv_delay = 1
@@ -26,8 +27,6 @@ module MemIntfTestServer #(
   MemIntf.server dut
 );
 
-  FLTestUtils t( .* );
-  
   //----------------------------------------------------------------------
   // Store memory values in association array
   //----------------------------------------------------------------------
@@ -117,26 +116,41 @@ module MemIntfTestServer #(
       // Execute the transaction
       case( curr_req.op )
         MEM_MSG_READ: begin
-          if( curr_req.addr  == CYCLE_COUNT_ADDR )
-            curr_resp.data = cycle_count;
-          else if( mem.exists( curr_req.addr ) == 1 )
-            curr_resp.data = mem[curr_req.addr];
-          else
-            curr_resp.data = 'x;
+          for( int w = 0; w < p_num_words; w++ ) begin
+            if( try_fl_read(curr_req.addr + (w << 2), _temp_write_data) )
+              curr_resp.data[w*32 +: 32] = _temp_write_data;
+            else if( (curr_req.addr + (w << 2)) == CYCLE_COUNT_ADDR )
+              curr_resp.data[w*32 +: 32] = cycle_count;
+            else if( mem.exists( curr_req.addr + (w << 2) ) == 1 )
+              curr_resp.data[w*32 +: 32] = mem[curr_req.addr + (w << 2)];
+            else
+              curr_resp.data[w*32 +: 32] = 'x;
+          end
           curr_resp.strb  = curr_req.strb;
         end
         MEM_MSG_WRITE: begin
-          _temp_write_data = mem[curr_req.addr];
-          if( ( curr_req.strb & 4'b0001 ) > 0 )
-            _temp_write_data[7:0] = curr_req.data[7:0];
-          if( ( curr_req.strb & 4'b0010 ) > 0 )
-            _temp_write_data[15:8] = curr_req.data[15:8];
-          if( ( curr_req.strb & 4'b0100 ) > 0 )
-            _temp_write_data[23:16] = curr_req.data[23:16];
-          if( ( curr_req.strb & 4'b1000 ) > 0 )
-            _temp_write_data[31:24] = curr_req.data[31:24];
+          for( int i = 0; i < p_num_words; i++ ) begin
+            if( mem.exists( curr_req.addr + (i << 2) ) == 1 )
+              _temp_write_data = mem[curr_req.addr + (i << 2)];
+            else
+              _temp_write_data = '0;
+            if( ( curr_req.strb[i*4 +: 4] & 4'b0001 ) > 0 )
+              _temp_write_data[7:0] = curr_req.data[i*32 +: 8];
+            if( ( curr_req.strb[i*4 +: 4] & 4'b0010 ) > 0 )
+              _temp_write_data[15:8] = curr_req.data[i*32+8 +: 8];
+            if( ( curr_req.strb[i*4 +: 4] & 4'b0100 ) > 0 )
+              _temp_write_data[23:16] = curr_req.data[i*32+16 +: 8];
+            if( ( curr_req.strb[i*4 +: 4] & 4'b1000 ) > 0 )
+              _temp_write_data[31:24] = curr_req.data[i*32+24 +: 8];
+            if( curr_req.strb[i*4 +: 4] == 4'b1111 ) begin
+              if( try_fl_write(curr_req.addr + (i << 2), _temp_write_data) );
+              else
+                mem[curr_req.addr + (i << 2)] = _temp_write_data;
+            end else begin
+              mem[curr_req.addr + (i << 2)] = _temp_write_data;
+            end
+          end
 
-          mem[curr_req.addr] = _temp_write_data;
           curr_resp.data = 'x;
           curr_resp.strb  = curr_req.strb;
         end

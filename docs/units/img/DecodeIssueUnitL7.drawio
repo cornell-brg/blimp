@@ -31,7 +31,7 @@
             <mxPoint x="230" y="314.71" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="TZuAfcEIjXhIGf_Y7F3L-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="M2RenameTable" vertex="1">
+        <mxCell id="TZuAfcEIjXhIGf_Y7F3L-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="SSRenameTableL2" vertex="1">
           <mxGeometry height="110" width="100" x="420" y="260" as="geometry" />
         </mxCell>
         <mxCell id="TZuAfcEIjXhIGf_Y7F3L-11" edge="1" parent="1" source="TZuAfcEIjXhIGf_Y7F3L-8" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#7D7D7D;gradientColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="TZuAfcEIjXhIGf_Y7F3L-10" value="">
@@ -43,7 +43,7 @@
         <mxCell id="TZuAfcEIjXhIGf_Y7F3L-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="allocate r_dest" vertex="1">
           <mxGeometry height="30" width="60" x="340" y="275.25" as="geometry" />
         </mxCell>
-        <mxCell id="TZuAfcEIjXhIGf_Y7F3L-14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="InstRouterIQ" vertex="1">
+        <mxCell id="TZuAfcEIjXhIGf_Y7F3L-14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="SSInstRouter" vertex="1">
           <mxGeometry height="110" width="100" x="600" y="260" as="geometry" />
         </mxCell>
         <mxCell id="TZuAfcEIjXhIGf_Y7F3L-15" edge="1" parent="1" source="TZuAfcEIjXhIGf_Y7F3L-10" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#7D7D7D;gradientColor=none;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="TZuAfcEIjXhIGf_Y7F3L-14" value="">

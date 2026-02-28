@@ -15,9 +15,9 @@
 `include "hw/decode_issue/InstDecoder.v"
 `include "hw/decode_issue/ImmGen.v"
 `include "hw/decode_issue/InstRouter.v"
-`include "hw/decode_issue/MRegfile.v"
-`include "hw/decode_issue/MRenameTable.v"
-`include "hw/util/MSeqAge.v"
+`include "hw/decode_issue/SSRegfileL1.v"
+`include "hw/decode_issue/SSRenameTableL1.v"
+`include "hw/util/SSSeqAge.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
@@ -141,7 +141,7 @@ module DecodeIssueUnitL6 #(
   logic [p_phys_addr_bits-1:0] lookup_preg    [2];
   logic                        lookup_pending [2];
 
-  MRenameTable #(
+  SSRenameTableL1 #(
     .p_num_phys_regs (p_num_phys_regs),
     .p_num_be_lanes  (p_num_be_lanes)
   ) rename_table (
@@ -176,7 +176,7 @@ module DecodeIssueUnitL6 #(
     end
   endgenerate
 
-  MRegfile #(
+  SSRegfileL1 #(
     .p_entry_bits   (32),
     .p_num_regs     (p_num_phys_regs),
     .p_num_be_lanes (p_num_be_lanes)
@@ -232,7 +232,7 @@ module DecodeIssueUnitL6 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
-  MSeqAge #(
+  SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
   ) seq_age (
     .*

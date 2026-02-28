@@ -225,8 +225,8 @@ module MemIntfTestServer_2Port #(
           end else begin
             mem[curr_req[1].addr] = _temp_write_data[1];
           end
-          curr_resp[0].data = 'x;
-          curr_resp[0].strb  = curr_req[0].strb;
+          curr_resp[1].data = 'x;
+          curr_resp[1].strb  = curr_req[1].strb;
         end
       endcase
 

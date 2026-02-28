@@ -38,8 +38,23 @@ typedef enum logic {
     logic [31:0]          data;     \
   } `MEM_REQ( OPAQ_BITS )
 
+`define MEM_REQ_SS( OPAQ_BITS, NUM_WORDS ) \
+  t_mem_req_msg_``OPAQ_BITS``_``NUM_WORDS``
+
+`define MEM_REQ_DEFINE_SS( OPAQ_BITS, NUM_WORDS ) \
+  typedef struct packed {                         \
+    t_op                       op;                \
+    logic [OPAQ_BITS-1:0]      opaque;            \
+    logic [31:0]               addr;              \
+    logic [NUM_WORDS*4-1:0]    strb;              \
+    logic [NUM_WORDS*32-1:0]   data;              \
+  } `MEM_REQ_SS( OPAQ_BITS, NUM_WORDS )
+
 `define MEM_RESP( OPAQ_BITS ) \
   t_mem_resp_msg_``OPAQ_BITS``
+
+`define MEM_RESP_SS( OPAQ_BITS, NUM_WORDS ) \
+  t_mem_resp_msg_``OPAQ_BITS``_``NUM_WORDS``
 
 `define MEM_RESP_DEFINE( OPAQ_BITS ) \
   typedef struct packed {            \
@@ -49,6 +64,15 @@ typedef enum logic {
     logic [3:0]           strb;      \
     logic [31:0]          data;      \
   } `MEM_RESP( OPAQ_BITS )
+
+`define MEM_RESP_DEFINE_SS( OPAQ_BITS, NUM_WORDS ) \
+  typedef struct packed {                          \
+    t_op                       op;                 \
+    logic [OPAQ_BITS-1:0]      opaque;             \
+    logic [31:0]               addr;               \
+    logic [NUM_WORDS*4-1:0]    strb;               \
+    logic [NUM_WORDS*32-1:0]   data;               \
+  } `MEM_RESP_SS( OPAQ_BITS, NUM_WORDS )
 
 //------------------------------------------------------------------------
 // Define commonly-used parametrizations

@@ -1,25 +1,25 @@
 //========================================================================
-// MRegfile_test.v
+// SSRegfileL1_test.v
 //========================================================================
 // A testbench for our parametrized pending register file
 
 `include "test/TestUtils.v"
-`include "hw/decode_issue/MRegfile.v"
+`include "hw/decode_issue/SSRegfileL1.v"
 
 import TestEnv::*;
 
 //========================================================================
-// MRegfileTestSuite
+// SSRegfileL1TestSuite
 //========================================================================
 // A test suite for a particular parametrization of the multi-write port regfile
 
-module MRegfileTestSuite #(
+module SSRegfileL1TestSuite #(
   parameter p_suite_num    = 0,
   parameter p_entry_bits   = 32,
   parameter p_num_regs     = 32,
   parameter p_num_be_lanes = 2
 );
-  string suite_name = $sformatf("%0d: MRegfileTestSuite_%0d_%d", 
+  string suite_name = $sformatf("%0d: SSRegfileL1TestSuite_%0d_%d", 
                                 p_suite_num, p_num_regs, 
                                 p_entry_bits);
 
@@ -46,7 +46,7 @@ module MRegfileTestSuite #(
   logic [p_entry_bits-1:0] dut_wdata [p_num_be_lanes];
   logic                    dut_wen   [p_num_be_lanes];
 
-  MRegfile #(
+  SSRegfileL1 #(
     .p_entry_bits   (p_entry_bits),
     .p_num_regs     (p_num_regs),
     .p_num_be_lanes (p_num_be_lanes)
@@ -299,14 +299,14 @@ module MRegfileTestSuite #(
 endmodule
 
 //========================================================================
-// MRegfile_test
+// SSRegfileL1_test
 //========================================================================
 
-module MRegfile_test;
-  MRegfileTestSuite #(1)         suite_1();
-  MRegfileTestSuite #(2, 16, 32) suite_2();
-  MRegfileTestSuite #(3, 32, 8 ) suite_3();
-  MRegfileTestSuite #(4,  8, 64) suite_4();
+module SSRegfileL1_test;
+  SSRegfileL1TestSuite #(1)         suite_1();
+  SSRegfileL1TestSuite #(2, 16, 32) suite_2();
+  SSRegfileL1TestSuite #(3, 32, 8 ) suite_3();
+  SSRegfileL1TestSuite #(4,  8, 64) suite_4();
 
   int s;
 

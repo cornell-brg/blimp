@@ -1,9 +1,9 @@
 //========================================================================
-// MRenameTable_test.v
+// SSRenameTableL1_test.v
 //========================================================================
 // A testbench for our multi rename table
 
-`include "hw/decode_issue/MRenameTable.v"
+`include "hw/decode_issue/SSRenameTableL1.v"
 `include "intf/CommitNotif.v"
 `include "intf/CompleteNotif.v"
 `include "test/fl/TestCaller.v"
@@ -13,11 +13,11 @@
 import TestEnv::*;
 
 //========================================================================
-// MRenameTableTestSuite
+// SSRenameTableL1TestSuite
 //========================================================================
 // A test suite for the rename table
 
-module MRenameTableTestSuite #(
+module SSRenameTableL1TestSuite #(
   parameter p_suite_num     = 0,
   parameter p_num_phys_regs = 36,
   parameter p_num_be_lanes  = 2
@@ -25,7 +25,7 @@ module MRenameTableTestSuite #(
 
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
-  string suite_name = $sformatf("%0d: MRenameTableTestSuite_%0d", 
+  string suite_name = $sformatf("%0d: SSRenameTableL1TestSuite_%0d", 
                                 p_suite_num, p_num_phys_regs);
   
   //----------------------------------------------------------------------
@@ -58,7 +58,7 @@ module MRenameTableTestSuite #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) commit_notif [p_num_be_lanes] ();
 
-  MRenameTable #(
+  SSRenameTableL1 #(
     .p_num_phys_regs (p_num_phys_regs),
     .p_num_be_lanes  (p_num_be_lanes)
   ) dut (
@@ -202,8 +202,8 @@ module MRenameTableTestSuite #(
   endgenerate
 
   TestMPub #(
-    .t_msg    (t_complete_msg),
-    .num_msgs (p_num_be_lanes)
+    .t_msg      (t_complete_msg),
+    .p_num_msgs (p_num_be_lanes)
   ) complete_pub (
     .msg (complete_msg),
     .val (complete_msg_val),
@@ -260,8 +260,8 @@ module MRenameTableTestSuite #(
   endgenerate
 
   TestMPub #(
-    .t_msg    (t_commit_msg),
-    .num_msgs (p_num_be_lanes)
+    .t_msg      (t_commit_msg),
+    .p_num_msgs (p_num_be_lanes)
   ) commit_pub (
     .msg (commit_msg),
     .val (commit_msg_val),
@@ -428,13 +428,13 @@ module MRenameTableTestSuite #(
 endmodule
 
 //========================================================================
-// MRenameTable_test
+// SSRenameTableL1_test
 //========================================================================
 
-module MRenameTable_test;
-  MRenameTableTestSuite #(1)        suite_1();
-  MRenameTableTestSuite #(2, 40, 4) suite_2();
-  MRenameTableTestSuite #(3, 64, 8) suite_3();
+module SSRenameTableL1_test;
+  SSRenameTableL1TestSuite #(1)        suite_1();
+  SSRenameTableL1TestSuite #(2, 40, 4) suite_2();
+  SSRenameTableL1TestSuite #(3, 64, 8) suite_3();
 
   int s;
 

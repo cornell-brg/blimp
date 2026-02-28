@@ -10,7 +10,8 @@
 
 interface MemIntf
 #(
-  parameter p_opaq_bits = 8
+  parameter p_opaq_bits = 8,
+  parameter p_num_words = 1
 );
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -21,8 +22,8 @@ interface MemIntf
     t_op                    op;
     logic [p_opaq_bits-1:0] opaque;
     logic [31:0]            addr;
-    logic [3:0]             strb;
-    logic [31:0]            data;
+    logic [p_num_words*4-1:0]   strb;
+    logic [p_num_words*32-1:0]  data;
   } mem_msg_t;
   
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
