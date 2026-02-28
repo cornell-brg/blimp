@@ -45,9 +45,413 @@ task test_case_golden_mixed_1_basic();
 endtask
 
 //------------------------------------------------------------------------
-// run_add_tests
+// test_case_golden_mixed_2_waw
+//------------------------------------------------------------------------
+// Write-After-Write: multiple instructions target the same register.
+// In a superscalar, both may be in-flight; the later write must win.
+
+task test_case_golden_mixed_2_waw();
+  h.t.test_case_begin( "test_case_golden_mixed_2_waw" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  // Back-to-back writes to x1
+  h.asm( 'h200, "addi x1, x0, 1"     ); // x1 = 1
+  h.asm( 'h204, "addi x1, x0, 2"     ); // x1 = 2 (WAW)
+  h.asm( 'h208, "addi x2, x1, 0"     ); // x2 should read x1 = 2
+
+  // WAW with different instruction types (addi then add)
+  h.asm( 'h20c, "addi x3, x0, 3"     );
+  h.asm( 'h210, "addi x4, x0, 4"     );
+  h.asm( 'h214, "addi x5, x0, 10"    ); // x5 = 10
+  h.asm( 'h218, "add  x5, x3, x4"    ); // x5 = 7 (WAW overwrites 10)
+  h.asm( 'h21c, "addi x6, x5, 0"     ); // x6 = 7
+
+  // WAW: mul (long latency) then addi — addi must win
+  h.asm( 'h220, "addi x7, x0, 5"     );
+  h.asm( 'h224, "addi x8, x0, 6"     );
+  h.asm( 'h228, "mul  x9, x7, x8"    ); // x9 = 30 (mul may be slow)
+  h.asm( 'h22c, "addi x9, x0, 99"    ); // x9 = 99 (WAW: must beat mul)
+  h.asm( 'h230, "addi x10, x9, 0"    ); // x10 = 99
+
+  // WAW: addi then mul — mul must win
+  h.asm( 'h234, "addi x11, x0, 42"   ); // x11 = 42
+  h.asm( 'h238, "mul  x11, x7, x8"   ); // x11 = 30 (WAW: mul after addi)
+  h.asm( 'h23c, "addi x12, x11, 0"   ); // x12 = 30
+
+  // Three consecutive writes to same register
+  h.asm( 'h240, "addi x13, x0, 1"    );
+  h.asm( 'h244, "addi x13, x0, 2"    );
+  h.asm( 'h248, "addi x13, x0, 3"    ); // x13 = 3 (final)
+  h.asm( 'h24c, "addi x14, x13, 0"   ); // x14 = 3
+
+  // Four consecutive writes to same register
+  h.asm( 'h250, "addi x15, x0, 10"   );
+  h.asm( 'h254, "addi x15, x0, 20"   );
+  h.asm( 'h258, "addi x15, x0, 30"   );
+  h.asm( 'h25c, "addi x15, x0, 40"   ); // x15 = 40 (final)
+  h.asm( 'h260, "addi x16, x15, 0"   ); // x16 = 40
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_3_war
+//------------------------------------------------------------------------
+// Write-After-Read: a later instruction writes a register that an earlier
+// instruction reads. The write must not corrupt the earlier read.
+
+task test_case_golden_mixed_3_war();
+  h.t.test_case_begin( "test_case_golden_mixed_3_war" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  h.asm( 'h200, "addi x1, x0, 10"    ); // x1 = 10
+  h.asm( 'h204, "addi x2, x0, 20"    ); // x2 = 20
+
+  // Read x1, then overwrite x1
+  h.asm( 'h208, "addi x3, x1, 5"     ); // x3 = 15 (reads x1=10)
+  h.asm( 'h20c, "addi x1, x0, 99"    ); // x1 = 99 (WAR on x1)
+  h.asm( 'h210, "addi x4, x1, 0"     ); // x4 = 99
+
+  // Add reads x2, next instr writes x2
+  h.asm( 'h214, "add  x5, x1, x2"    ); // x5 = 99+20 = 119 (reads x2=20)
+  h.asm( 'h218, "addi x2, x0, 77"    ); // x2 = 77 (WAR on x2)
+  h.asm( 'h21c, "addi x6, x2, 0"     ); // x6 = 77
+
+  // Mul reads operands, next instructions overwrite them
+  h.asm( 'h220, "addi x7, x0, 3"     );
+  h.asm( 'h224, "addi x8, x0, 4"     );
+  h.asm( 'h228, "mul  x9, x7, x8"    ); // x9 = 12 (reads x7=3, x8=4)
+  h.asm( 'h22c, "addi x7, x0, 100"   ); // x7 = 100 (WAR)
+  h.asm( 'h230, "addi x8, x0, 200"   ); // x8 = 200 (WAR)
+  h.asm( 'h234, "addi x10, x9, 0"    ); // x10 = 12 (must be 3*4)
+
+  // Ping-pong between two registers (combined RAW + WAR)
+  h.asm( 'h238, "addi x11, x0, 1"    ); // x11 = 1
+  h.asm( 'h23c, "addi x12, x11, 1"   ); // x12 = 2
+  h.asm( 'h240, "addi x11, x12, 1"   ); // x11 = 3
+  h.asm( 'h244, "addi x12, x11, 1"   ); // x12 = 4
+  h.asm( 'h248, "addi x11, x12, 1"   ); // x11 = 5
+  h.asm( 'h24c, "addi x12, x11, 1"   ); // x12 = 6
+  h.asm( 'h250, "addi x11, x12, 1"   ); // x11 = 7
+  h.asm( 'h254, "addi x12, x11, 1"   ); // x12 = 8
+  h.asm( 'h258, "addi x13, x11, 0"   ); // x13 = 7
+  h.asm( 'h25c, "addi x14, x12, 0"   ); // x14 = 8
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_4_raw_chain
+//------------------------------------------------------------------------
+// Long RAW dependency chains across different instruction types.
+
+task test_case_golden_mixed_4_raw_chain();
+  h.t.test_case_begin( "test_case_golden_mixed_4_raw_chain" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  // Deep addi chain: x1 -> x2 -> x3 -> x4 -> x5 -> x6 -> x7 -> x8
+  h.asm( 'h200, "addi x1, x0, 1"     ); // 1
+  h.asm( 'h204, "addi x2, x1, 1"     ); // 2
+  h.asm( 'h208, "addi x3, x2, 1"     ); // 3
+  h.asm( 'h20c, "addi x4, x3, 1"     ); // 4
+  h.asm( 'h210, "addi x5, x4, 1"     ); // 5
+  h.asm( 'h214, "addi x6, x5, 1"     ); // 6
+  h.asm( 'h218, "addi x7, x6, 1"     ); // 7
+  h.asm( 'h21c, "addi x8, x7, 1"     ); // 8
+
+  // Mixed-type chain: addi -> mul -> add -> mul -> add
+  h.asm( 'h220, "addi x9,  x0, 2"    ); // 2
+  h.asm( 'h224, "mul  x10, x9, x9"   ); // 4
+  h.asm( 'h228, "add  x11, x10, x9"  ); // 6
+  h.asm( 'h22c, "mul  x12, x11, x9"  ); // 12
+  h.asm( 'h230, "add  x13, x12, x11" ); // 18
+
+  // Load -> arithmetic chain
+  h.asm( 'h234, "addi x14, x0, 0x100" );
+  h.asm( 'h238, "lw   x15, 0(x14)"    ); // x15 = 7
+  h.asm( 'h23c, "addi x16, x15, 3"    ); // x16 = 10
+  h.asm( 'h240, "mul  x17, x16, x15"  ); // x17 = 70
+  h.asm( 'h244, "add  x18, x17, x16"  ); // x18 = 80
+
+  // Store then load same address chain
+  h.asm( 'h248, "addi x19, x0, 0x110" );
+  h.asm( 'h24c, "sw   x18, 0(x19)"    ); // mem[0x110] = 80
+  h.asm( 'h250, "lw   x20, 0(x19)"    ); // x20 = 80
+  h.asm( 'h254, "addi x21, x20, 1"    ); // x21 = 81
+
+  // Write data
+  h.data( 'h100, 7 );
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_5_mem_deps
+//------------------------------------------------------------------------
+// Memory dependency patterns: store-to-load forwarding, multiple stores
+// to same address, interleaved memory operations.
+
+task test_case_golden_mixed_5_mem_deps();
+  h.t.test_case_begin( "test_case_golden_mixed_5_mem_deps" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  h.asm( 'h200, "addi x1, x0, 0x100" );
+  h.asm( 'h204, "addi x2, x0, 0x104" );
+  h.asm( 'h208, "addi x3, x0, 0x108" );
+
+  // Store then immediate load (store-to-load forwarding)
+  h.asm( 'h20c, "addi x4, x0, 42"    );
+  h.asm( 'h210, "sw   x4, 0(x1)"     ); // mem[0x100] = 42
+  h.asm( 'h214, "lw   x5, 0(x1)"     ); // x5 = 42
+
+  // Store, independent work, then load same address
+  h.asm( 'h218, "addi x6, x0, 55"    );
+  h.asm( 'h21c, "sw   x6, 0(x2)"     ); // mem[0x104] = 55
+  h.asm( 'h220, "addi x7, x0, 77"    ); // independent
+  h.asm( 'h224, "addi x8, x0, 88"    ); // independent
+  h.asm( 'h228, "lw   x9, 0(x2)"     ); // x9 = 55
+
+  // Multiple stores to same address, load should get last
+  h.asm( 'h22c, "addi x10, x0, 10"   );
+  h.asm( 'h230, "addi x11, x0, 20"   );
+  h.asm( 'h234, "addi x12, x0, 30"   );
+  h.asm( 'h238, "sw   x10, 0(x3)"    ); // mem[0x108] = 10
+  h.asm( 'h23c, "sw   x11, 0(x3)"    ); // mem[0x108] = 20
+  h.asm( 'h240, "sw   x12, 0(x3)"    ); // mem[0x108] = 30
+  h.asm( 'h244, "lw   x13, 0(x3)"    ); // x13 = 30
+
+  // Load-compute-store-load (read-modify-write)
+  h.asm( 'h248, "lw   x14, 0(x1)"    ); // x14 = 42
+  h.asm( 'h24c, "addi x15, x14, 8"   ); // x15 = 50
+  h.asm( 'h250, "sw   x15, 0(x1)"    ); // mem[0x100] = 50
+  h.asm( 'h254, "lw   x16, 0(x1)"    ); // x16 = 50
+
+  // Stores and loads to different addresses (no conflict, parallelizable)
+  h.asm( 'h258, "addi x17, x0, 61"   );
+  h.asm( 'h25c, "addi x18, x0, 62"   );
+  h.asm( 'h260, "sw   x17, 0(x2)"    ); // mem[0x104] = 61
+  h.asm( 'h264, "sw   x18, 0(x3)"    ); // mem[0x108] = 62
+  h.asm( 'h268, "lw   x19, 0(x3)"    ); // x19 = 62
+  h.asm( 'h26c, "lw   x20, 0(x2)"    ); // x20 = 61
+
+  // Computed address: addi -> sw -> lw (address RAW dependency)
+  h.asm( 'h270, "addi x21, x0, 0x10c" );
+  h.asm( 'h274, "addi x22, x0, 0x70"  );
+  h.asm( 'h278, "sw   x22, 0(x21)"    ); // mem[0x10c] = 0x70
+  h.asm( 'h27c, "lw   x23, 0(x21)"    ); // x23 = 0x70
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_6_mixed_latency
+//------------------------------------------------------------------------
+// Interleave mul (multi-cycle) with single-cycle adds and loads.
+// Tests that varying latencies are handled correctly.
+
+task test_case_golden_mixed_6_mixed_latency();
+  h.t.test_case_begin( "test_case_golden_mixed_6_mixed_latency" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  h.asm( 'h200, "addi x1, x0, 2"     );
+  h.asm( 'h204, "addi x2, x0, 3"     );
+  h.asm( 'h208, "addi x3, x0, 4"     );
+  h.asm( 'h20c, "addi x4, x0, 5"     );
+
+  // Mul then independent adds, then use mul result
+  h.asm( 'h210, "mul  x5, x1, x2"    ); // x5 = 6
+  h.asm( 'h214, "add  x6, x3, x4"    ); // x6 = 9 (independent)
+  h.asm( 'h218, "add  x7, x3, x3"    ); // x7 = 8 (independent)
+  h.asm( 'h21c, "add  x8, x5, x6"    ); // x8 = 15 (needs mul result)
+
+  // Two muls with independent work between
+  h.asm( 'h220, "mul  x9,  x1, x3"   ); // x9 = 8
+  h.asm( 'h224, "addi x10, x0, 7"    ); // independent
+  h.asm( 'h228, "addi x11, x0, 11"   ); // independent
+  h.asm( 'h22c, "mul  x12, x2, x4"   ); // x12 = 15
+  h.asm( 'h230, "add  x13, x9, x12"  ); // x13 = 23 (needs both muls)
+
+  // Mul chain: each feeds the next
+  h.asm( 'h234, "mul  x14, x1, x2"   ); // x14 = 6
+  h.asm( 'h238, "mul  x15, x14, x3"  ); // x15 = 24
+  h.asm( 'h23c, "mul  x16, x15, x1"  ); // x16 = 48
+
+  // Load feeding mul
+  h.asm( 'h240, "addi x17, x0, 0x100" );
+  h.asm( 'h244, "lw   x18, 0(x17)"    ); // x18 = 5
+  h.asm( 'h248, "mul  x19, x18, x2"   ); // x19 = 15 (load->mul RAW)
+  h.asm( 'h24c, "add  x20, x19, x18"  ); // x20 = 20
+
+  // Mul result stored then loaded back
+  h.asm( 'h250, "mul  x21, x3, x4"    ); // x21 = 20
+  h.asm( 'h254, "addi x22, x0, 0x110" );
+  h.asm( 'h258, "sw   x21, 0(x22)"    ); // mem[0x110] = 20
+  h.asm( 'h25c, "lw   x23, 0(x22)"    ); // x23 = 20
+  h.asm( 'h260, "addi x24, x23, 1"    ); // x24 = 21
+
+  // Write data
+  h.data( 'h100, 5 );
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_7_ctrl_data
+//------------------------------------------------------------------------
+// Control flow depending on just-computed values: branch on arithmetic
+// results, mul results, load results, and JAL link register usage.
+
+task test_case_golden_mixed_7_ctrl_data();
+  h.t.test_case_begin( "test_case_golden_mixed_7_ctrl_data" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+
+  // Branch on just-computed add result (RAW into branch)
+  h.asm( 'h200, "addi x1, x0, 5"     );
+  h.asm( 'h204, "addi x2, x0, 5"     );
+  h.asm( 'h208, "add  x3, x1, x0"    ); // x3 = 5
+  h.asm( 'h20c, "bne  x3, x2, 0x220" ); // NOT taken (5 == 5)
+  h.asm( 'h210, "addi x4, x0, 1"     ); // executes
+
+  // Branch on mul result (long-latency RAW into branch)
+  h.asm( 'h214, "mul  x5, x1, x2"    ); // x5 = 25
+  h.asm( 'h218, "addi x6, x0, 25"    );
+  h.asm( 'h21c, "bne  x5, x6, 0x240" ); // NOT taken (25 == 25)
+
+  // JAL link register used immediately after landing
+  h.asm( 'h220, "jal  x7, 0x228"     ); // x7 = 0x224, jump to 0x228
+  h.asm( 'h224, "addi x8, x0, 99"    ); // squashed
+  h.asm( 'h228, "addi x9, x7, 0"     ); // x9 = 0x224 (RAW on link reg)
+
+  // Load result used as branch condition
+  h.asm( 'h22c, "addi x10, x0, 0x100" );
+  h.asm( 'h230, "lw   x11, 0(x10)"    ); // x11 = 1
+  h.asm( 'h234, "bne  x11, x0, 0x23c" ); // taken (1 != 0)
+  h.asm( 'h238, "addi x12, x0, 99"    ); // squashed
+
+  // Compute then branch then use result across branch
+  h.asm( 'h23c, "addi x13, x0, 3"    );
+  h.asm( 'h240, "addi x14, x0, 3"    );
+  h.asm( 'h244, "add  x15, x13, x14" ); // x15 = 6
+  h.asm( 'h248, "bne  x15, x0, 0x250" ); // taken (6 != 0)
+  h.asm( 'h24c, "addi x16, x0, 99"   ); // squashed
+  h.asm( 'h250, "addi x17, x15, 1"   ); // x17 = 7 (x15 survives branch)
+
+  // Loop with computed bound (mul result as branch operand)
+  h.asm( 'h254, "addi x18, x0, 0"    ); // counter = 0
+  h.asm( 'h258, "mul  x19, x13, x1"  ); // x19 = 3*5 = 15 (loop bound)
+  h.asm( 'h25c, "addi x18, x18, 1"   ); // loop: counter++
+  h.asm( 'h260, "blt  x18, x19, 0x25c" ); // loop while counter < 15
+  h.asm( 'h264, "addi x20, x18, 0"   ); // x20 = 15
+
+  // Write data
+  h.data( 'h100, 1 );
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// test_case_golden_mixed_8_complex
+//------------------------------------------------------------------------
+// Realistic program: sum of squares with loads, muls, stores, and
+// verification — exercises all dependency types together.
+
+task test_case_golden_mixed_8_complex();
+  h.t.test_case_begin( "test_case_golden_mixed_8_complex" );
+  if( !h.t.run_test ) return;
+  fl_reset();
+
+  // Write assembly program into memory
+  // Compute: result[i] = running sum of (arr[i] * arr[i])
+
+  h.asm( 'h200, "addi x1, x0, 0x100" ); // x1 = array base
+  h.asm( 'h204, "addi x2, x0, 0x110" ); // x2 = result base
+  h.asm( 'h208, "addi x3, x0, 0"     ); // x3 = accumulator
+
+  // Iter 1: lw->mul RAW, mul->add RAW, add->sw RAW
+  h.asm( 'h20c, "lw   x5, 0(x1)"     ); // x5 = 3
+  h.asm( 'h210, "mul  x6, x5, x5"    ); // x6 = 9
+  h.asm( 'h214, "add  x3, x3, x6"    ); // x3 = 9
+  h.asm( 'h218, "sw   x3, 0(x2)"     ); // mem[0x110] = 9
+  h.asm( 'h21c, "addi x1, x1, 4"     ); // WAR: x1 read by lw above
+  h.asm( 'h220, "addi x2, x2, 4"     );
+
+  // Iter 2
+  h.asm( 'h224, "lw   x5, 0(x1)"     ); // x5 = 4
+  h.asm( 'h228, "mul  x6, x5, x5"    ); // x6 = 16
+  h.asm( 'h22c, "add  x3, x3, x6"    ); // x3 = 25
+  h.asm( 'h230, "sw   x3, 0(x2)"     ); // mem[0x114] = 25
+  h.asm( 'h234, "addi x1, x1, 4"     );
+  h.asm( 'h238, "addi x2, x2, 4"     );
+
+  // Iter 3
+  h.asm( 'h23c, "lw   x5, 0(x1)"     ); // x5 = 5
+  h.asm( 'h240, "mul  x6, x5, x5"    ); // x6 = 25
+  h.asm( 'h244, "add  x3, x3, x6"    ); // x3 = 50
+  h.asm( 'h248, "sw   x3, 0(x2)"     ); // mem[0x118] = 50
+
+  // Verify: load results back, combine
+  h.asm( 'h24c, "addi x7, x0, 0x110" );
+  h.asm( 'h250, "lw   x8,  0(x7)"    ); // x8  = 9
+  h.asm( 'h254, "lw   x9,  4(x7)"    ); // x9  = 25
+  h.asm( 'h258, "lw   x10, 8(x7)"    ); // x10 = 50
+  h.asm( 'h25c, "add  x11, x8, x9"   ); // x11 = 34
+  h.asm( 'h260, "add  x12, x11, x10" ); // x12 = 84
+  h.asm( 'h264, "or   x13, x8, x9"   ); // x13 = 9|25 = 29
+
+  // Write data
+  h.data( 'h100, 3 );
+  h.data( 'h104, 4 );
+  h.data( 'h108, 5 );
+  h.data( 'h110, 0 );
+  h.data( 'h114, 0 );
+  h.data( 'h118, 0 );
+
+  h.check_traces();
+
+  h.t.test_case_end();
+endtask
+
+//------------------------------------------------------------------------
+// run_golden_mixed_tests
 //------------------------------------------------------------------------
 
 task run_golden_mixed_tests();
   test_case_golden_mixed_1_basic();
+  test_case_golden_mixed_2_waw();
+  test_case_golden_mixed_3_war();
+  test_case_golden_mixed_4_raw_chain();
+  test_case_golden_mixed_5_mem_deps();
+  test_case_golden_mixed_6_mixed_latency();
+  test_case_golden_mixed_7_ctrl_data();
+  test_case_golden_mixed_8_complex();
 endtask

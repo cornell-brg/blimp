@@ -9,6 +9,7 @@
 `include "intf/MemIntf.v"
 `include "intf/InstTraceNotif.v"
 `include "test/fl/MemIntfTestServer_2Port.v"
+`include "test/fl/MemIntfTestServer_MPort.v"
 
 import "DPI-C" context function void load_elf ( string elf_file );
 
@@ -18,7 +19,8 @@ module BlimpV11_sim;
   localparam p_num_phys_regs = 36;
   localparam p_opaq_bits     = 8;
   localparam p_seq_num_bits  = 5;
-  localparam p_num_be_lanes  = 2;
+  localparam p_num_be_lanes  = 4;
+  localparam p_num_fe_lanes  = 4;
   localparam p_iq_depth      = 4;
   
   //----------------------------------------------------------------------
@@ -43,7 +45,7 @@ module BlimpV11_sim;
 
   MemIntf #(
     .p_opaq_bits (p_opaq_bits)
-  ) dmem_intf();
+  ) dmem_intf[2]();
 
   InstTraceNotif inst_trace_notif [p_num_be_lanes]();
 
@@ -51,11 +53,12 @@ module BlimpV11_sim;
     .p_opaq_bits     (p_opaq_bits),
     .p_seq_num_bits  (p_seq_num_bits),
     .p_num_phys_regs (p_num_phys_regs),
+    .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes),
     .p_iq_depth      (p_iq_depth)
   ) dut (
-    .inst_mem   (mem_intf[0]),
-    .data_mem   (mem_intf[1]),
+    .inst_mem   (imem_intf),
+    .data_mem   (dmem_intf[0]),
     .inst_trace (inst_trace_notif),
     .*
   );
@@ -95,7 +98,7 @@ module BlimpV11_sim;
   // FL Memory
   //----------------------------------------------------------------------
 
-    MemIntfTestServer_MPort #(
+  MemIntfTestServer_MPort #(
     .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
     .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
     .p_num_ports       (p_num_fe_lanes),
@@ -107,7 +110,7 @@ module BlimpV11_sim;
     .*
   );
 
-  MemIntfTestServer #(
+  MemIntfTestServer_2Port #(
     .t_req_msg         (`MEM_REQ ( p_opaq_bits )),
     .t_resp_msg        (`MEM_RESP( p_opaq_bits )),
     .p_send_intv_delay ( 1 ),
@@ -142,8 +145,10 @@ module BlimpV11_sim;
     #2;
     trace = "";
 
-    trace = {trace, fl_mem.trace( t.trace_level )};
-    trace = {trace, " || "};
+    // trace = {trace, fl_imem.trace( t.trace_level )};
+    // trace = {trace, " || "};
+    // trace = {trace, fl_dmem.trace( t.trace_level )};
+    // trace = {trace, " || "};
     trace = {trace, dut.trace( t.trace_level )};
     trace = {trace, " || "};
 
