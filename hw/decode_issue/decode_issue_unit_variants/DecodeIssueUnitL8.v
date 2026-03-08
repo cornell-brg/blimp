@@ -49,8 +49,8 @@ module DecodeIssueUnitL8 #(
                                                          OP_BGE_VEC  |
                                                          OP_BLTU_VEC |
                                                          OP_BGEU_VEC,
-  parameter p_f_fifo_depth                             = 4,
-  parameter p_f_fifo_bypass                            = 0,
+  parameter p_f_intf_fifo_depth                        = 4,
+  parameter p_f_intf_fifo_bypass                       = 0,
   parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1
 ) (
   input  logic clk,
@@ -125,8 +125,8 @@ module DecodeIssueUnitL8 #(
   DecodeIssueUnitBypassFifo #(
     .t_msg          (fifo_lane_t),
     .p_seq_num_bits (p_seq_num_bits),
-    .p_depth        (p_f_fifo_depth),
-    .p_bypass       (p_f_fifo_bypass),
+    .p_depth        (p_f_intf_fifo_depth),
+    .p_bypass       (p_f_intf_fifo_bypass),
     .p_num_lanes    (p_num_fe_lanes)
   ) f_fifo (
     .clk                 (clk),

@@ -9,14 +9,17 @@
 `define HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
 
 `include "hw/writeback_commit/MROB.v"
+`include "hw/writeback_commit/WritebackCommitUnitBypassFifo.v"
 `include "hw/common/MRRArb.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 `include "intf/X__WIntf.v"
 
 module WritebackCommitUnitL4 #(
-  parameter p_num_pipes = 1,
-  parameter p_num_be_lanes = 2
+  parameter p_num_pipes          = 1,
+  parameter p_num_be_lanes       = 2,
+  parameter p_x_intf_fifo_depth  = 4,
+  parameter p_x_intf_fifo_bypass = 0
 )(
   input  logic clk,
   input  logic rst,
@@ -37,7 +40,7 @@ module WritebackCommitUnitL4 #(
   // Commit Interface
   //----------------------------------------------------------------------
 
-  CommitNotif.pub   commit [p_num_be_lanes]
+  CommitNotif.pub commit [p_num_be_lanes]
 );
 
   localparam p_seq_num_bits   = complete.p_seq_num_bits;
@@ -84,10 +87,13 @@ module WritebackCommitUnitL4 #(
     end
   endgenerate
 
+  logic fifo_full;
+
   logic [p_seq_num_bits:0]         avail_slots_mrob;
   logic [$clog2(p_num_be_lanes):0] avail_slots_mrrarb;
 
-  assign avail_slots_mrrarb = ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
+  assign avail_slots_mrrarb = fifo_full ? '0 :
+                             ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
                                                     p_num_be_lanes :
                                                     avail_slots_mrob);
 
@@ -149,7 +155,7 @@ module WritebackCommitUnitL4 #(
   endgenerate
   
   //----------------------------------------------------------------------
-  // Pipeline registers for X interface
+  // Bypass FIFO for X interface
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -162,49 +168,9 @@ module WritebackCommitUnitL4 #(
     logic [p_phys_addr_bits-1:0] ppreg;
   } X_input;
 
-  X_input X_reg      [p_num_be_lanes];
-  X_input X_reg_next [p_num_be_lanes];
-
+  // Complete notifications (driven from pre-FIFO arbiter output)
   generate
-    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: X_REG_GEN
-      always_ff @( posedge clk ) begin
-        if ( rst )
-          X_reg[i] <= '{ 
-            val: 1'b0, 
-            pc: 'x,
-            seq_num: 'x, 
-            waddr: 'x, 
-            wdata: 'x, 
-            wen: 1'b0,
-            ppreg: 'x
-          };
-        else
-          X_reg[i] <= X_reg_next[i];
-      end
-
-      always_comb begin
-        if ( Ex_val_sel[i] )
-          X_reg_next[i] = '{
-            val:     1'b1,
-            pc:      Ex_pc_sel[i],
-            seq_num: Ex_seq_num_sel[i],
-            waddr:   Ex_waddr_sel[i],
-            wdata:   Ex_wdata_sel[i],
-            wen:     Ex_wen_sel[i],
-            ppreg:   Ex_ppreg_sel[i]
-          };
-        else
-          X_reg_next[i] = '{ 
-            val: 1'b0, 
-            pc: 'x,
-            seq_num: 'x, 
-            waddr: 'x, 
-            wdata: 'x, 
-            wen: 1'b0,
-            ppreg: 'x
-          };
-      end
-
+    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: COMPLETE_GEN
       assign complete[i].val     = Ex_val_sel[i];
       assign complete[i].seq_num = Ex_seq_num_sel[i];
       assign complete[i].waddr   = Ex_waddr_sel[i];
@@ -213,6 +179,47 @@ module WritebackCommitUnitL4 #(
       assign complete[i].preg    = Ex_preg_sel[i];
     end
   endgenerate
+
+  // Pack post-arbiter data into X_input for FIFO
+  X_input fifo_in [p_num_be_lanes];
+  logic [p_num_be_lanes-1:0] Ex_val_sel_packed;
+
+  generate
+    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: FIFO_IN_GEN
+      assign Ex_val_sel_packed[i] = Ex_val_sel[i];
+      assign fifo_in[i] = '{
+        val:     Ex_val_sel[i],
+        pc:      Ex_pc_sel[i],
+        seq_num: Ex_seq_num_sel[i],
+        waddr:   Ex_waddr_sel[i],
+        wdata:   Ex_wdata_sel[i],
+        wen:     Ex_wen_sel[i],
+        ppreg:   Ex_ppreg_sel[i]
+      };
+    end
+  endgenerate
+
+  logic fifo_push, fifo_pop, fifo_empty;
+  assign fifo_push = |Ex_val_sel_packed & !fifo_full;
+  assign fifo_pop  = !fifo_empty;
+
+  X_input X_curr [p_num_be_lanes];
+
+  WritebackCommitUnitBypassFifo #(
+    .t_msg       (X_input),
+    .p_depth     (p_x_intf_fifo_depth),
+    .p_bypass    (p_x_intf_fifo_bypass),
+    .p_num_lanes (p_num_be_lanes)
+  ) x_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (fifo_push),
+    .i_msg (fifo_in),
+    .full  (fifo_full),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .o_msg (X_curr)
+  );
 
   //----------------------------------------------------------------------
   // ROB
@@ -230,20 +237,20 @@ module WritebackCommitUnitL4 #(
 
   generate
     for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_ROB_INPUT
-      assign rob_input[i].pc      = X_reg[i].pc;
-      assign rob_input[i].waddr   = X_reg[i].waddr;
-      assign rob_input[i].wdata   = X_reg[i].wdata;
-      assign rob_input[i].wen     = ( X_reg[i].waddr == '0 ) ? 0 : X_reg[i].wen;
-      assign rob_input[i].ppreg   = X_reg[i].ppreg;
+      assign rob_input[i].pc      = X_curr[i].pc;
+      assign rob_input[i].waddr   = X_curr[i].waddr;
+      assign rob_input[i].wdata   = X_curr[i].wdata;
+      assign rob_input[i].wen     = ( X_curr[i].waddr == '0 ) ? 0 : X_curr[i].wen;
+      assign rob_input[i].ppreg   = X_curr[i].ppreg;
     end
   endgenerate
 
-  logic [p_seq_num_bits-1:0] X_reg_seq_num [p_num_be_lanes];
-  logic                      X_reg_val     [p_num_be_lanes];
+  logic [p_seq_num_bits-1:0] X_curr_seq_num [p_num_be_lanes];
+  logic                      X_curr_val     [p_num_be_lanes];
   generate
-    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_X_REG_PACKED
-      assign X_reg_seq_num[i] = X_reg[i].seq_num;
-      assign X_reg_val[i]     = X_reg[i].val;
+    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_X_CURR_PACKED
+      assign X_curr_seq_num[i] = X_curr[i].seq_num;
+      assign X_curr_val[i]     = X_curr[i].val & !fifo_empty;
     end
   endgenerate
 
@@ -256,10 +263,10 @@ module WritebackCommitUnitL4 #(
     .p_num_lanes (p_num_be_lanes),
     .p_msg_bits  ($bits(t_rob_msg))
   ) rob (
-    .ins_idx     (X_reg_seq_num),
+    .ins_idx     (X_curr_seq_num),
     .ins_msg     (rob_input),
-    .ins_msg_val (X_reg_val),
-    .ins_en      (X_reg_val.or()),
+    .ins_msg_val (X_curr_val),
+    .ins_en      (X_curr_val.or()),
     .ins_rdy     (),
     .avail_slots (avail_slots_mrob),
 
@@ -304,11 +311,11 @@ module WritebackCommitUnitL4 #(
       if( i != 0 )
         trace = {trace, "  "};
 
-      if( X_reg[i].val ) begin
+      if( X_curr[i].val ) begin
         if( trace_level > 0 )
-          trace = {trace, $sformatf("%h:%h:%h:%h", X_reg[i].seq_num, X_reg[i].wen, X_reg[i].waddr, X_reg[i].wdata )};
+          trace = {trace, $sformatf("%h:%h:%h:%h", X_curr[i].seq_num, X_curr[i].wen, X_curr[i].waddr, X_curr[i].wdata )};
         else
-          trace = {trace, $sformatf("%h", X_reg[i].seq_num)};
+          trace = {trace, $sformatf("%h", X_curr[i].seq_num)};
       end else begin
         if( trace_level > 0 )
           trace = {trace, {str_len{" "}}};

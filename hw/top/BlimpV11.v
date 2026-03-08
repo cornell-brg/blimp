@@ -27,16 +27,18 @@
 `include "intf/InstTraceNotif.v"
 
 module BlimpV11 #(
-  parameter p_opaq_bits     = 8,
-  parameter p_seq_num_bits  = 5,
-  parameter p_num_phys_regs = 36,
-  parameter p_num_fe_lanes  = 2,
-  parameter p_num_be_lanes  = 2,  // must be <= 2**p_seq_num_bits (ROB depth)
-  parameter p_iq_depth      = 8,
-  parameter p_reclaim_width = p_num_be_lanes,
-  parameter p_max_in_flight = 8,
-  parameter p_f_fifo_depth  = 4,
-  parameter p_f_fifo_bypass = 0
+  parameter p_opaq_bits          = 8,
+  parameter p_seq_num_bits       = 5,
+  parameter p_num_phys_regs      = 36,
+  parameter p_num_fe_lanes       = 2,
+  parameter p_num_be_lanes       = 2,  // must be <= 2**p_seq_num_bits (ROB depth)
+  parameter p_iq_depth           = 8,
+  parameter p_reclaim_width      = p_num_be_lanes,
+  parameter p_max_in_flight      = 8,
+  parameter p_f_intf_fifo_depth  = 4,
+  parameter p_f_intf_fifo_bypass = 0,
+  parameter p_x_intf_fifo_depth  = 4,
+  parameter p_x_intf_fifo_bypass = 0
 ) (
   input logic clk,
   input logic rst,
@@ -195,9 +197,9 @@ module BlimpV11 #(
       p_alu_subset,  // ALU1
       p_alu_subset   // ALU0
     }),
-    .p_ctrl_subset   (p_ctrl_subset),
-    .p_f_fifo_depth  (p_f_fifo_depth),
-    .p_f_fifo_bypass (p_f_fifo_bypass)
+    .p_ctrl_subset        (p_ctrl_subset),
+    .p_f_intf_fifo_depth  (p_f_intf_fifo_depth),
+    .p_f_intf_fifo_bypass (p_f_intf_fifo_bypass)
   ) DIU (
     .F          (f__d_intfs),
     .Ex         (d__x_intfs),
@@ -285,8 +287,10 @@ module BlimpV11 #(
   );
 
   WritebackCommitUnitL4 #(
-    .p_num_pipes     (p_num_pipes),
-    .p_num_be_lanes  (p_num_be_lanes)
+    .p_num_pipes          (p_num_pipes),
+    .p_num_be_lanes       (p_num_be_lanes),
+    .p_x_intf_fifo_depth  (p_x_intf_fifo_depth),
+    .p_x_intf_fifo_bypass (p_x_intf_fifo_bypass)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
