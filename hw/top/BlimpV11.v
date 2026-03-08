@@ -15,7 +15,7 @@
 `include "hw/execute/execute_units_l7/IterativeMulDivRemL7.v"
 `include "hw/execute/execute_units_l7/LoadStoreUnitL7.v"
 `include "hw/execute/execute_units_l6/ControlFlowUnitL6.v"
-`include "hw/squash/SquashUnitL3.v"
+`include "hw/squash/SquashUnitL2.v"
 `include "hw/writeback_commit/writeback_commit_unit_variants/WritebackCommitUnitL4.v"
 `include "intf/MemIntf.v"
 `include "intf/F__DIntf.v"
@@ -32,7 +32,11 @@ module BlimpV11 #(
   parameter p_num_phys_regs = 36,
   parameter p_num_fe_lanes  = 2,
   parameter p_num_be_lanes  = 2,  // must be <= 2**p_seq_num_bits (ROB depth)
-  parameter p_iq_depth      = 8
+  parameter p_iq_depth      = 8,
+  parameter p_reclaim_width = p_num_be_lanes,
+  parameter p_max_in_flight = 8,
+  parameter p_f_fifo_depth  = 4,
+  parameter p_f_fifo_bypass = 0
 ) (
   input logic clk,
   input logic rst,
@@ -88,11 +92,7 @@ module BlimpV11 #(
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
-  ) squash_ctrl_notif [1]();
-
-  SquashNotif #(
-    .p_seq_num_bits (p_seq_num_bits)
-  ) squash_diu_gnt_notif();
+  ) squash_arb_notif [2]();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -167,8 +167,8 @@ module BlimpV11 #(
                             OP_BGEU_VEC;
 
   FetchUnitL5 #(
-    .p_reclaim_width (p_num_be_lanes),
-    .p_max_in_flight (8),
+    .p_reclaim_width (p_reclaim_width),
+    .p_max_in_flight (p_max_in_flight),
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
   ) FU (
@@ -195,13 +195,15 @@ module BlimpV11 #(
       p_alu_subset,  // ALU1
       p_alu_subset   // ALU0
     }),
-    .p_ctrl_subset   (p_ctrl_subset)
+    .p_ctrl_subset   (p_ctrl_subset),
+    .p_f_fifo_depth  (p_f_fifo_depth),
+    .p_f_fifo_bypass (p_f_fifo_bypass)
   ) DIU (
     .F          (f__d_intfs),
     .Ex         (d__x_intfs),
     .complete   (complete_notif),
-    .squash_pub (squash_diu_pub_notif),
-    .squash_sub (squash_diu_gnt_notif),
+    .squash_pub (squash_arb_notif[0]),
+    .squash_sub (squash_gnt_notif),
     .commit     (commit_notif),
     .*
   );
@@ -278,7 +280,7 @@ module BlimpV11 #(
   ControlFlowUnitL6 CTRL_XU (
     .D      (d__x_intfs[7]),
     .W      (x__w_intfs[7]),
-    .squash (squash_ctrl_notif[0]),
+    .squash (squash_arb_notif[1]),
     .*
   );
 
@@ -292,15 +294,13 @@ module BlimpV11 #(
     .*
   );
 
-  SquashUnitL3 #(
-    .p_num_ctrl_arb (1),
+  SquashUnitL2 #(
+    .p_num_arb      (2),
     .p_num_be_lanes (p_num_be_lanes)
   ) SU (
-    .arb_diu (squash_diu_pub_notif),
-    .arb     (squash_ctrl_notif),
-    .gnt     (squash_gnt_notif),
-    .diu_gnt (squash_diu_gnt_notif),
-    .commit  (commit_notif),
+    .arb    (squash_arb_notif),
+    .gnt    (squash_gnt_notif),
+    .commit (commit_notif),
     .*
   );
 

@@ -13,7 +13,8 @@
 module FifoBypass
 #(
   parameter p_entry_bits = 32,
-  parameter p_depth      = 32
+  parameter p_depth      = 32,
+  parameter p_bypass     = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -43,14 +44,19 @@ module FifoBypass
 
   logic [p_addr_bits:0] rptr, wptr;
 
-  // Bypass condition: queue is empty and both push and pop at once
-  logic bypass;
-  assign bypass = empty & push & pop;
+  // Bypass mux: show wdata on rdata when empty and pushing, independent
+  // of pop to avoid combinational loops (pop may depend on rdata).
+  logic bypass_mux;
+  assign bypass_mux = p_bypass[0] & empty & push;
 
-  // When bypassing, don't actually enqueue/dequeue
+  // Bypass enqueue suppression: when empty, pushing, and popping
+  // simultaneously, don't actually store — data flows straight through.
+  logic bypass_ctrl;
+  assign bypass_ctrl = bypass_mux & pop;
+
   logic do_push, do_pop;
-  assign do_push = push & ~bypass;
-  assign do_pop  = pop  & ~bypass;
+  assign do_push = push & ~bypass_ctrl;
+  assign do_pop  = pop  & ~bypass_ctrl;
 
   always @( posedge clk ) begin
     if( rst ) begin
@@ -105,7 +111,7 @@ module FifoBypass
   endgenerate
 
   // Mux between bypass path and array read
-  assign rdata = bypass ? wdata : arr_rdata;
+  assign rdata = bypass_mux ? wdata : arr_rdata;
 
 endmodule
 

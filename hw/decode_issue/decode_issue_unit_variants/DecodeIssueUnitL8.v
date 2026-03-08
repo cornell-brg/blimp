@@ -19,6 +19,7 @@
 `include "hw/decode_issue/SSRenameTableL3.v"
 `include "hw/decode_issue/IssueQueueInOrder.v"
 `include "hw/util/SSSeqAge.v"
+`include "hw/decode_issue/DecodeIssueUnitBypassFifo.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
@@ -48,6 +49,8 @@ module DecodeIssueUnitL8 #(
                                                          OP_BGE_VEC  |
                                                          OP_BLTU_VEC |
                                                          OP_BGEU_VEC,
+  parameter p_f_fifo_depth                             = 4,
+  parameter p_f_fifo_bypass                            = 0,
   parameter p_iq_entries_bits                          = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1
 ) (
   input  logic clk,
@@ -89,9 +92,9 @@ module DecodeIssueUnitL8 #(
   localparam p_phys_addr_bits   = $clog2( p_num_phys_regs );
   localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
   localparam p_pipe_bits        = p_num_pipes > 1 ? $clog2(p_num_pipes) : 1;
-  
+
   //----------------------------------------------------------------------
-  // Pipeline registers for F interface
+  // Instruction window FIFO
   //----------------------------------------------------------------------
 
   logic [p_fe_lane_idx_bits-1:0] pipe_to_lane_map [p_num_pipes];
@@ -100,6 +103,13 @@ module DecodeIssueUnitL8 #(
   logic oldest_ctrl_insn_srcs_ready;
 
   logic stage_pass_s1      [p_num_fe_lanes];
+  logic invalidate_insn    [p_num_fe_lanes];
+
+  // Head entry outputs from FIFO wrapper
+  logic                      fifo_pop;
+  logic                      fifo_empty;
+  logic [p_num_fe_lanes-1:0] fifo_set_invalid;
+  logic [p_num_fe_lanes-1:0] fifo_set_dispatched;
 
   typedef struct packed {
     logic                      val;
@@ -108,110 +118,51 @@ module DecodeIssueUnitL8 #(
     logic [p_seq_num_bits-1:0] seq_num;
     logic                      insn_valid;
     logic                      dispatched;
-  } F_input;
+  } fifo_lane_t;
 
-  F_input F_reg      [p_num_fe_lanes];
-  F_input F_reg_next [p_num_fe_lanes];
-  logic   F_xfer     [p_num_fe_lanes];
-  logic   F_xfer_all;
-  logic   iq_val     [p_num_pipes];
-  logic   dispatched [p_num_fe_lanes];
+  fifo_lane_t F_curr [p_num_fe_lanes];
 
+  DecodeIssueUnitBypassFifo #(
+    .t_msg          (fifo_lane_t),
+    .p_seq_num_bits (p_seq_num_bits),
+    .p_depth        (p_f_fifo_depth),
+    .p_bypass       (p_f_fifo_bypass),
+    .p_num_lanes    (p_num_fe_lanes)
+  ) f_fifo (
+    .clk                 (clk),
+    .rst                 (rst | squash_sub.val | squash_pub_val_comb),
+    .F                   (F),
+    .pop                 (fifo_pop),
+    .empty               (fifo_empty),
+    .o_msg               (F_curr),
+    .edit_set_invalid    (fifo_set_invalid),
+    .edit_set_dispatched (fifo_set_dispatched)
+  );
+
+  // Wire edit signals from invalidation/dispatch to FIFO shadow state
   always_comb begin
-    for( int j = 0; j < p_num_fe_lanes; j++ )
-      dispatched[j] = F_reg[j].dispatched;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      fifo_set_invalid[j]    = invalidate_insn[j];
+      fifo_set_dispatched[j] = dispatch_go[j];
+    end
   end
 
-  // Ready to receive new IW if each register is:
-  // 1) passing stage 1 checks (valid instruction)
-  // 2) dispatching on this cycle or has already dispatched
+  // Pop when done processing current instruction window
+  // Each lane must be: invalid (stage_pass_s1 false), dispatching
+  // this cycle, or already dispatched
   logic F_rdy_all;
   always_comb begin
     F_rdy_all = oldest_ctrl_insn_srcs_ready;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
       F_rdy_all &= (
         !stage_pass_s1[j] |
-        dispatch_go[j]    | 
-        dispatched[j]
+        dispatch_go[j]    |
+        F_curr[j].dispatched
       );
     end
   end
 
-  logic [p_fe_lane_idx_bits-1:0] oldest_ctrl_insn_idx;
-  logic [p_seq_num_bits-1:0]     oldest_ctrl_insn_seq_num;
-  logic                          oldest_ctrl_insn_found;
-  logic                          oldest_ctrl_insn_is_brx;
-
-  logic invalidate_insn [p_num_fe_lanes];
-
-  genvar i;
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: F_REG_GEN
-      always_ff @( posedge clk ) begin
-        if ( rst )
-          F_reg[i] <= '{
-            val: 1'b0,
-            inst: '0,
-            pc: '0,
-            seq_num: '0,
-            insn_valid: '0,
-            dispatched: '0
-          };
-        else
-          F_reg[i] <= F_reg_next[i];
-      end
-
-      assign F[i].rdy = F_rdy_all;
-      assign F_xfer[i] = F[i].val & F[i].rdy;
-
-      always_comb begin
-
-        // New instructions from FU
-        if ( F_xfer[i] )
-          F_reg_next[i] = '{
-            val: 1'b1,
-            inst: F[i].inst,
-            pc: F[i].pc,
-            seq_num: F[i].seq_num,
-            insn_valid: F[i].insn_valid,
-            dispatched: 1'b0
-          };
-
-        // Invalidate this instruction
-        else if( invalidate_insn[i] )
-          F_reg_next[i] = '{
-            val: 1'b0,
-            inst: '0,
-            pc: '0,
-            seq_num: '0,
-            insn_valid: '0,
-            dispatched: '0
-          };
-
-        // Mark this instruction as dispatched
-        else if( dispatch_go[i] )
-          F_reg_next[i] = '{
-            val: F_reg[i].val,
-            inst: F_reg[i].inst,
-            pc: F_reg[i].pc,
-            seq_num: F_reg[i].seq_num,
-            insn_valid: F_reg[i].insn_valid,
-            dispatched: 1'b1
-          };
-
-        // Keep same value otherwise
-        else
-          F_reg_next[i] = F_reg[i];
-      end
-    end
-  endgenerate
-
-  always_comb begin
-    F_xfer_all  = 1'b1;
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      F_xfer_all &= F_xfer[k];
-    end
-  end
+  assign fifo_pop = F_rdy_all & !fifo_empty;
 
   //----------------------------------------------------------------------
   // Decode
@@ -227,12 +178,13 @@ module DecodeIssueUnitL8 #(
   logic       decoder_op2_sel [p_num_fe_lanes];
   logic [1:0] decoder_jal     [p_num_fe_lanes];
   logic       decoder_op3_sel [p_num_fe_lanes];
-  
+
+  genvar i;
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: DECODER_GEN
       InstDecoder decoder (
         .val     (decoder_val[i]),
-        .inst    (F_reg[i].inst),
+        .inst    (F_curr[i].inst),
         .uop     (decoder_uop[i]),
         .raddr0  (decoder_raddr0[i]),
         .raddr1  (decoder_raddr1[i]),
@@ -250,17 +202,16 @@ module DecodeIssueUnitL8 #(
   // Find oldest control instruction in IW if present
   //----------------------------------------------------------------------
 
+  logic [p_fe_lane_idx_bits-1:0] oldest_ctrl_insn_idx;
+  logic [p_seq_num_bits-1:0]     oldest_ctrl_insn_seq_num;
+  logic                          oldest_ctrl_insn_found;
+  logic                          oldest_ctrl_insn_is_brx;
+
   logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes+1][2];
   logic                        lookup_iq_en      [p_num_pipes+1][2];
   logic                        lookup_iq_pending [p_num_pipes+1][2];
 
   logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
-
-  logic [p_seq_num_bits-1:0] F_reg_seq_num_arr [p_num_fe_lanes];
-  always_comb begin
-    for( int k = 0; k < p_num_fe_lanes; k++ )
-      F_reg_seq_num_arr[k] = F_reg[k].seq_num;
-  end
 
   SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes)
@@ -272,7 +223,7 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     oldest_ctrl_insn_idx      = '0;
-    oldest_ctrl_insn_seq_num  = F_reg[p_num_fe_lanes-1].seq_num;
+    oldest_ctrl_insn_seq_num  = F_curr[p_num_fe_lanes-1].seq_num;
     oldest_ctrl_insn_found    = 1'b0;
     oldest_ctrl_insn_is_brx   = 1'b0;
 
@@ -280,15 +231,15 @@ module DecodeIssueUnitL8 #(
       logic is_brx, is_jal, is_valid;
       is_brx   = in_subset(p_brx_subset, num_ops'(1 << decoder_uop[k]));
       is_jal   = (decoder_jal[k] != 2'd0);
-      is_valid = stage_pass_s1[k] && !dispatched[k];
+      is_valid = stage_pass_s1[k] && !F_curr[k].dispatched;
 
       if( (is_brx || is_jal) && is_valid &&
           (!oldest_ctrl_insn_found ||
-           seq_age.is_older(F_reg[k].seq_num, oldest_ctrl_insn_seq_num))
+           seq_age.is_older(F_curr[k].seq_num, oldest_ctrl_insn_seq_num))
         )
       begin
         oldest_ctrl_insn_idx      = p_fe_lane_idx_bits'(k);
-        oldest_ctrl_insn_seq_num  = F_reg[k].seq_num;
+        oldest_ctrl_insn_seq_num  = F_curr[k].seq_num;
         oldest_ctrl_insn_found    = 1'b1;
         oldest_ctrl_insn_is_brx   = is_brx;
       end
@@ -327,13 +278,13 @@ module DecodeIssueUnitL8 #(
         .o_pass          (stage_pass_s1[i]),
         .o_invalidate    (invalidate_insn_s1[i]),
 
-        .entry_val        (F_reg[i].val),
-        .entry_insn_val   (F_reg[i].insn_valid),
+        .entry_val        (F_curr[i].val),
+        .entry_insn_val   (F_curr[i].insn_valid),
         .decoder_val      (decoder_val[i])
       );
     end
   endgenerate
-  
+
   //----------------------------------------------------------------------
   // Instruction check stage 2: check against control instruction
   //----------------------------------------------------------------------
@@ -384,12 +335,12 @@ module DecodeIssueUnitL8 #(
         .alloc_try (alloc_try_s3[i]),
         .alloc_rdy (alloc_rdy[i]),
 
-        .dispatched (dispatched[i])
+        .dispatched (F_curr[i].dispatched)
       );
 
       // The next insn's S3 check will see this instruction as ok
       // if it is invalid, since it won't need a preg
-      assign prev_insn_pass_s3[i] = stage_pass_s3[i] || !F_reg[i].insn_valid;
+      assign prev_insn_pass_s3[i] = stage_pass_s3[i] || !F_curr[i].insn_valid;
     end
   endgenerate
 
@@ -403,6 +354,8 @@ module DecodeIssueUnitL8 #(
 
   logic                   lane_val         [p_num_fe_lanes];
   logic [p_pipe_bits-1:0] lane_to_pipe_map [p_num_fe_lanes];
+
+  logic                   iq_val [p_num_pipes];
 
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
@@ -425,12 +378,12 @@ module DecodeIssueUnitL8 #(
         .o_pass          (stage_pass_s4[i]),
         .o_invalidate    (invalidate_insn_s4[i]),
 
-        .dispatched (dispatched[i]),
-        .prev_insn_dispatched(i == 0 ? 1'b1 : dispatched[i-1]),
+        .dispatched (F_curr[i].dispatched),
+        .prev_insn_dispatched(i == 0 ? 1'b1 : F_curr[i-1].dispatched),
         .lane_val   (lane_val[i])
       );
 
-      assign prev_insn_pass_s4[i] = stage_pass_s4[i] || !F_reg[i].insn_valid;
+      assign prev_insn_pass_s4[i] = stage_pass_s4[i] || !F_curr[i].insn_valid;
     end
   endgenerate
 
@@ -468,7 +421,7 @@ module DecodeIssueUnitL8 #(
       lookup_new_inst_en[k][0] = 1'b1;
       lookup_new_inst_en[k][1] = 1'b1;
       alloc_try[k] = stage_pass_s1[k] &
-                     !dispatched[k];
+                     !F_curr[k].dispatched;
     end
   end
 
@@ -541,7 +494,7 @@ module DecodeIssueUnitL8 #(
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin
       ImmGen imm_gen (
-        .inst    (F_reg[i].inst),
+        .inst    (F_curr[i].inst),
         .imm_sel (decoder_imm_sel[i]),
         .imm     (imm[i])
       );
@@ -560,7 +513,7 @@ module DecodeIssueUnitL8 #(
   always_comb begin
     if( !oldest_ctrl_insn_is_brx ) begin
       case( decoder_jal[oldest_ctrl_insn_idx] )
-        2'd1:    jump_target = F_reg[oldest_ctrl_insn_idx].pc + imm[oldest_ctrl_insn_idx];   // JAL
+        2'd1:    jump_target = F_curr[oldest_ctrl_insn_idx].pc + imm[oldest_ctrl_insn_idx];   // JAL
         2'd2:    jump_target = (jump_base + imm[oldest_ctrl_insn_idx]) & 32'hFFFFFFFE; // JALR
         default: jump_target = '0;
       endcase
@@ -569,21 +522,35 @@ module DecodeIssueUnitL8 #(
     end
   end
 
+  // Combinational squash signal for internal use (FIFO reset, squash_sent)
+  logic squash_pub_val_comb;
+  assign squash_pub_val_comb = oldest_ctrl_insn_found &&
+                               !oldest_ctrl_insn_is_brx &&
+                               dispatch_go[oldest_ctrl_insn_idx];
+
   logic squash_sent;
   always_ff @( posedge clk ) begin
     if( rst )
       squash_sent <= 1'b0;
-    else if( F_xfer_all )
+    else if( fifo_pop )
       squash_sent <= 1'b0;
-    else if( squash_pub.val )
+    else if( squash_pub_val_comb )
       squash_sent <= 1'b1;
   end
 
-  assign squash_pub.val = oldest_ctrl_insn_found && 
-                          !oldest_ctrl_insn_is_brx && 
-                          dispatch_go[oldest_ctrl_insn_idx];
-  assign squash_pub.target  = jump_target;
-  assign squash_pub.seq_num = F_reg[oldest_ctrl_insn_idx].seq_num;
+  // Register squash_pub outputs to break combinational loop through
+  // SU → FU → bypass FIFO → DIU
+  always_ff @( posedge clk ) begin
+    if( rst ) begin
+      squash_pub.val     <= 1'b0;
+      squash_pub.target  <= '0;
+      squash_pub.seq_num <= '0;
+    end else begin
+      squash_pub.val     <= squash_pub_val_comb;
+      squash_pub.target  <= jump_target;
+      squash_pub.seq_num <= F_curr[oldest_ctrl_insn_idx].seq_num;
+    end
+  end
 
   //----------------------------------------------------------------------
   // Route the instruction to issue queue based on uop
@@ -595,9 +562,11 @@ module DecodeIssueUnitL8 #(
   // Get routing decisions for instruction in valid, decodable instruction
   // that hasn't been dispatched yet
   logic xbar_val [p_num_fe_lanes];
+  logic [p_seq_num_bits-1:0] seq_num_arr [p_num_fe_lanes];
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      xbar_val[i] = stage_pass_s1[i] && !dispatched[i];
+      xbar_val[i]      = stage_pass_s1[i] && !F_curr[i].dispatched;
+      seq_num_arr[i]  = F_curr[i].seq_num;
     end
   end
 
@@ -614,7 +583,7 @@ module DecodeIssueUnitL8 #(
     .clk            (clk),
     .rst            (rst),
     .uop            (decoder_uop),
-    .seq_num        (F_reg_seq_num_arr),
+    .seq_num        (seq_num_arr),
     .val            (xbar_val),
     .iq_rdy         (iq_rdy),
     .iq_avail_slots (iq_avail_slots),
@@ -646,33 +615,33 @@ module DecodeIssueUnitL8 #(
         .rst                     (rst),
 
         // Insert
-        .ins_msg_pc              (F_reg[pipe_to_lane_map[i]].pc),
+        .ins_msg_pc              (F_curr[pipe_to_lane_map[i]].pc),
         .ins_msg_preg            (lookup_new_inst_preg[pipe_to_lane_map[i]]),
         .ins_msg_decoder_uop     (decoder_uop[pipe_to_lane_map[i]]),
         .ins_msg_decoder_waddr   (decoder_waddr[pipe_to_lane_map[i]]),
         .ins_msg_imm             (imm[pipe_to_lane_map[i]]),
         .ins_msg_decoder_op2_sel (decoder_op2_sel[pipe_to_lane_map[i]]),
         .ins_msg_decoder_op3_sel (decoder_op3_sel[pipe_to_lane_map[i]]),
-        .ins_msg_seq_num         (F_reg[pipe_to_lane_map[i]].seq_num),
+        .ins_msg_seq_num         (F_curr[pipe_to_lane_map[i]].seq_num),
         .ins_msg_alloc_preg      (alloc_preg[pipe_to_lane_map[i]]),
         .ins_msg_alloc_ppreg     (alloc_ppreg[pipe_to_lane_map[i]]),
         .ins_en                  (stage_pass_s4[pipe_to_lane_map[i]] && iq_val[i]),
         .ins_rdy                 (iq_rdy[i]),
         .avail_slots             (iq_avail_slots[i]),
 
-        // Dequeue 
+        // Dequeue
         .Ex                      (Ex[i]),
 
-        // Rename Table Access 
+        // Rename Table Access
         .rt_lookup_preg          (lookup_iq_preg[i]),
         .rt_lookup_pending       (lookup_iq_pending[i]),
         .rt_lookup_en            (lookup_iq_en[i]),
 
-        // Register File Access 
+        // Register File Access
         .rf_raddr                (raddr[i]),
         .rf_rdata                (rdata[i]),
 
-        // Complete interface 
+        // Complete interface
         .complete                (complete)
       );
 
@@ -709,8 +678,8 @@ module DecodeIssueUnitL8 #(
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
       if( i != 0 )
         trace = {trace, " | "};
-      if( F_xfer[i] )
-        trace = {trace, $sformatf("%x: %-30s", F_reg[i].seq_num, disassemble(F_reg[i].inst, F_reg[i].pc))};
+      if( fifo_pop )
+        trace = {trace, $sformatf("%x: %-30s", F_curr[i].seq_num, disassemble(F_curr[i].inst, F_curr[i].pc))};
       else
         trace = {trace, {(32 + ceil_div_4( p_seq_num_bits )){" "}}};
     end
