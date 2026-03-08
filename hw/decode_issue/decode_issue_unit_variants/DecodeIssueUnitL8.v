@@ -608,6 +608,7 @@ module DecodeIssueUnitL8 #(
     .p_num_input_lanes (p_num_fe_lanes),
     .p_iq_depth        (p_iq_depth),
     .p_seq_num_bits    (p_seq_num_bits),
+    .p_num_iter        (p_num_fe_lanes),
     .p_num_be_lanes    (p_num_be_lanes)
   ) inst_xbar (
     .clk            (clk),
