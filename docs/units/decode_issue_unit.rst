@@ -126,7 +126,7 @@ squash on subsequent cycles before the next fetch block arrives.
 
 For BRX instructions (conditional branches resolved in the control-flow XU),
 the DIU ensures that only instructions at or older than the oldest branch in
-the fetch block are issued. The ``xbar_insn_val`` signal masks out any
+the fetch block are issued. The ``xbar_inst_val`` signal masks out any
 instruction whose sequence number is younger than the oldest BRX's sequence
 number, preventing younger instructions from being routed to issue queues
 before the branch is resolved. This avoids speculatively issuing instructions

@@ -77,7 +77,7 @@ module FetchUnitL5
   logic               [31:0] D_inst       [p_num_fe_lanes];
   logic               [31:0] D_pc         [p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] D_seq_num    [p_num_fe_lanes];
-  logic                      D_insn_valid [p_num_fe_lanes];
+  logic                      D_inst_valid [p_num_fe_lanes];
 
   // D interface signals (driven by external)
   logic                      D_rdy     [p_num_fe_lanes];
@@ -89,7 +89,7 @@ module FetchUnitL5
       assign D[i].inst       = D_inst[i];
       assign D[i].pc         = D_pc[i];
       assign D[i].seq_num    = D_seq_num[i];
-      assign D[i].insn_valid = D_insn_valid[i];
+      assign D[i].inst_valid = D_inst_valid[i];
 
       // Inputs from D interface
       assign D_rdy[i] = D[i].rdy;
@@ -290,7 +290,7 @@ module FetchUnitL5
 
       always_comb begin
         if( (needs_squash_restart & !should_drop) ) begin
-          D_insn_valid[i] = mem.resp_val & (i >= squash_restart_offset);
+          D_inst_valid[i] = mem.resp_val & (i >= squash_restart_offset);
           alloc_rdy[i]    = mem.resp_val & D_rdy[i] & (i >= squash_restart_offset);
           /* verilator lint_off CMPCONST */
           if( p_lane_idx_bits'(i) >= squash_restart_offset )
@@ -299,7 +299,7 @@ module FetchUnitL5
             D_val[i]        = mem.resp_val;
           /* verilator lint_on CMPCONST */
         end else begin
-          D_insn_valid[i] = mem.resp_val & !should_drop;
+          D_inst_valid[i] = mem.resp_val & !should_drop;
           alloc_rdy[i]    = mem.resp_val & D_rdy[i] & !should_drop;
           D_val[i]        = mem.resp_val & alloc_ok[i] & !should_drop;
         end

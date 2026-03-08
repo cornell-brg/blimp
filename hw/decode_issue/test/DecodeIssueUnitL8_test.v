@@ -112,7 +112,7 @@ module DecodeIssueUnitL8TestSuite #(
     logic               [31:0] inst;
     logic               [31:0] pc;
     logic [p_seq_num_bits-1:0] seq_num;
-    logic                      insn_valid;
+    logic                      inst_valid;
   } t_f__d_msg;
 
   t_f__d_msg f__d_msg [p_num_fe_lanes];
@@ -123,7 +123,7 @@ module DecodeIssueUnitL8TestSuite #(
       assign F__D_intf[i].inst       = f__d_msg[i].inst;
       assign F__D_intf[i].pc         = f__d_msg[i].pc;
       assign F__D_intf[i].seq_num    = f__d_msg[i].seq_num;
-      assign F__D_intf[i].insn_valid = f__d_msg[i].insn_valid;
+      assign F__D_intf[i].inst_valid = f__d_msg[i].inst_valid;
 
       TestIstream #( 
         t_f__d_msg, 
@@ -167,7 +167,7 @@ module DecodeIssueUnitL8TestSuite #(
     input logic               [31:0] pc         [p_num_fe_lanes],
     input string                     assembly   [p_num_fe_lanes],
     input logic [p_seq_num_bits-1:0] seq_num    [p_num_fe_lanes],
-    input logic                      insn_valid [p_num_fe_lanes],
+    input logic                      inst_valid [p_num_fe_lanes],
     input logic                      valid      [p_num_fe_lanes]
   );
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
@@ -177,7 +177,7 @@ module DecodeIssueUnitL8TestSuite #(
           send_task_msg[jj].inst       = assemble(assembly[jj], pc[jj]);
           send_task_msg[jj].pc         = pc[jj];
           send_task_msg[jj].seq_num    = seq_num[jj];
-          send_task_msg[jj].insn_valid = insn_valid[jj];
+          send_task_msg[jj].inst_valid = inst_valid[jj];
           msgs_to_send[jj]             = send_task_msg[jj];
           msgs_to_send_val[jj]         = valid[jj];
           while(msgs_to_send_val[jj])

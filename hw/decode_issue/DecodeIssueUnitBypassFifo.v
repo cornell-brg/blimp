@@ -80,7 +80,7 @@ module DecodeIssueUnitBypassFifo
         F[i].inst,
         F[i].pc,
         F[i].seq_num,
-        F[i].insn_valid,
+        F[i].inst_valid,
         1'b0
       };
       assign F[i].rdy    = !fifo_full;
@@ -146,7 +146,7 @@ module DecodeIssueUnitBypassFifo
         lane.inst,
         lane.pc,
         lane.seq_num,
-        lane.insn_valid,
+        lane.inst_valid,
         dispatched_r[j]
       };
     end

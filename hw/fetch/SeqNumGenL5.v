@@ -104,7 +104,7 @@ module SeqNumGenL5 #(
           end
 
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-          // Squashing - free all insn seq nums younger than squash insn's
+          // Squashing - free all inst seq nums younger than squash inst's
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
           if( squash.val & seq_age.is_older( squash.seq_num, p_seq_num_bits'(i) ) )
@@ -191,7 +191,7 @@ module SeqNumGenL5 #(
   always_comb begin
     curr_head_ptr_next = curr_head_ptr;
 
-    // On a squash, head pointer goes to insn after squashed insn
+    // On a squash, head pointer goes to inst after squashed inst
     // Extend squash.seq_num to (p_seq_num_bits+1) bits to match pointer width
     if( squash.val ) curr_head_ptr_next = squash.seq_num + 1;
 
