@@ -15,7 +15,7 @@
 `include "hw/execute/execute_units_l7/IterativeMulDivRemL7.v"
 `include "hw/execute/execute_units_l7/LoadStoreUnitL7.v"
 `include "hw/execute/execute_units_l6/ControlFlowUnitL6.v"
-`include "hw/squash/SquashUnitL2.v"
+`include "hw/squash/SquashUnitL3.v"
 `include "hw/writeback_commit/writeback_commit_unit_variants/WritebackCommitUnitL4.v"
 `include "intf/MemIntf.v"
 `include "intf/F__DIntf.v"
@@ -56,7 +56,7 @@ module BlimpV11 #(
   InstTraceNotif.pub inst_trace [p_num_be_lanes]
 );
 
-  localparam p_num_pipes = 6;
+  localparam p_num_pipes = 8;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
   //----------------------------------------------------------------------
@@ -80,11 +80,19 @@ module BlimpV11 #(
   X__WIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) buffer_intf [2]();
+  ) buffer_intf [4]();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
-  ) squash_arb_notif [2]();
+  ) squash_diu_pub_notif();
+
+  SquashNotif #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) squash_ctrl_notif [1]();
+
+  SquashNotif #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) squash_diu_gnt_notif();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -181,6 +189,8 @@ module BlimpV11 #(
       p_mem_subset,  // Memory
       p_m_subset,    // M-Extension for MUL1
       p_m_subset,    // M-Extension for MUL0
+      p_alu_subset,  // ALU3
+      p_alu_subset,  // ALU2
       p_alu_subset,  // ALU1
       p_alu_subset   // ALU0
     }),
@@ -189,8 +199,8 @@ module BlimpV11 #(
     .F          (f__d_intfs),
     .Ex         (d__x_intfs),
     .complete   (complete_notif),
-    .squash_pub (squash_arb_notif[0]),
-    .squash_sub (squash_gnt_notif),
+    .squash_pub (squash_diu_pub_notif),
+    .squash_sub (squash_diu_gnt_notif),
     .commit     (commit_notif),
     .*
   );
@@ -207,6 +217,18 @@ module BlimpV11 #(
     .*
   );
 
+  ALUL6 ALU2_XU (
+    .D (d__x_intfs[2]),
+    .W (buffer_intf[2]),
+    .*
+  );
+
+  ALUL6 ALU3_XU (
+    .D (d__x_intfs[3]),
+    .W (buffer_intf[3]),
+    .*
+  );
+
   ExQueue #(1) alu0_buf (
     .in  (buffer_intf[0]),
     .out (x__w_intfs[0]),
@@ -219,31 +241,43 @@ module BlimpV11 #(
     .*
   );
 
+  ExQueue #(1) alu2_buf (
+    .in  (buffer_intf[2]),
+    .out (x__w_intfs[2]),
+    .*
+  );
+
+  ExQueue #(1) alu3_buf (
+    .in  (buffer_intf[3]),
+    .out (x__w_intfs[3]),
+    .*
+  );
+
   IterativeMulDivRemL7 MUL_DIV_REM0_XU (
-    .D (d__x_intfs[2]),
-    .W (x__w_intfs[2]),
+    .D (d__x_intfs[4]),
+    .W (x__w_intfs[4]),
     .*
   );
 
   IterativeMulDivRemL7 MUL_DIV_REM1_XU (
-    .D (d__x_intfs[3]),
-    .W (x__w_intfs[3]),
+    .D (d__x_intfs[5]),
+    .W (x__w_intfs[5]),
     .*
   );
 
   LoadStoreUnitL7 #(
     .p_opaq_bits (p_opaq_bits)
   ) MEM_XU (
-    .D   (d__x_intfs[4]),
-    .W   (x__w_intfs[4]),
+    .D   (d__x_intfs[6]),
+    .W   (x__w_intfs[6]),
     .mem (data_mem),
     .*
   );
 
   ControlFlowUnitL6 CTRL_XU (
-    .D      (d__x_intfs[5]),
-    .W      (x__w_intfs[5]),
-    .squash (squash_arb_notif[1]),
+    .D      (d__x_intfs[7]),
+    .W      (x__w_intfs[7]),
+    .squash (squash_ctrl_notif[0]),
     .*
   );
 
@@ -257,13 +291,15 @@ module BlimpV11 #(
     .*
   );
 
-  SquashUnitL2 #(
-    .p_num_arb      (2),
+  SquashUnitL3 #(
+    .p_num_ctrl_arb (1),
     .p_num_be_lanes (p_num_be_lanes)
   ) SU (
-    .arb    (squash_arb_notif),
-    .gnt    (squash_gnt_notif),
-    .commit (commit_notif),
+    .arb_diu (squash_diu_pub_notif),
+    .arb     (squash_ctrl_notif),
+    .gnt     (squash_gnt_notif),
+    .diu_gnt (squash_diu_gnt_notif),
+    .commit  (commit_notif),
     .*
   );
 
@@ -274,23 +310,27 @@ module BlimpV11 #(
 `ifndef SYNTHESIS
   function string trace( int trace_level );
     trace = "";
-    // trace = {trace, FU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, DIU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, ALU0_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, ALU1_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MEM_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, CTRL_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, WCU.trace( trace_level )};
+    trace = {trace, FU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, DIU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU0_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU1_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU2_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU3_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MEM_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, CTRL_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, WCU.trace( trace_level )};
   endfunction
 `endif
 

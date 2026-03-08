@@ -181,7 +181,7 @@ module MemIntfTestServer #(
     str_len = 2 + 1 +                       // op
               ceil_div_4(p_opaq_bits) + 1 + // opaque
               8                       + 1 + // addr
-              8;                            // data
+              ceil_div_4(p_num_words * 32); // data
 
     if( dut.req_val & dut.req_rdy ) begin
       case( dut.req_msg.op )

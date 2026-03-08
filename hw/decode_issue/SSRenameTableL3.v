@@ -26,15 +26,15 @@ module SSRenameTableL3 #(
   // Allocation
   // ---------------------------------------------------------------------
 
-  // Allocation must be successful on all lanes with alloc_en set in order
+  // Allocation must be successful on all lanes with alloc_try set in order
   // to continue
   input  logic                  [4:0] alloc_areg   [p_num_fe_lanes],
   /* verilator lint_off UNOPTFLAT */
   output logic [p_phys_addr_bits-1:0] alloc_preg   [p_num_fe_lanes],
   /* verilator lint_on UNOPTFLAT */
   output logic [p_phys_addr_bits-1:0] alloc_ppreg  [p_num_fe_lanes],
-  input  logic                        alloc_en     [p_num_fe_lanes],
-  input  logic                        alloc_commit [p_num_fe_lanes],
+  input  logic                        alloc_try    [p_num_fe_lanes],
+  input  logic                        alloc_val    [p_num_fe_lanes],
   output logic                        alloc_rdy    [p_num_fe_lanes],
 
   // ---------------------------------------------------------------------
@@ -122,7 +122,7 @@ module SSRenameTableL3 #(
       always_ff @( posedge clk ) begin
         if( rst ) begin
           rename_table[i] <= '{pending: 1'b0, preg: p_phys_addr_bits'(i)};
-        end else if( got_complete_pend[i] || (do_commit_rename_reg && alloc_commit[do_commit_rename_lane]) ) begin
+        end else if( got_complete_pend[i] || (do_commit_rename_reg && alloc_val[do_commit_rename_lane]) ) begin
           rename_table[i] <= rename_table_next[i];
         end
       end
@@ -168,7 +168,7 @@ module SSRenameTableL3 #(
             free_list[i] <= 1'b0;
           else
             free_list[i] <= 1'b1;
-        end else if( got_free[i] || (do_commit_free_reg && alloc_commit[do_commit_free_lane]) ) begin
+        end else if( got_free[i] || (do_commit_free_reg && alloc_val[do_commit_free_lane]) ) begin
           free_list[i] <= free_list_next[i];
         end
       end
@@ -210,7 +210,7 @@ module SSRenameTableL3 #(
   genvar j;
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: ALLOC_LANES
-      assign alloc_xfer[i] = alloc_en[i] & alloc_rdy[i];
+      assign alloc_xfer[i] = alloc_val[i] & alloc_rdy[i];
 
       // Use priority encoder to get first free physical address from freelist
       logic [p_num_phys_regs-1:1] preg_alloc_sel_in, preg_alloc_sel_out;
@@ -220,12 +220,12 @@ module SSRenameTableL3 #(
         // check previous lanes for conflicts on this preg before selecting it
         // for this lane
         always_comb begin
-          preg_alloc_sel_in[j] = free_list[j];
+          preg_alloc_sel_in[j] = free_list[j] | got_free[j];
           for( int k = 0; k < i; k++ ) begin: ALLOC_CONFLICT
 
             // if allocating preg j on a previous lane, can't select it for this
             // lane
-            if( alloc_areg[k] != 0 && alloc_preg[k] == j )
+            if( alloc_areg[k] != 0 && alloc_preg[k] == j && alloc_try[k] )
               preg_alloc_sel_in[j] = 1'b0;
           end
         end
@@ -260,7 +260,7 @@ module SSRenameTableL3 #(
       always_comb begin
         is_dup_areg = 1'b0;
         for( int k = 0; k < i; k++ ) begin: DUP_AREG
-          if( ( alloc_areg[k] != 0 ) & ( alloc_areg[k] == alloc_areg[i] ) )
+          if( ( alloc_areg[k] != 0 ) & ( alloc_areg[k] == alloc_areg[i] ) && alloc_try[k] )
             is_dup_areg = 1'b1;
         end
       end
@@ -302,20 +302,33 @@ module SSRenameTableL3 #(
     end
   end
   
+  logic found_alloc;
   always_comb begin
     for( int k = 0; k < p_num_lookup_ports; k++ ) begin: LOOKUP_SET_PENDING_OUTER
       for( int l = 0; l < 2; l++ ) begin: LOOKUP_SET_PENDING_INNER
         if( lookup_iq_preg[k][l] == '0 ) begin
           lookup_iq_pending[k][l] = 0;
+          found_alloc = 1'b0;
+        end else if( got_complete_lookup[k][l] ) begin
+          lookup_iq_pending[k][l] = 1'b0; // Bypass
+          found_alloc = 1'b0;
         end else begin
-          if( got_complete_lookup[k][l] )
-            lookup_iq_pending[k][l] = 1'b0; // Bypass
+          // Check if preg was just allocated this cycle
+          // (uses alloc_try, not alloc_val, to break comb loop through dispatch_go)
+          found_alloc = 1'b0;
+          for ( int m = 0; m < p_num_fe_lanes; m++ ) begin: LOOKUP_ALLOC_FWD
+            if( alloc_try[m] && alloc_areg[m] != 0 &&
+                lookup_iq_preg[k][l] == alloc_preg[m] )
+              found_alloc = 1'b1;
+          end
+
+          if( found_alloc )
+            lookup_iq_pending[k][l] = 1'b1;
           else begin
             lookup_iq_pending[k][l] = '0;
             for ( int m = 1; m < 32; m++ ) begin: LOOKUP_PENDING_SEARCH
-              if( lookup_iq_preg[k][l] == rename_table_next[m].preg ) begin
-                lookup_iq_pending[k][l] = rename_table_next[m].pending;
-              end
+              if( lookup_iq_preg[k][l] == rename_table[m].preg )
+                lookup_iq_pending[k][l] = rename_table[m].pending;
             end
           end
         end
@@ -334,7 +347,7 @@ module SSRenameTableL3 #(
         end else begin
           lookup_new_inst_preg[k][l] = rename_table[lookup_new_inst_areg[k][l]].preg;
           for( int m = 0; m < k; m++ ) begin
-            if( alloc_rdy[m] && 
+            if( alloc_try[m] && 
                 alloc_areg[m] == lookup_new_inst_areg[k][l]) begin
               lookup_new_inst_preg[k][l] = alloc_preg[m];
             end
@@ -370,83 +383,87 @@ module SSRenameTableL3 #(
   // Linetracing
   // ---------------------------------------------------------------------
 
-// `ifndef SYNTHESIS
+`ifndef SYNTHESIS
 
-//   string test_trace;
-//   int    alloc_len;
-//   int    lookup_len;
-//   int    complete_len;
-//   int    free_len;
+  string test_trace;
+  int    alloc_len;
+  int    lookup_len;
+  int    complete_len;
+  int    free_len;
 
-//   initial begin
-//     test_trace = $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg);
-//     alloc_len  = test_trace.len();
+  initial begin
+    test_trace = $sformatf("%x > %x (%x)", alloc_areg[0], alloc_preg[0], alloc_ppreg[0]);
+    alloc_len  = test_trace.len();
 
-//     test_trace = $sformatf("%x > %x", lookup_areg[0][0], lookup_preg[0][0]);
-//     lookup_len = test_trace.len();
+    test_trace = $sformatf("%x > %x", lookup_new_inst_areg[0][0], lookup_new_inst_preg[0][0]);
+    lookup_len = test_trace.len();
 
-//     test_trace   = $sformatf("%x", complete_preg);
-//     complete_len = test_trace.len();
+    test_trace   = $sformatf("%x", complete_preg[0]);
+    complete_len = test_trace.len();
 
-//     test_trace = $sformatf("%x", free_ppreg);
-//     free_len   = test_trace.len();
-//   end
+    test_trace = $sformatf("%x", free_ppreg[0]);
+    free_len   = test_trace.len();
+  end
 
-//   function string trace( int trace_level );
-//     trace = "[";
-//     if( alloc_en & alloc_rdy ) begin
-//       if( trace_level > 0 )
-//         trace = {trace, $sformatf("%x > %x (%x)", alloc_areg, alloc_preg, alloc_ppreg)};
-//       else
-//         trace = {trace, $sformatf("%x", alloc_areg)};
-//     end
-//     else begin
-//       if( trace_level > 0 )
-//         trace = {trace, {(alloc_len){" "}}};
-//       else
-//         trace = {trace, {(2){" "}}};
-//     end
+  function string trace( int trace_level );
+    trace = "[";
+    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+      if( i != 0 )
+        trace = {trace, ", "};
+      if( alloc_try[i] & alloc_rdy[i] ) begin
+        if( trace_level > 0 )
+          trace = {trace, $sformatf("%x > %x (%x)", alloc_areg[i], alloc_preg[i], alloc_ppreg[i])};
+        else
+          trace = {trace, $sformatf("%x", alloc_areg[i])};
+      end
+      else begin
+        if( trace_level > 0 )
+          trace = {trace, {(alloc_len){" "}}};
+        else
+          trace = {trace, {(2){" "}}};
+      end
+    end
 
-//     trace = {trace, "] ["};
-    
-//     for( int j = 0; j < p_num_lookup_ports; j++ ) begin
-//       for( int k = 0; k < 2; k++ ) begin
-//         if( j != 0 || k != 0 )
-//           trace = {trace, ", "};
-//         if( lookup_en[j][k] ) begin
-//           if( trace_level > 0 )
-//             trace = {trace, $sformatf("%x > %x", lookup_areg[j][k], lookup_preg[j][k])};
-//           else
-//             trace = {trace, $sformatf("%x", lookup_areg[j][k])};
-//         end
-//         else begin
-//           if( trace_level > 0 )
-//             trace = {trace, {(lookup_len){" "}}};
-//           else
-//             trace = {trace, {(2){" "}}};
-//         end
-//       end
-//     end
+    trace = {trace, "] ["};
 
-//     trace = {trace, "] ["};
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      for( int k = 0; k < 2; k++ ) begin
+        if( j != 0 || k != 0 )
+          trace = {trace, ", "};
+        if( lookup_new_inst_en[j][k] ) begin
+          if( trace_level > 0 )
+            trace = {trace, $sformatf("%x > %x", lookup_new_inst_areg[j][k], lookup_new_inst_preg[j][k])};
+          else
+            trace = {trace, $sformatf("%x", lookup_new_inst_areg[j][k])};
+        end
+        else begin
+          if( trace_level > 0 )
+            trace = {trace, {(lookup_len){" "}}};
+          else
+            trace = {trace, {(2){" "}}};
+        end
+      end
+    end
 
-//     for( int i = 0; i < p_num_be_lanes; i++ ) begin
-//       if( complete_val[i] )
-//         trace = {trace, $sformatf("%x ", complete_preg[i])};
-//       else
-//         trace = {trace, {(complete_len){" "}}};
-//     end
+    trace = {trace, "] ["};
 
-//     for( int i = 0; i < p_num_be_lanes; i++ ) begin
-//       if( free_val[i] )
-//         trace = {trace, $sformatf("%x ", free_ppreg[i])};
-//       else
-//         trace = {trace, {(free_len){" "}}};
-//     end
+    for( int i = 0; i < p_num_be_lanes; i++ ) begin
+      if( complete_val[i] )
+        trace = {trace, $sformatf("%x ", complete_preg[i])};
+      else
+        trace = {trace, {(complete_len){" "}}};
+    end
 
-//     trace = {trace, "]"};
-//   endfunction
-// `endif
+    for( int i = 0; i < p_num_be_lanes; i++ ) begin
+      if( free_val[i] )
+        trace = {trace, $sformatf("%x ", free_ppreg[i])};
+      else
+        trace = {trace, {(free_len){" "}}};
+    end
+
+    trace = {trace, "]"};
+  endfunction
+`endif
 
 endmodule
 

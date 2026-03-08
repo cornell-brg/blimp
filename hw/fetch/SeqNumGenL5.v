@@ -293,38 +293,45 @@ module SeqNumGenL5 #(
   // Linetracing
   //----------------------------------------------------------------------
 
-// `ifndef SYNTHESIS
-//   function int ceil_div_4( int val );
-//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-//   endfunction
+`ifndef SYNTHESIS
+  function int ceil_div_4( int val );
+    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+  endfunction
 
-//   function automatic string trace( int trace_level );
-//     string alloc_trace, free_trace;
+  function automatic string trace( int trace_level );
+    string alloc_trace, free_trace;
 
-//     if( is_alloc ) begin
-//       alloc_trace = $sformatf("%h", alloc_seq_num[0]);
-//       for( int j = 1; j < p_num_fe_lanes; j = j + 1 )
-//         alloc_trace = $sformatf("%s,%h", alloc_trace, alloc_seq_num[j]);
-//     end else
-//       alloc_trace = {ceil_div_4(p_seq_num_bits){" "}};
+    alloc_trace = "";
+    for( int j = 0; j < p_num_fe_lanes; j = j + 1 ) begin
+      if( j != 0 )
+        alloc_trace = {alloc_trace, ","};
+      if( alloc_val[j] )
+        alloc_trace = {alloc_trace, $sformatf("%h", alloc_seq_num[j])};
+      else
+        alloc_trace = {alloc_trace, {(ceil_div_4(p_seq_num_bits)){" "}}};
+    end
 
-//     for( int j = 0; j < p_num_be_lanes; j = j + 1 ) begin
-//       if( is_free[j] )
-//         free_trace = $sformatf("%h", commit_seq_num[j]);
-//       else
-//         free_trace = {ceil_div_4(p_seq_num_bits){" "}};
-//     end
-//     if( trace_level > 0 )
-//       trace = $sformatf("%h::%h (%s) (%s)",
-//         curr_head_ptr,
-//         curr_tail_ptr,
-//         alloc_trace,
-//         free_trace
-//       );
-//     else
-//       trace = $sformatf("%s - %s", alloc_trace, free_trace);
-//   endfunction
-// `endif
+    free_trace = "";
+    for( int j = 0; j < p_num_be_lanes; j = j + 1 ) begin
+      if( j != 0 )
+        free_trace = {free_trace, ","};
+      if( is_free[j] )
+        free_trace = {free_trace, $sformatf("%h", commit_seq_num[j])};
+      else
+        free_trace = {free_trace, {(ceil_div_4(p_seq_num_bits)){" "}}};
+    end
+
+    if( trace_level > 0 )
+      trace = $sformatf("%h::%h (%s) (%s)",
+        curr_head_ptr,
+        curr_tail_ptr,
+        alloc_trace,
+        free_trace
+      );
+    else
+      trace = $sformatf("%s - %s", alloc_trace, free_trace);
+  endfunction
+`endif
 
 endmodule
 

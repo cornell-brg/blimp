@@ -385,37 +385,58 @@ module FetchUnitL5
   // Linetracing
   //----------------------------------------------------------------------
 
-// `ifndef SYNTHESIS
-//   function int ceil_div_4( int val );
-//     return (val / 4) + ((val % 4) > 0 ? 1 : 0);
-//   endfunction
+`ifndef SYNTHESIS
+  function int ceil_div_4( int val );
+    return (val / 4) + ((val % 4) > 0 ? 1 : 0);
+  endfunction
 
-//   function string trace( int trace_level );
-//     if( trace_level > 0 ) begin
-//       if( memreq_xfer )
-//         trace = $sformatf("%h", mem.req_msg.addr);
-//       else
-//         trace = {8{" "}};
+  // seq num section width: p_num_fe_lanes * ceil_div_4(p_seq_num_bits) + (p_num_fe_lanes - 1) commas
+  // total low trace width:  seq_num_width + 2 (": ") + 8 (addr)
+  function string trace( int trace_level );
+    int seq_w;
+    int total_w;
+    seq_w   = p_num_fe_lanes * ceil_div_4(p_seq_num_bits) + (p_num_fe_lanes - 1);
+    total_w = seq_w + 2 + 8;
 
-//       trace = {trace, " > "};
+    if( trace_level > 0 ) begin
+      if( memreq_xfer )
+        trace = $sformatf("%h", mem.req_msg.addr);
+      else
+        trace = {8{" "}};
 
-//       if( D_xfer )
-//         trace = {trace, $sformatf("%h (%h) %s ",
-//                                   mem.resp_msg.addr, alloc_seq_num,
-//                                   (should_drop ? "X" : " "))};
-//       else
-//         trace = {trace, {(14 + ceil_div_4(p_seq_num_bits)){" "}}};
-//     end else begin
-//       if( D_xfer )
-//         if( should_drop )
-//           trace = {(ceil_div_4(p_seq_num_bits) + 2 + 8){"X"}};
-//         else
-//           trace = $sformatf("%h: %h", alloc_seq_num, mem.resp_msg.addr);
-//       else
-//         trace = {(ceil_div_4(p_seq_num_bits) + 2 + 8){" "}};
-//     end
-//   endfunction
-// `endif
+      trace = {trace, " > "};
+
+      if( D_xfer_all ) begin
+        trace = {trace, $sformatf("%h %s ", fifo_rdata_addr,
+                                  (should_drop ? "X" : " "))};
+        for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+          if( i != 0 )
+            trace = {trace, ","};
+          if( D_xfer[i] )
+            trace = {trace, $sformatf("%h", alloc_seq_num[i])};
+          else
+            trace = {trace, {(ceil_div_4(p_seq_num_bits)){" "}}};
+        end
+      end else
+        trace = {trace, {(11 + seq_w){" "}}};
+    end else begin
+      if( D_xfer_all ) begin
+        if( should_drop )
+          trace = {(total_w){"X"}};
+        else begin
+          trace = "";
+          for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+            if( i != 0 )
+              trace = {trace, ","};
+            trace = {trace, $sformatf("%h", alloc_seq_num[i])};
+          end
+          trace = {trace, $sformatf(": %h", fifo_rdata_addr)};
+        end
+      end else
+        trace = {(total_w){" "}};
+    end
+  endfunction
+`endif
 
 endmodule
 
