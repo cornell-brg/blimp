@@ -167,6 +167,7 @@ module BlimpV11 #(
                             OP_BGEU_VEC;
 
   FetchUnitL5 #(
+    .p_reclaim_width (p_num_be_lanes),
     .p_max_in_flight (8),
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
