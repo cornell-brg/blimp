@@ -8,22 +8,21 @@
 
 // valid instruction
 module InsnCheckS1 (
-  input  logic prev_stage_pass,
-  output logic o_pass,
-  output logic o_invalidate,
+  InsnCheckIntf.check intf,
 
   input  logic entry_val,
   input  logic entry_insn_val,
   input  logic decoder_val
 );
 
-  assign o_pass =
-    prev_stage_pass &&
+  assign intf.pass =
+    intf.prev_stage_pass &&
     entry_val &&
     entry_insn_val &&
     decoder_val;
 
-  assign o_invalidate = 1'b0;
+  assign intf.invalidate = 1'b0;
+  assign intf.prev_insn_pass_out = intf.pass || !intf.insn_valid;
 
 endmodule
 
@@ -33,9 +32,7 @@ module InsnCheckS2 #(
   parameter p_num_fe_lanes = 2,
   parameter p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1
 ) (
-  input  logic prev_stage_pass,
-  output logic o_pass,
-  output logic o_invalidate,
+  InsnCheckIntf.check intf,
 
   // Details about oldest control instruction in IW if present
   input  logic oldest_ctrl_insn_found,
@@ -47,13 +44,13 @@ module InsnCheckS2 #(
   input  logic squash_sub_val
 );
 
-  assign o_pass = prev_stage_pass && !squash_sub_val && (
+  assign intf.pass = intf.prev_stage_pass && !squash_sub_val && (
     !oldest_ctrl_insn_found ||
     int'(insn_idx) < int'(oldest_ctrl_insn_idx) ||
     (int'(insn_idx) == int'(oldest_ctrl_insn_idx) && oldest_ctrl_insn_srcs_ready)
   );
 
-  assign o_invalidate = prev_stage_pass && (
+  assign intf.invalidate = intf.prev_stage_pass && (
     squash_sub_val || (
       oldest_ctrl_insn_found &&
       !oldest_ctrl_insn_is_brx &&
@@ -62,14 +59,13 @@ module InsnCheckS2 #(
     )
   );
 
+  assign intf.prev_insn_pass_out = intf.pass || !intf.insn_valid;
+
 endmodule
 
 // check if can be allocated preg for areg if necessary
 module InsnCheckS3 (
-  input  logic prev_insn_pass,
-  input  logic prev_stage_pass,
-  output logic o_pass,
-  output logic o_invalidate,
+  InsnCheckIntf.check intf,
 
   input  logic decoder_wen,
 
@@ -78,32 +74,29 @@ module InsnCheckS3 (
   input  logic dispatched
 );
 
-  assign alloc_try = prev_stage_pass & decoder_wen & prev_insn_pass;
-  assign o_pass    = prev_stage_pass & prev_insn_pass &
-                     (dispatched | alloc_rdy | !decoder_wen);
-  assign o_invalidate = 1'b0;
+  assign alloc_try    = intf.prev_stage_pass & decoder_wen & intf.prev_insn_pass;
+  assign intf.pass    = intf.prev_stage_pass & intf.prev_insn_pass &
+                        (dispatched | alloc_rdy | !decoder_wen);
+  assign intf.invalidate = 1'b0;
+  assign intf.prev_insn_pass_out = intf.pass || !intf.insn_valid;
 
 endmodule
 
 // check for structural hazard (xbar cannot route)
 module InsnCheckS4 (
-  input  logic prev_insn_pass,
-  input  logic prev_stage_pass,
-  output logic o_pass,
-  output logic o_invalidate,
+  InsnCheckIntf.check intf,
 
   input logic dispatched,
   input logic prev_insn_dispatched,
   input logic lane_val
 );
 
-  // o_pass = lane_val
-
-  assign o_pass = prev_stage_pass && 
-                  lane_val && 
-                  (prev_insn_pass || prev_insn_dispatched) && 
-                  !dispatched;
-  assign o_invalidate = 1'b0;
+  assign intf.pass = intf.prev_stage_pass &&
+                     lane_val &&
+                     (intf.prev_insn_pass || prev_insn_dispatched) &&
+                     !dispatched;
+  assign intf.invalidate = 1'b0;
+  assign intf.prev_insn_pass_out = intf.pass || !intf.insn_valid;
 
 endmodule
 

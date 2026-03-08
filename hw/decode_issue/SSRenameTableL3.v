@@ -45,9 +45,9 @@ module SSRenameTableL3 #(
   input  logic                        lookup_new_inst_en   [p_num_fe_lanes][2],
   output logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2],
 
-  input  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_lookup_ports][2],
-  input  logic                        lookup_iq_en      [p_num_lookup_ports][2],
-  output logic                        lookup_iq_pending [p_num_lookup_ports][2],
+  input  logic [p_phys_addr_bits-1:0] lookup_preg    [p_num_lookup_ports][2],
+  input  logic                        lookup_preg_en [p_num_lookup_ports][2],
+  output logic                        lookup_pending [p_num_lookup_ports][2],
 
   // ---------------------------------------------------------------------
   // Complete (clear pending)
@@ -277,12 +277,12 @@ module SSRenameTableL3 #(
   // ---------------------------------------------------------------------
 
   logic got_complete_lookup [p_num_lookup_ports][2];
-  logic unused_iq_lookup_en [p_num_lookup_ports][2];
+  logic unused_iq_lookup_preg_en [p_num_lookup_ports][2];
 
   always_comb begin
-    for( int j = 0; j < p_num_lookup_ports; j++ ) begin: UNUSED_IQ_LOOKUP_EN_OUTER
-      for( int k = 0; k < 2; k++ ) begin: UNUSED_IQ_LOOKUP_EN_INNER
-        unused_iq_lookup_en[j][k] = lookup_iq_en[j][k];
+    for( int j = 0; j < p_num_lookup_ports; j++ ) begin: UNUSED_IQ_lookup_preg_en_OUTER
+      for( int k = 0; k < 2; k++ ) begin: UNUSED_IQ_lookup_preg_en_INNER
+        unused_iq_lookup_preg_en[j][k] = lookup_preg_en[j][k];
       end
     end
   end
@@ -296,7 +296,7 @@ module SSRenameTableL3 #(
     for( int j = 0; j < p_num_be_lanes; j++ ) begin: GOT_COMPLETE_OUTER
       for( int k = 0; k < p_num_lookup_ports; k++ ) begin: GOT_COMPLETE_MIDDLE
         for( int l = 0; l < 2; l++ ) begin: GOT_COMPLETE_INNER
-          if( complete_preg[j] == lookup_iq_preg[k][l] ) got_complete_lookup[k][l] = 1'b1;
+          if( complete_preg[j] == lookup_preg[k][l] ) got_complete_lookup[k][l] = 1'b1;
         end
       end
     end
@@ -306,11 +306,11 @@ module SSRenameTableL3 #(
   always_comb begin
     for( int k = 0; k < p_num_lookup_ports; k++ ) begin: LOOKUP_SET_PENDING_OUTER
       for( int l = 0; l < 2; l++ ) begin: LOOKUP_SET_PENDING_INNER
-        if( lookup_iq_preg[k][l] == '0 ) begin
-          lookup_iq_pending[k][l] = 0;
+        if( lookup_preg[k][l] == '0 ) begin
+          lookup_pending[k][l] = 0;
           found_alloc = 1'b0;
         end else if( got_complete_lookup[k][l] ) begin
-          lookup_iq_pending[k][l] = 1'b0; // Bypass
+          lookup_pending[k][l] = 1'b0; // Bypass
           found_alloc = 1'b0;
         end else begin
           // Check if preg was just allocated this cycle
@@ -318,17 +318,17 @@ module SSRenameTableL3 #(
           found_alloc = 1'b0;
           for ( int m = 0; m < p_num_fe_lanes; m++ ) begin: LOOKUP_ALLOC_FWD
             if( alloc_try[m] && alloc_areg[m] != 0 &&
-                lookup_iq_preg[k][l] == alloc_preg[m] )
+                lookup_preg[k][l] == alloc_preg[m] )
               found_alloc = 1'b1;
           end
 
           if( found_alloc )
-            lookup_iq_pending[k][l] = 1'b1;
+            lookup_pending[k][l] = 1'b1;
           else begin
-            lookup_iq_pending[k][l] = '0;
+            lookup_pending[k][l] = '0;
             for ( int m = 1; m < 32; m++ ) begin: LOOKUP_PENDING_SEARCH
-              if( lookup_iq_preg[k][l] == rename_table[m].preg )
-                lookup_iq_pending[k][l] = rename_table[m].pending;
+              if( lookup_preg[k][l] == rename_table[m].preg )
+                lookup_pending[k][l] = rename_table[m].pending;
             end
           end
         end

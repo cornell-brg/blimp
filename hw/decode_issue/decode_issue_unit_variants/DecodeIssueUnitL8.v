@@ -24,6 +24,7 @@
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
 `include "intf/SquashNotif.v"
+`include "intf/InsnCheckIntf.v"
 `include "hw/decode_issue/InsnChecks.v"
 
 import ISA::*;
@@ -102,8 +103,17 @@ module DecodeIssueUnitL8 #(
   logic alloc_rdy   [p_num_fe_lanes];
   logic oldest_ctrl_insn_srcs_ready;
 
-  logic stage_pass_s1      [p_num_fe_lanes];
-  logic invalidate_insn    [p_num_fe_lanes];
+  InsnCheckIntf inst_chk_s1[p_num_fe_lanes]();
+  InsnCheckIntf inst_chk_s2[p_num_fe_lanes]();
+  InsnCheckIntf inst_chk_s3[p_num_fe_lanes]();
+  InsnCheckIntf inst_chk_s4[p_num_fe_lanes]();
+
+  // Helper arrays for variable-indexed access (SV interfaces cannot be
+  // indexed with runtime variables)
+  logic inst_chk_s1_pass       [p_num_fe_lanes];
+  logic inst_chk_s4_pass       [p_num_fe_lanes];
+
+  logic invalidate_insn   [p_num_fe_lanes];
 
   // Head entry outputs from FIFO wrapper
   logic                      fifo_pop;
@@ -155,8 +165,8 @@ module DecodeIssueUnitL8 #(
     F_rdy_all = oldest_ctrl_insn_srcs_ready;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
       F_rdy_all &= (
-        !stage_pass_s1[j] |
-        dispatch_go[j]    |
+        !inst_chk_s1_pass[j] |
+        dispatch_go[j]       |
         F_curr[j].dispatched
       );
     end
@@ -207,9 +217,9 @@ module DecodeIssueUnitL8 #(
   logic                          oldest_ctrl_insn_found;
   logic                          oldest_ctrl_insn_is_brx;
 
-  logic [p_phys_addr_bits-1:0] lookup_iq_preg    [p_num_pipes+1][2];
-  logic                        lookup_iq_en      [p_num_pipes+1][2];
-  logic                        lookup_iq_pending [p_num_pipes+1][2];
+  logic [p_phys_addr_bits-1:0] lookup_preg    [p_num_pipes+1][2];
+  logic                        lookup_preg_en      [p_num_pipes+1][2];
+  logic                        lookup_pending [p_num_pipes+1][2];
 
   logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
 
@@ -231,7 +241,7 @@ module DecodeIssueUnitL8 #(
       logic is_brx, is_jal, is_valid;
       is_brx   = in_subset(p_brx_subset, num_ops'(1 << decoder_uop[k]));
       is_jal   = (decoder_jal[k] != 2'd0);
-      is_valid = stage_pass_s1[k] && !F_curr[k].dispatched;
+      is_valid = inst_chk_s1_pass[k] && !F_curr[k].dispatched;
 
       if( (is_brx || is_jal) && is_valid &&
           (!oldest_ctrl_insn_found ||
@@ -248,20 +258,23 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     oldest_ctrl_insn_srcs_ready = 1'b1;
-    lookup_iq_en[p_num_pipes][0] = 1'b0;
-    lookup_iq_en[p_num_pipes][1] = 1'b0;
-    lookup_iq_preg[p_num_pipes][0] = '0;
-    lookup_iq_preg[p_num_pipes][1] = '0;
+    lookup_preg_en[p_num_pipes][0] = 1'b0;
+    lookup_preg_en[p_num_pipes][1] = 1'b0;
+    lookup_preg[p_num_pipes][0]    = '0;
+    lookup_preg[p_num_pipes][1]    = '0;
     if( oldest_ctrl_insn_found ) begin
-      lookup_iq_en[p_num_pipes][0] = 1'b1;
-      lookup_iq_preg[p_num_pipes][0] = lookup_new_inst_preg[oldest_ctrl_insn_idx][0];
+      lookup_preg_en[p_num_pipes][0] = 1'b1;
+      lookup_preg[p_num_pipes][0]    = 
+        lookup_new_inst_preg[oldest_ctrl_insn_idx][0];
       if( oldest_ctrl_insn_is_brx ) begin
-        lookup_iq_en[p_num_pipes][1] = 1'b1;
-        lookup_iq_preg[p_num_pipes][1] = lookup_new_inst_preg[oldest_ctrl_insn_idx][1];
+        lookup_preg_en[p_num_pipes][1] = 1'b1;
+        lookup_preg[p_num_pipes][1] = 
+          lookup_new_inst_preg[oldest_ctrl_insn_idx][1];
       end
       oldest_ctrl_insn_srcs_ready =
-        !lookup_iq_pending[p_num_pipes][0] &
-        (!oldest_ctrl_insn_is_brx | !lookup_iq_pending[p_num_pipes][1]);
+        !lookup_pending[p_num_pipes][0] &
+        (!oldest_ctrl_insn_is_brx | 
+        !lookup_pending[p_num_pipes][1]);
     end
   end
 
@@ -269,19 +282,21 @@ module DecodeIssueUnitL8 #(
   // Instruction check stage 1: validation
   //----------------------------------------------------------------------
 
-  logic invalidate_insn_s1 [p_num_fe_lanes];
-
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INSN_CHECK_S1_GEN
+      assign inst_chk_s1[i].prev_stage_pass = 1'b1;
+      assign inst_chk_s1[i].prev_insn_pass  = 1'b1;
+      assign inst_chk_s1[i].insn_valid      = F_curr[i].insn_valid;
+
       InsnCheckS1 check_s1 (
-        .prev_stage_pass (1'b1),
-        .o_pass          (stage_pass_s1[i]),
-        .o_invalidate    (invalidate_insn_s1[i]),
+        .intf (inst_chk_s1[i]),
 
         .entry_val        (F_curr[i].val),
         .entry_insn_val   (F_curr[i].insn_valid),
         .decoder_val      (decoder_val[i])
       );
+
+      assign inst_chk_s1_pass[i] = inst_chk_s1[i].pass;
     end
   endgenerate
 
@@ -289,24 +304,23 @@ module DecodeIssueUnitL8 #(
   // Instruction check stage 2: check against control instruction
   //----------------------------------------------------------------------
 
-  logic stage_pass_s2      [p_num_fe_lanes];
-  logic invalidate_insn_s2 [p_num_fe_lanes];
-
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INSN_CHECK_S2_GEN
+      assign inst_chk_s2[i].prev_stage_pass = inst_chk_s1[i].pass;
+      assign inst_chk_s2[i].prev_insn_pass  = 1'b1;
+      assign inst_chk_s2[i].insn_valid      = F_curr[i].insn_valid;
+
       InsnCheckS2 #(
         .insn_idx (i),
         .p_num_fe_lanes (p_num_fe_lanes)
       ) check_s2 (
-        .prev_stage_pass (stage_pass_s1[i]),
-        .o_pass          (stage_pass_s2[i]),
-        .o_invalidate    (invalidate_insn_s2[i]),
+        .intf (inst_chk_s2[i]),
 
         .oldest_ctrl_insn_found       (oldest_ctrl_insn_found),
         .oldest_ctrl_insn_is_brx      (oldest_ctrl_insn_is_brx),
         .oldest_ctrl_insn_idx         (oldest_ctrl_insn_idx),
         .oldest_ctrl_insn_srcs_ready  (oldest_ctrl_insn_srcs_ready),
-        .oldest_ctrl_insn_dispatch_en (stage_pass_s4[oldest_ctrl_insn_idx]),
+        .oldest_ctrl_insn_dispatch_en (inst_chk_s4_pass[oldest_ctrl_insn_idx]),
 
         .squash_sub_val               (squash_sub.val)
       );
@@ -317,40 +331,31 @@ module DecodeIssueUnitL8 #(
   // Instruction check stage 3: check if can allocate preg for areg
   //----------------------------------------------------------------------
 
-  logic prev_insn_pass_s3  [p_num_fe_lanes];
-  logic stage_pass_s3      [p_num_fe_lanes];
-  logic invalidate_insn_s3 [p_num_fe_lanes];
-
   logic alloc_try_s3 [p_num_fe_lanes];
 
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INSN_CHECK_S3_GEN
+      assign inst_chk_s3[i].prev_stage_pass = inst_chk_s2[i].pass;
+      assign inst_chk_s3[i].prev_insn_pass  = (i == 0) ? 1'b1 : 
+                                              inst_chk_s3[i-1].prev_insn_pass_out;
+      assign inst_chk_s3[i].insn_valid      = F_curr[i].insn_valid;
+
       InsnCheckS3 check_s3 (
-        .prev_insn_pass  (i == 0 ? 1'b1 : prev_insn_pass_s3[i-1]),
-        .prev_stage_pass (stage_pass_s2[i]),
-        .o_pass          (stage_pass_s3[i]),
-        .o_invalidate    (invalidate_insn_s3[i]),
-        .decoder_wen     (decoder_wen[i]),
+        .intf (inst_chk_s3[i]),
+
+        .decoder_wen (decoder_wen[i]),
 
         .alloc_try (alloc_try_s3[i]),
         .alloc_rdy (alloc_rdy[i]),
 
         .dispatched (F_curr[i].dispatched)
       );
-
-      // The next insn's S3 check will see this instruction as ok
-      // if it is invalid, since it won't need a preg
-      assign prev_insn_pass_s3[i] = stage_pass_s3[i] || !F_curr[i].insn_valid;
     end
   endgenerate
 
   //----------------------------------------------------------------------
   // Instruction check stage 4: check for structural hazard
   //----------------------------------------------------------------------
-
-  logic prev_insn_pass_s4  [p_num_fe_lanes];
-  logic stage_pass_s4      [p_num_fe_lanes];
-  logic invalidate_insn_s4 [p_num_fe_lanes];
 
   logic                   lane_val         [p_num_fe_lanes];
   logic [p_pipe_bits-1:0] lane_to_pipe_map [p_num_fe_lanes];
@@ -372,18 +377,20 @@ module DecodeIssueUnitL8 #(
 
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INSN_CHECK_S4_GEN
+      assign inst_chk_s4[i].prev_stage_pass = inst_chk_s3[i].pass;
+      assign inst_chk_s4[i].prev_insn_pass  = (i == 0) ? 1'b1 : 
+                                              inst_chk_s4[i-1].prev_insn_pass_out;
+      assign inst_chk_s4[i].insn_valid      = F_curr[i].insn_valid;
+
       InsnCheckS4 check_s4(
-        .prev_insn_pass  (i == 0 ? 1'b1 : prev_insn_pass_s4[i-1]),
-        .prev_stage_pass (stage_pass_s3[i]),
-        .o_pass          (stage_pass_s4[i]),
-        .o_invalidate    (invalidate_insn_s4[i]),
+        .intf (inst_chk_s4[i]),
 
         .dispatched (F_curr[i].dispatched),
         .prev_insn_dispatched(i == 0 ? 1'b1 : F_curr[i-1].dispatched),
         .lane_val   (lane_val[i])
       );
 
-      assign prev_insn_pass_s4[i] = stage_pass_s4[i] || !F_curr[i].insn_valid;
+      assign inst_chk_s4_pass[i] = inst_chk_s4[i].pass;
     end
   endgenerate
 
@@ -391,15 +398,15 @@ module DecodeIssueUnitL8 #(
   // Invalidate instruction
   //----------------------------------------------------------------------
 
-  always_comb begin
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      invalidate_insn[k] =
-        invalidate_insn_s1[k] |
-        invalidate_insn_s2[k] |
-        invalidate_insn_s3[k] |
-        invalidate_insn_s4[k];
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INVALIDATE_GEN
+      assign invalidate_insn[i] =
+        inst_chk_s1[i].invalidate |
+        inst_chk_s2[i].invalidate |
+        inst_chk_s3[i].invalidate |
+        inst_chk_s4[i].invalidate;
     end
-  end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Rename Table and Register File
@@ -418,9 +425,9 @@ module DecodeIssueUnitL8 #(
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
       lookup_new_inst_areg[k][0] = decoder_raddr0[k];
       lookup_new_inst_areg[k][1] = decoder_raddr1[k];
-      lookup_new_inst_en[k][0] = 1'b1;
-      lookup_new_inst_en[k][1] = 1'b1;
-      alloc_try[k] = stage_pass_s1[k] &
+      lookup_new_inst_en[k][0]   = 1'b1;
+      lookup_new_inst_en[k][1]   = 1'b1;
+      alloc_try[k] = inst_chk_s1_pass[k] &
                      !F_curr[k].dispatched;
     end
   end
@@ -451,9 +458,9 @@ module DecodeIssueUnitL8 #(
     .lookup_new_inst_en      (lookup_new_inst_en),
     .lookup_new_inst_preg    (lookup_new_inst_preg),
 
-    .lookup_iq_preg    (lookup_iq_preg),
-    .lookup_iq_en      (lookup_iq_en),
-    .lookup_iq_pending (lookup_iq_pending),
+    .lookup_preg    (lookup_preg),
+    .lookup_preg_en      (lookup_preg_en),
+    .lookup_pending (lookup_pending),
 
     .complete       (complete),
     .commit         (commit)
@@ -565,7 +572,7 @@ module DecodeIssueUnitL8 #(
   logic [p_seq_num_bits-1:0] seq_num_arr [p_num_fe_lanes];
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      xbar_val[i]      = stage_pass_s1[i] && !F_curr[i].dispatched;
+      xbar_val[i]      = inst_chk_s1_pass[i] && !F_curr[i].dispatched;
       seq_num_arr[i]  = F_curr[i].seq_num;
     end
   end
@@ -594,7 +601,7 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      dispatch_go[i] = stage_pass_s4[i] && iq_rdy[lane_to_pipe_map[i]];
+      dispatch_go[i] = inst_chk_s4_pass[i] && iq_rdy[lane_to_pipe_map[i]];
     end
   end
 
@@ -625,7 +632,7 @@ module DecodeIssueUnitL8 #(
         .ins_msg_seq_num         (F_curr[pipe_to_lane_map[i]].seq_num),
         .ins_msg_alloc_preg      (alloc_preg[pipe_to_lane_map[i]]),
         .ins_msg_alloc_ppreg     (alloc_ppreg[pipe_to_lane_map[i]]),
-        .ins_en                  (stage_pass_s4[pipe_to_lane_map[i]] && iq_val[i]),
+        .ins_en                  (inst_chk_s4_pass[pipe_to_lane_map[i]] && iq_val[i]),
         .ins_rdy                 (iq_rdy[i]),
         .avail_slots             (iq_avail_slots[i]),
 
@@ -633,9 +640,9 @@ module DecodeIssueUnitL8 #(
         .Ex                      (Ex[i]),
 
         // Rename Table Access
-        .rt_lookup_preg          (lookup_iq_preg[i]),
-        .rt_lookup_pending       (lookup_iq_pending[i]),
-        .rt_lookup_en            (lookup_iq_en[i]),
+        .rt_lookup_preg          (lookup_preg[i]),
+        .rt_lookup_pending       (lookup_pending[i]),
+        .rt_lookup_en            (lookup_preg_en[i]),
 
         // Register File Access
         .rf_raddr                (raddr[i]),
