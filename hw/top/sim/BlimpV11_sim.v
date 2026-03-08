@@ -15,7 +15,7 @@ import "DPI-C" context function void load_elf ( string elf_file );
 module BlimpV11_sim;
 
   // Define default simulation parameters
-  localparam p_num_phys_regs = 36;
+  localparam p_num_phys_regs = 40;
   localparam p_opaq_bits     = 8;
   localparam p_seq_num_bits  = 5;
   localparam p_num_be_lanes  = 4;
