@@ -166,6 +166,15 @@ module ALUL6 #(
         trace = {(ceil_div_4(p_seq_num_bits)){" "}};
     end
   endfunction
+
+  function string trace_json();
+    if( !fifo_empty )
+      trace_json = $sformatf("{\"seq\":\"%h\",\"uop\":\"%0s\",\"waddr\":\"%h\",\"op1\":\"%h\",\"op2\":\"%h\",\"wdata\":\"%h\",\"val\":\"%b\",\"rdy\":\"%b\",\"xfer\":\"%b\"}",
+        W.seq_num, D_curr.uop.name(), W.waddr, op1, op2, W.wdata,
+        W.val, W.rdy, W.val & W.rdy );
+    else
+      trace_json = "null";
+  endfunction
 `endif
 
 endmodule

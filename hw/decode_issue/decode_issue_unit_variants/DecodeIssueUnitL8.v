@@ -685,12 +685,18 @@ module DecodeIssueUnitL8 #(
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
       if( i != 0 )
         trace = {trace, " | "};
-      if( fifo_pop )
-        trace = {trace, $sformatf("%x: %-30s",
-          F_curr[i].seq_num, disassemble(F_curr[i].inst, F_curr[i].pc))};
-      else
-        trace = {trace, {(32 + ceil_div_4(p_seq_num_bits)){" "}}};
+      trace = {trace, $sformatf("%x: %-30s",
+        F_curr[i].seq_num, disassemble(F_curr[i].inst, F_curr[i].pc))};
     end
+  endfunction
+
+  function string trace_json_lane( int lane );
+    if( !fifo_empty )
+      trace_json_lane = $sformatf("{\"seq\":\"%x\",\"inst\":\"%0s\",\"xfer\":\"%b\",\"dispatched\":\"%b\",\"inst_valid\":\"%b\"}",
+        F_curr[lane].seq_num, disassemble(F_curr[lane].inst, F_curr[lane].pc),
+        dispatch_go[lane], F_curr[lane].dispatched, F_curr[lane].inst_valid);
+    else
+      trace_json_lane = "null";
   endfunction
 `endif
 

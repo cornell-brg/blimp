@@ -450,6 +450,15 @@ module IterativeMulDivRemL7 #(
         trace = {(ceil_div_4(p_seq_num_bits) + 3){" "}};
     end
   endfunction
+
+  function string trace_json();
+    if( curr_state != IDLE )
+      trace_json = $sformatf("{\"seq\":\"%h\",\"state\":\"%0s\",\"sign_restore\":\"%h\",\"waddr\":\"%h\",\"opa\":\"%h\",\"opb\":\"%h\",\"result\":\"%h\"}",
+        W.seq_num, state_str(), need_to_sign_restore,
+        W.waddr, opa[31:0], opb[31:0], result );
+    else
+      trace_json = "null";
+  endfunction
 `endif
 
 endmodule

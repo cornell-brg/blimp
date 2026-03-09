@@ -198,7 +198,7 @@ module WritebackCommitUnitL4 #(
   generate
     for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: FIFO_IN_GEN
       assign Ex_val_sel_packed[i] = Ex_msg_sel[i].val;
-      assign fifo_in[i]          = Ex_msg_sel[i];
+      assign fifo_in[i]           = Ex_msg_sel[i];
     end
   endgenerate
 
@@ -295,6 +295,14 @@ module WritebackCommitUnitL4 #(
                    ceil_div_4( 5 )              + 1 + // addr
                    8;                                 // data
 
+  // Helper array for commit.val (interfaces can't be runtime-indexed)
+  logic commit_val [p_num_be_lanes];
+  generate
+    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_COMMIT_VAL
+      assign commit_val[i] = commit[i].val;
+    end
+  endgenerate
+
   function string trace( int trace_level );
     trace = "";
     for( int i = 0; i < p_num_be_lanes; i++ ) begin
@@ -313,6 +321,15 @@ module WritebackCommitUnitL4 #(
           trace = {trace, {(ceil_div_4( p_seq_num_bits )){" "}}};
       end
     end
+  endfunction
+
+  function string trace_json_lane( int lane );
+    if( X_curr[lane].val && !fifo_empty)
+      trace_json_lane = $sformatf("{\"seq\":\"%h\",\"wen\":\"%h\",\"waddr\":\"%h\",\"wdata\":\"%h\",\"xfer\":\"%b\"}",
+        X_curr[lane].seq_num, X_curr[lane].wen, X_curr[lane].waddr, X_curr[lane].wdata,
+        commit_val[lane] );
+    else
+      trace_json_lane = "null";
   endfunction
 `endif
 

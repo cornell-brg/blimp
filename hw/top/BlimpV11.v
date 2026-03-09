@@ -122,6 +122,7 @@ module BlimpV11 #(
       assign inst_trace[i].wdata      = commit_notif[i].wdata;
       assign inst_trace[i].wen        = commit_notif[i].wen;
       assign inst_trace[i].val        = commit_notif[i].val;
+      assign inst_trace[i].seq_num    = commit_notif[i].seq_num;
       assign unused_complete_waddr[i] = complete_notif[i].waddr;
     end
   endgenerate
@@ -337,6 +338,40 @@ module BlimpV11 #(
     trace = {trace, CTRL_XU.trace( trace_level )};
     trace = {trace, " | "};
     trace = {trace, WCU.trace( trace_level )};
+  endfunction
+
+  function string trace_json();
+    trace_json = "";
+
+    // Fetch Unit
+    trace_json = {trace_json, "\"fu\":",   FU.trace_json()};
+
+    // Decode/Issue Unit (per lane)
+    for( int i = 0; i < p_num_fe_lanes; i++ )
+      trace_json = {trace_json, $sformatf(",\"diu_%0d\":", i), DIU.trace_json_lane(i)};
+
+    // ALU Units
+    trace_json = {trace_json, ",\"alu_0\":", ALU0_XU.trace_json()};
+    trace_json = {trace_json, ",\"alu_1\":", ALU1_XU.trace_json()};
+    trace_json = {trace_json, ",\"alu_2\":", ALU2_XU.trace_json()};
+    trace_json = {trace_json, ",\"alu_3\":", ALU3_XU.trace_json()};
+
+    // Multiplier/Divider Units
+    trace_json = {trace_json, ",\"mul_0\":", MUL_DIV_REM0_XU.trace_json()};
+    trace_json = {trace_json, ",\"mul_1\":", MUL_DIV_REM1_XU.trace_json()};
+
+    // Memory Unit
+    trace_json = {trace_json, ",\"mem_xu\":", MEM_XU.trace_json()};
+
+    // Control Flow Unit
+    trace_json = {trace_json, ",\"ctrl\":", CTRL_XU.trace_json()};
+
+    // Squash Unit
+    trace_json = {trace_json, ",\"squash\":", SU.trace_json()};
+
+    // Writeback/Commit Unit (per lane)
+    for( int i = 0; i < p_num_be_lanes; i++ )
+      trace_json = {trace_json, $sformatf(",\"wcu_%0d\":", i), WCU.trace_json_lane(i)};
   endfunction
 `endif
 

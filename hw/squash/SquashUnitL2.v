@@ -240,6 +240,14 @@ module SquashUnitL2 #(
         trace = {(ceil_div_4(p_seq_num_bits)){" "}};
     end
   endfunction
+
+  function string trace_json();
+    if( gnt.val )
+      trace_json = $sformatf("{\"seq\":\"%h\",\"target\":\"%h\",\"xfer\":\"1\"}",
+        gnt.seq_num, gnt.target );
+    else
+      trace_json = "null";
+  endfunction
 `endif
 
 endmodule
