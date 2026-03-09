@@ -4,3 +4,5 @@ _build/
 build_*/
 .vscode
 .DS_Store
+.claude/
+CLAUDE.md

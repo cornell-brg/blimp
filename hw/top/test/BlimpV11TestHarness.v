@@ -193,11 +193,13 @@ module BlimpV11TestHarness #(
     #2;
     trace = "";
 
-    // trace = {trace, fl_imem.trace( t.trace_level )};
-    // trace = {trace, " || "};
-    // trace = {trace, dut.trace( t.trace_level )};
-    // trace = {trace, " || "};
-    // trace = {trace, inst_trace_sub.trace( t.trace_level )};
+    trace = {trace, fl_imem.trace( t.trace_level )};
+    trace = {trace, " || "};
+    trace = {trace, fl_dmem.trace( t.trace_level )};
+    trace = {trace, " || "};
+    trace = {trace, dut.trace( t.trace_level )};
+    trace = {trace, " || "};
+    trace = {trace, inst_trace_sub.trace( t.trace_level )};
 
     t.trace( trace );
   end

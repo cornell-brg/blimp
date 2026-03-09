@@ -26,7 +26,7 @@ interface F__DIntf
   logic [p_seq_num_bits-1:0] seq_num;
 
   // Added in v11
-  logic                      insn_valid;
+  logic                      inst_valid;
 
   // verilator lint_on UNUSEDSIGNAL
 
@@ -44,7 +44,7 @@ interface F__DIntf
     output seq_num,
 
     // v11
-    output insn_valid
+    output inst_valid
   );
 
   modport D_intf (
@@ -57,7 +57,7 @@ interface F__DIntf
     input  seq_num,
 
     // v11
-    input  insn_valid
+    input  inst_valid
   );
 
 endinterface

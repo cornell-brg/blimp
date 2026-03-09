@@ -8,13 +8,17 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L6_CONTROLFLOWUNITL6_V
 
 `include "defs/UArch.v"
+`include "hw/common/FifoBypass.v"
 `include "intf/D__XIntf.v"
 `include "intf/SquashNotif.v"
 `include "intf/X__WIntf.v"
 
 import UArch::*;
 
-module ControlFlowUnitL6 (
+module ControlFlowUnitL6 #(
+  parameter p_d_intf_fifo_depth  = 4,
+  parameter p_d_intf_fifo_bypass = 0
+)(
   input  logic clk,
   input  logic rst,
 
@@ -39,9 +43,9 @@ module ControlFlowUnitL6 (
 
   localparam p_seq_num_bits   = D.p_seq_num_bits;
   localparam p_phys_addr_bits = D.p_phys_addr_bits;
-  
+
   //----------------------------------------------------------------------
-  // Register inputs
+  // Bypass FIFO for D interface
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -57,59 +61,61 @@ module ControlFlowUnitL6 (
     logic [p_phys_addr_bits-1:0] ppreg;
   } D_input;
 
-  D_input D_reg;
-  D_input D_reg_next;
-  logic   D_xfer;
-  logic   W_xfer;
-
   // verilator lint_off ENUMVALUE
 
-  always_ff @( posedge clk ) begin
-    if ( rst )
-      D_reg <= '0;
-    else
-      D_reg <= D_reg_next;
-  end
-
-  always_comb begin
-    D_xfer = D.val & D.rdy;
-    W_xfer = W.val & W.rdy;
-
-    if ( D_xfer )
-      D_reg_next = '{ 
-        val:     1'b1, 
-        pc:      D.pc,
-        seq_num: D.seq_num,
-        op1:     D.op1,
-        op2:     D.op2,
-        imm:     D.op3.branch_imm,
-        waddr:   D.waddr,
-        uop:     D.uop,
-        preg:    D.preg,
-        ppreg:   D.ppreg
-      };
-    else if ( W_xfer )
-      D_reg_next = '0;
-    else
-      D_reg_next = D_reg;
-  end
+  D_input fifo_in;
+  assign fifo_in = '{
+    val:     1'b1,
+    pc:      D.pc,
+    seq_num: D.seq_num,
+    op1:     D.op1,
+    op2:     D.op2,
+    imm:     D.op3.branch_imm,
+    waddr:   D.waddr,
+    uop:     D.uop,
+    preg:    D.preg,
+    ppreg:   D.ppreg
+  };
 
   // verilator lint_on ENUMVALUE
+
+  logic fifo_full, fifo_empty;
+  logic fifo_push, fifo_pop;
+
+  assign fifo_push = D.val & !fifo_full;
+  assign fifo_pop  = !fifo_empty & W.rdy;
+
+  D_input D_curr;
+
+  FifoBypass #(
+    .p_entry_bits ($bits(D_input)),
+    .p_depth      (p_d_intf_fifo_depth),
+    .p_bypass     (p_d_intf_fifo_bypass)
+  ) d_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (fifo_push),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_in),
+    .rdata (D_curr)
+  );
 
   //----------------------------------------------------------------------
   // Determine squash condition
   //----------------------------------------------------------------------
 
   logic should_branch;
-  
+
   always_comb begin
-    case( D_reg.uop )
-      OP_BEQ:   should_branch = ( D_reg.op1 == D_reg.op2 );
-      OP_BNE:   should_branch = ( D_reg.op1 != D_reg.op2 );
-      OP_BLT:   should_branch = ( $signed(D_reg.op1) <  $signed(D_reg.op2) );
-      OP_BGE:   should_branch = ( $signed(D_reg.op1) >= $signed(D_reg.op2) );
-      OP_BLTU:  should_branch = ( D_reg.op1 <  D_reg.op2 );
-      OP_BGEU:  should_branch = ( D_reg.op1 >= D_reg.op2 );
+    case( D_curr.uop )
+      OP_BEQ:   should_branch = ( D_curr.op1 == D_curr.op2 );
+      OP_BNE:   should_branch = ( D_curr.op1 != D_curr.op2 );
+      OP_BLT:   should_branch = ( $signed(D_curr.op1) <  $signed(D_curr.op2) );
+      OP_BGE:   should_branch = ( $signed(D_curr.op1) >= $signed(D_curr.op2) );
+      OP_BLTU:  should_branch = ( D_curr.op1 <  D_curr.op2 );
+      OP_BGEU:  should_branch = ( D_curr.op1 >= D_curr.op2 );
       OP_JAL:   should_branch = 1'b0;
       OP_JALR:  should_branch = 1'b0;
       default:  should_branch = 1'bx;
@@ -120,23 +126,23 @@ module ControlFlowUnitL6 (
   always_ff @( posedge clk ) begin
     if( rst )
       squash_sent <= 1'b0;
-    else if( D_xfer )
+    else if( fifo_pop )
       squash_sent <= 1'b0;
-    else
+    else if( !fifo_empty )
       squash_sent <= 1'b1;
   end
 
   // Squash until message is taken
-  assign squash.val     = D_reg.val & should_branch & !squash_sent;
-  assign squash.target  = D_reg.pc + D_reg.imm;
-  assign squash.seq_num = D_reg.seq_num;
+  assign squash.val     = !fifo_empty & should_branch & !squash_sent;
+  assign squash.target  = D_curr.pc + D_curr.imm;
+  assign squash.seq_num = D_curr.seq_num;
 
   //----------------------------------------------------------------------
   // Determine register write
   //----------------------------------------------------------------------
 
   always_comb begin
-    case( D_reg.uop )
+    case( D_curr.uop )
       OP_BNE:  W.wen = 1'b0;
       OP_JAL:  W.wen = 1'b1;
       OP_JALR: W.wen = 1'b1;
@@ -144,24 +150,24 @@ module ControlFlowUnitL6 (
     endcase
   end
 
-  assign W.wdata = D_reg.pc + 32'd4;
+  assign W.wdata = D_curr.pc + 32'd4;
 
   //----------------------------------------------------------------------
   // Remaining signals
   //----------------------------------------------------------------------
-  
-  assign W.pc      = D_reg.pc;
-  assign W.waddr   = D_reg.waddr;
-  assign W.seq_num = D_reg.seq_num;
-  assign W.preg    = D_reg.preg;
-  assign W.ppreg   = D_reg.ppreg;
+
+  assign W.pc      = D_curr.pc;
+  assign W.waddr   = D_curr.waddr;
+  assign W.seq_num = D_curr.seq_num;
+  assign W.preg    = D_curr.preg;
+  assign W.ppreg   = D_curr.ppreg;
 
   //----------------------------------------------------------------------
   // Assign remaining signals
   //----------------------------------------------------------------------
 
-  assign D.rdy = W.rdy | (!D_reg.val);
-  assign W.val = D_reg.val;
+  assign D.rdy = !fifo_full;
+  assign W.val = !fifo_empty;
 
   //----------------------------------------------------------------------
   // Linetracing
@@ -181,7 +187,7 @@ module ControlFlowUnitL6 (
   function string trace( int trace_level );
     if( W.val & W.rdy ) begin
       if( trace_level > 0 )
-        trace = $sformatf("%11s:%h:%h:%h", D_reg.uop.name(),
+        trace = $sformatf("%11s:%h:%h:%h", D_curr.uop.name(),
                         W.seq_num, W.waddr, W.wdata );
       else
         trace = $sformatf("%h", W.seq_num);

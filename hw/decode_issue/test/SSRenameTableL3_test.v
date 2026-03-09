@@ -172,37 +172,37 @@ module SSRenameTableL3TestSuite #(
   endtask
 
   //----------------------------------------------------------------------
-  // Lookup new insn source registers
+  // Lookup new inst source registers
   //----------------------------------------------------------------------
 
-  typedef logic [4:0] t_lookup_new_insn_call_msg;
+  typedef logic [4:0] t_lookup_new_inst_call_msg;
   typedef struct packed {
     logic [p_phys_addr_bits-1:0] preg;
-  } t_new_insn_lookup_ret_msg;
+  } t_new_inst_lookup_ret_msg;
 
-  t_new_insn_lookup_ret_msg lookup_new_insn_ret_msg [p_num_fe_lanes][2];
+  t_new_inst_lookup_ret_msg lookup_new_inst_ret_msg [p_num_fe_lanes][2];
   generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: LOOKUP_NEW_INSN_PORT
-      assign lookup_new_insn_ret_msg[i][0].preg = dut_lookup_new_inst_preg[i][0];
-      assign lookup_new_insn_ret_msg[i][1].preg = dut_lookup_new_inst_preg[i][1];
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: LOOKUP_NEW_INST_PORT
+      assign lookup_new_inst_ret_msg[i][0].preg = dut_lookup_new_inst_preg[i][0];
+      assign lookup_new_inst_ret_msg[i][1].preg = dut_lookup_new_inst_preg[i][1];
 
       TestCaller #(
-        .t_call_msg (t_lookup_new_insn_call_msg),
-        .t_ret_msg  (t_new_insn_lookup_ret_msg)
-      ) lookup_new_insn_caller_0 (
+        .t_call_msg (t_lookup_new_inst_call_msg),
+        .t_ret_msg  (t_new_inst_lookup_ret_msg)
+      ) lookup_new_inst_caller_0 (
         .call_msg (dut_lookup_new_inst_areg[i][0]),
-        .ret_msg  (lookup_new_insn_ret_msg[i][0]),
+        .ret_msg  (lookup_new_inst_ret_msg[i][0]),
         .en       (dut_lookup_new_inst_en[i][0]),
         .rdy      (1'b1),
         .*
       );
 
       TestCaller #(
-        .t_call_msg (t_lookup_new_insn_call_msg),
-        .t_ret_msg  (t_new_insn_lookup_ret_msg)
-      ) lookup_new_insn_caller_1 (
+        .t_call_msg (t_lookup_new_inst_call_msg),
+        .t_ret_msg  (t_new_inst_lookup_ret_msg)
+      ) lookup_new_inst_caller_1 (
         .call_msg (dut_lookup_new_inst_areg[i][1]),
-        .ret_msg  (lookup_new_insn_ret_msg[i][1]),
+        .ret_msg  (lookup_new_inst_ret_msg[i][1]),
         .en       (dut_lookup_new_inst_en[i][1]),
         .rdy      (1'b1),
         .*
@@ -210,45 +210,45 @@ module SSRenameTableL3TestSuite #(
     end
   endgenerate
 
-  t_new_insn_lookup_ret_msg msg_from_new_insn_lookup      [p_num_fe_lanes][2];
-  logic               [4:0] msg_from_new_insn_lookup_areg [p_num_fe_lanes][2];
-  logic                     msg_from_new_insn_lookup_val  [p_num_fe_lanes][2];
+  t_new_inst_lookup_ret_msg msg_from_new_inst_lookup      [p_num_fe_lanes][2];
+  logic               [4:0] msg_from_new_inst_lookup_areg [p_num_fe_lanes][2];
+  logic                     msg_from_new_inst_lookup_val  [p_num_fe_lanes][2];
 
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin
       always @( posedge clk ) begin
         #1;
         fork
-          if( msg_from_new_insn_lookup_val[i][0] ) begin
-            LOOKUP_NEW_INSN_PORT[i].lookup_new_insn_caller_0.call( 
-              msg_from_new_insn_lookup_areg[i][0],
-              msg_from_new_insn_lookup[i][0]
+          if( msg_from_new_inst_lookup_val[i][0] ) begin
+            LOOKUP_NEW_INST_PORT[i].lookup_new_inst_caller_0.call( 
+              msg_from_new_inst_lookup_areg[i][0],
+              msg_from_new_inst_lookup[i][0]
             );
           end
-          if( msg_from_new_insn_lookup_val[i][1] ) begin
-            LOOKUP_NEW_INSN_PORT[i].lookup_new_insn_caller_1.call( 
-              msg_from_new_insn_lookup_areg[i][1],
-              msg_from_new_insn_lookup[i][1]
+          if( msg_from_new_inst_lookup_val[i][1] ) begin
+            LOOKUP_NEW_INST_PORT[i].lookup_new_inst_caller_1.call( 
+              msg_from_new_inst_lookup_areg[i][1],
+              msg_from_new_inst_lookup[i][1]
             );
           end
         join
 
         // verilator lint_off BLKSEQ
-        msg_from_new_insn_lookup_val[i][0] = 1'b0;
-        msg_from_new_insn_lookup_val[i][1] = 1'b0;
+        msg_from_new_inst_lookup_val[i][0] = 1'b0;
+        msg_from_new_inst_lookup_val[i][1] = 1'b0;
         // verilator lint_on BLKSEQ
       end
 
       initial begin
-        msg_from_new_insn_lookup_val[i][0] = 1'b0;
-        msg_from_new_insn_lookup_val[i][1] = 1'b0;
+        msg_from_new_inst_lookup_val[i][0] = 1'b0;
+        msg_from_new_inst_lookup_val[i][1] = 1'b0;
       end
     end
   endgenerate
 
-  t_new_insn_lookup_ret_msg lookup_new_insn_task_msg [p_num_fe_lanes][2];
+  t_new_inst_lookup_ret_msg lookup_new_inst_task_msg [p_num_fe_lanes][2];
 
-  task lookup_new_insn_srcs(
+  task lookup_new_inst_srcs(
     input logic                  [4:0] lookup_areg [p_num_fe_lanes][2],
     input logic [p_phys_addr_bits-1:0] lookup_preg [p_num_fe_lanes][2],
     input logic                        valid       [p_num_fe_lanes][2]
@@ -257,15 +257,15 @@ module SSRenameTableL3TestSuite #(
       automatic int jj = j;
       fork
         begin
-          lookup_new_insn_task_msg[jj][0]  = lookup_preg[jj][0];
-          lookup_new_insn_task_msg[jj][1]  = lookup_preg[jj][1];
-          msg_from_new_insn_lookup_areg[jj][0] = lookup_areg[jj][0];
-          msg_from_new_insn_lookup_areg[jj][1] = lookup_areg[jj][1];
-          msg_from_new_insn_lookup[jj][0]      = lookup_new_insn_task_msg[jj][0];
-          msg_from_new_insn_lookup[jj][1]      = lookup_new_insn_task_msg[jj][1];
-          msg_from_new_insn_lookup_val[jj][0]  = valid[jj][0];
-          msg_from_new_insn_lookup_val[jj][1]  = valid[jj][1];
-          while ( msg_from_new_insn_lookup_val[jj][0] || msg_from_new_insn_lookup_val[jj][1] ) begin
+          lookup_new_inst_task_msg[jj][0]  = lookup_preg[jj][0];
+          lookup_new_inst_task_msg[jj][1]  = lookup_preg[jj][1];
+          msg_from_new_inst_lookup_areg[jj][0] = lookup_areg[jj][0];
+          msg_from_new_inst_lookup_areg[jj][1] = lookup_areg[jj][1];
+          msg_from_new_inst_lookup[jj][0]      = lookup_new_inst_task_msg[jj][0];
+          msg_from_new_inst_lookup[jj][1]      = lookup_new_inst_task_msg[jj][1];
+          msg_from_new_inst_lookup_val[jj][0]  = valid[jj][0];
+          msg_from_new_inst_lookup_val[jj][1]  = valid[jj][1];
+          while ( msg_from_new_inst_lookup_val[jj][0] || msg_from_new_inst_lookup_val[jj][1] ) begin
             #1;
           end
         end
@@ -275,7 +275,7 @@ module SSRenameTableL3TestSuite #(
   endtask
   
   //----------------------------------------------------------------------
-  // Lookup IQ insn source registers
+  // Lookup IQ inst source registers
   //----------------------------------------------------------------------
 
   typedef logic [p_phys_addr_bits-1:0] t_lookup_iq_call_msg;
@@ -559,7 +559,7 @@ module SSRenameTableL3TestSuite #(
         alloc_valid
       );
 
-      lookup_new_insn_srcs(
+      lookup_new_inst_srcs(
         lookup_areg, 
         lookup_preg, 
         lookup_valid
@@ -610,7 +610,7 @@ module SSRenameTableL3TestSuite #(
         alloc_valid
       );
 
-      lookup_new_insn_srcs(
+      lookup_new_inst_srcs(
         lookup_areg, 
         lookup_preg, 
         lookup_valid
@@ -682,7 +682,7 @@ module SSRenameTableL3TestSuite #(
           alloc_valid
         );
 
-        lookup_new_insn_srcs(
+        lookup_new_inst_srcs(
           lookup_areg, 
           lookup_preg, 
           lookup_valid
@@ -783,7 +783,7 @@ module SSRenameTableL3TestSuite #(
           alloc_valid
         );
 
-        lookup_new_insn_srcs(
+        lookup_new_inst_srcs(
           lookup_areg, 
           lookup_preg, 
           lookup_valid

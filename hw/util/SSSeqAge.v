@@ -33,23 +33,25 @@ module SSSeqAge #(
   logic                        commit_wen     [p_num_be_lanes-1:0];
   logic [p_phys_addr_bits-1:0] commit_ppreg   [p_num_be_lanes-1:0];
   logic                        commit_val     [p_num_be_lanes-1:0];
+  logic [p_num_be_lanes-1:0]   commit_val_packed;
 
   genvar i;
   for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: UNPACK_FROM_INTF
-    assign commit_pc[i]      = commit[i].pc;
-    assign commit_seq_num[i] = commit[i].seq_num;
-    assign commit_waddr[i]   = commit[i].waddr;
-    assign commit_wdata[i]   = commit[i].wdata;
-    assign commit_wen[i]     = commit[i].wen;
-    assign commit_ppreg[i]   = commit[i].ppreg;
-    assign commit_val[i]     = commit[i].val;
+    assign commit_pc[i]         = commit[i].pc;
+    assign commit_seq_num[i]    = commit[i].seq_num;
+    assign commit_waddr[i]      = commit[i].waddr;
+    assign commit_wdata[i]      = commit[i].wdata;
+    assign commit_wen[i]        = commit[i].wen;
+    assign commit_ppreg[i]      = commit[i].ppreg;
+    assign commit_val[i]        = commit[i].val;
+    assign commit_val_packed[i] = commit[i].val;
   end
 
   // Keep track of the oldest in-flight sequence number
   logic [p_seq_num_bits-1:0] oldest_seq_num;
   logic [p_seq_num_bits-1:0] youngest_commit_seq_num;
   logic                      any_commit;
-  assign any_commit = commit_val.or();
+  assign any_commit = |commit_val_packed;
 
   always_ff @( posedge clk ) begin
     if( rst )

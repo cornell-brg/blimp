@@ -10,7 +10,6 @@
 `include "defs/UArch.v"
 `include "hw/fetch/fetch_unit_variants/FetchUnitL5.v"
 `include "hw/decode_issue/decode_issue_unit_variants/DecodeIssueUnitL8.v"
-`include "hw/execute/ExQueue.v"
 `include "hw/execute/execute_units_l6/ALUL6.v"
 `include "hw/execute/execute_units_l7/IterativeMulDivRemL7.v"
 `include "hw/execute/execute_units_l7/LoadStoreUnitL7.v"
@@ -27,12 +26,26 @@
 `include "intf/InstTraceNotif.v"
 
 module BlimpV11 #(
-  parameter p_opaq_bits     = 8,
-  parameter p_seq_num_bits  = 5,
-  parameter p_num_phys_regs = 36,
-  parameter p_num_fe_lanes  = 2,
-  parameter p_num_be_lanes  = 2,  // must be <= 2**p_seq_num_bits (ROB depth)
-  parameter p_iq_depth      = 8
+  parameter p_opaq_bits               = 8,
+  parameter p_seq_num_bits            = 5,
+  parameter p_num_phys_regs           = 36,
+  parameter p_num_fe_lanes            = 2,
+  parameter p_num_be_lanes            = 2, // must be <= 2**p_seq_num_bits (ROB depth)
+  parameter p_iq_depth                = 8,
+  parameter p_reclaim_width           = p_num_be_lanes,
+  parameter p_max_in_flight           = 8,
+  parameter p_f_intf_fifo_depth       = 4,
+  parameter p_f_intf_fifo_bypass      = 0,
+  parameter p_x_intf_fifo_depth       = 4,
+  parameter p_x_intf_fifo_bypass      = 0,
+  parameter p_alu_d_intf_fifo_depth   = 4,
+  parameter p_alu_d_intf_fifo_bypass  = 0, // must be 0 - cannot bypass
+  parameter p_mul_d_intf_fifo_depth   = 4,
+  parameter p_mul_d_intf_fifo_bypass  = 0, // must be 0 - cannot bypass
+  parameter p_mem_d_intf_fifo_depth   = 4,
+  parameter p_mem_d_intf_fifo_bypass  = 0,
+  parameter p_ctrl_d_intf_fifo_depth  = 1, // must be 1 - 1-cycle brx resolution
+  parameter p_ctrl_d_intf_fifo_bypass = 0  // must be 0 - 1-cycle brx resolution
 ) (
   input logic clk,
   input logic rst,
@@ -56,7 +69,7 @@ module BlimpV11 #(
   InstTraceNotif.pub inst_trace [p_num_be_lanes]
 );
 
-  localparam p_num_pipes = 6;
+  localparam p_num_pipes = 8;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
   //----------------------------------------------------------------------
@@ -77,10 +90,9 @@ module BlimpV11 #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) x__w_intfs[p_num_pipes]();
 
-  X__WIntf #(
-    .p_seq_num_bits   (p_seq_num_bits),
-    .p_phys_addr_bits (p_phys_addr_bits)
-  ) buffer_intf [2]();
+  SquashNotif #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) squash_diu_pub_notif();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -159,7 +171,8 @@ module BlimpV11 #(
                             OP_BGEU_VEC;
 
   FetchUnitL5 #(
-    .p_max_in_flight (8),
+    .p_reclaim_width (p_reclaim_width),
+    .p_max_in_flight (p_max_in_flight),
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
   ) FU (
@@ -181,10 +194,14 @@ module BlimpV11 #(
       p_mem_subset,  // Memory
       p_m_subset,    // M-Extension for MUL1
       p_m_subset,    // M-Extension for MUL0
+      p_alu_subset,  // ALU3
+      p_alu_subset,  // ALU2
       p_alu_subset,  // ALU1
       p_alu_subset   // ALU0
     }),
-    .p_ctrl_subset   (p_ctrl_subset)
+    .p_ctrl_subset        (p_ctrl_subset),
+    .p_f_intf_fifo_depth  (p_f_intf_fifo_depth),
+    .p_f_intf_fifo_bypass (p_f_intf_fifo_bypass)
   ) DIU (
     .F          (f__d_intfs),
     .Ex         (d__x_intfs),
@@ -195,61 +212,86 @@ module BlimpV11 #(
     .*
   );
 
-  ALUL6 ALU0_XU (
+  ALUL6 #(
+    .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
+  ) ALU0_XU (
     .D (d__x_intfs[0]),
-    .W (buffer_intf[0]),
+    .W (x__w_intfs[0]),
     .*
   );
 
-  ALUL6 ALU1_XU (
+  ALUL6 #(
+    .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
+  ) ALU1_XU (
     .D (d__x_intfs[1]),
-    .W (buffer_intf[1]),
+    .W (x__w_intfs[1]),
     .*
   );
 
-  ExQueue #(1) alu0_buf (
-    .in  (buffer_intf[0]),
-    .out (x__w_intfs[0]),
-    .*
-  );
-
-  ExQueue #(1) alu1_buf (
-    .in  (buffer_intf[1]),
-    .out (x__w_intfs[1]),
-    .*
-  );
-
-  IterativeMulDivRemL7 MUL_DIV_REM0_XU (
+  ALUL6 #(
+    .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
+  ) ALU2_XU (
     .D (d__x_intfs[2]),
     .W (x__w_intfs[2]),
     .*
   );
 
-  IterativeMulDivRemL7 MUL_DIV_REM1_XU (
+  ALUL6 #(
+    .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
+  ) ALU3_XU (
     .D (d__x_intfs[3]),
     .W (x__w_intfs[3]),
     .*
   );
 
+  IterativeMulDivRemL7 #(
+    .p_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_mul_d_intf_fifo_bypass)
+  ) MUL_DIV_REM0_XU (
+    .D (d__x_intfs[4]),
+    .W (x__w_intfs[4]),
+    .*
+  );
+
+  IterativeMulDivRemL7 #(
+    .p_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_mul_d_intf_fifo_bypass)
+  ) MUL_DIV_REM1_XU (
+    .D (d__x_intfs[5]),
+    .W (x__w_intfs[5]),
+    .*
+  );
+
   LoadStoreUnitL7 #(
-    .p_opaq_bits (p_opaq_bits)
+    .p_opaq_bits          (p_opaq_bits),
+    .p_d_intf_fifo_depth  (p_mem_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) MEM_XU (
-    .D   (d__x_intfs[4]),
-    .W   (x__w_intfs[4]),
+    .D   (d__x_intfs[6]),
+    .W   (x__w_intfs[6]),
     .mem (data_mem),
     .*
   );
 
-  ControlFlowUnitL6 CTRL_XU (
-    .D      (d__x_intfs[5]),
-    .W      (x__w_intfs[5]),
+  ControlFlowUnitL6 #(
+    .p_d_intf_fifo_depth  (p_ctrl_d_intf_fifo_depth),
+    .p_d_intf_fifo_bypass (p_ctrl_d_intf_fifo_bypass)
+  ) CTRL_XU (
+    .D      (d__x_intfs[7]),
+    .W      (x__w_intfs[7]),
     .squash (squash_arb_notif[1]),
     .*
   );
 
   WritebackCommitUnitL4 #(
-    .p_num_pipes     (p_num_pipes),
-    .p_num_be_lanes  (p_num_be_lanes)
+    .p_num_pipes          (p_num_pipes),
+    .p_num_be_lanes       (p_num_be_lanes),
+    .p_x_intf_fifo_depth  (p_x_intf_fifo_depth),
+    .p_x_intf_fifo_bypass (p_x_intf_fifo_bypass)
   ) WCU (
     .Ex       (x__w_intfs),
     .complete (complete_notif),
@@ -274,23 +316,27 @@ module BlimpV11 #(
 `ifndef SYNTHESIS
   function string trace( int trace_level );
     trace = "";
-    // trace = {trace, FU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, DIU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, ALU0_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, ALU1_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, MEM_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, CTRL_XU.trace( trace_level )};
-    // trace = {trace, " | "};
-    // trace = {trace, WCU.trace( trace_level )};
+    trace = {trace, FU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, DIU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU0_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU1_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU2_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, ALU3_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, MEM_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, CTRL_XU.trace( trace_level )};
+    trace = {trace, " | "};
+    trace = {trace, WCU.trace( trace_level )};
   endfunction
 `endif
 

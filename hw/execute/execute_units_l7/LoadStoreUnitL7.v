@@ -7,6 +7,7 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L7_LOADSTOREUNITL7_V
 
 `include "defs/UArch.v"
+`include "hw/common/FifoBypass.v"
 `include "hw/common/Fifo.v"
 `include "intf/D__XIntf.v"
 `include "intf/X__WIntf.v"
@@ -15,8 +16,10 @@
 import UArch::*;
 
 module LoadStoreUnitL7 #(
-  parameter p_opaq_bits     = 8,
-  parameter p_num_in_flight = 8
+  parameter p_opaq_bits          = 8,
+  parameter p_num_in_flight      = 8,
+  parameter p_d_intf_fifo_depth  = 4,
+  parameter p_d_intf_fifo_bypass = 0
 )(
   input  logic clk,
   input  logic rst,
@@ -42,7 +45,7 @@ module LoadStoreUnitL7 #(
 
   localparam p_seq_num_bits   = D.p_seq_num_bits;
   localparam p_phys_addr_bits = D.p_phys_addr_bits;
-  
+
   //----------------------------------------------------------------------
   // Types
   //----------------------------------------------------------------------
@@ -70,91 +73,70 @@ module LoadStoreUnitL7 #(
     rv_uop                       uop;
     logic                  [1:0] offset;
   } stage2_msg;
-  
+
   //----------------------------------------------------------------------
-  // Stage 1: Request
+  // Stage 1: Request — Bypass FIFO for D interface
   //----------------------------------------------------------------------
-
-  D_input D_reg;
-  D_input D_reg_next;
-  logic   D_xfer;
-
-  logic      stage2_val;
-  logic      stage2_rdy;
-  stage2_msg stage2_reg;
-  stage2_msg stage2_reg_next;
-  logic      stage2_push, stage2_pop, stage2_empty, stage2_full;
-
-  logic W_xfer;
 
   // verilator lint_off ENUMVALUE
 
-  always_ff @( posedge clk ) begin
-    if ( rst )
-      D_reg <= '{ 
-        val:      1'b0, 
-        pc:       'x,
-        seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
-        waddr:    'x,
-        preg:     'x,
-        ppreg:    'x,
-        mem_data: 'x,
-        uop:      'x
-      };
-    else
-      D_reg <= D_reg_next;
-  end
-
-  always_comb begin
-    D_xfer = D.val & D.rdy;
-
-    if ( D_xfer )
-      D_reg_next = '{ 
-        val:      1'b1, 
-        pc:       D.pc,
-        seq_num:  D.seq_num,
-        op1:      D.op1, 
-        op2:      D.op2,
-        waddr:    D.waddr,
-        preg:     D.preg,
-        ppreg:    D.ppreg,
-        mem_data: D.op3.mem_data,
-        uop:      D.uop
-      };
-    else if ( stage2_push )
-      D_reg_next = '{ 
-        val:      1'b0, 
-        pc:       'x,
-        seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
-        waddr:    'x,
-        preg:     'x,
-        ppreg:    'x,
-        mem_data: 'x,
-        uop:      'x
-      };
-    else
-      D_reg_next = D_reg;
-  end
+  D_input fifo_in;
+  assign fifo_in = '{
+    val:      1'b1,
+    pc:       D.pc,
+    seq_num:  D.seq_num,
+    op1:      D.op1,
+    op2:      D.op2,
+    waddr:    D.waddr,
+    preg:     D.preg,
+    ppreg:    D.ppreg,
+    mem_data: D.op3.mem_data,
+    uop:      D.uop
+  };
 
   // verilator lint_on ENUMVALUE
+
+  logic d_fifo_full, d_fifo_empty;
+  logic d_fifo_push, d_fifo_pop;
+
+  D_input D_curr;
+
+  FifoBypass #(
+    .p_entry_bits ($bits(D_input)),
+    .p_depth      (p_d_intf_fifo_depth),
+    .p_bypass     (p_d_intf_fifo_bypass)
+  ) d_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (d_fifo_push),
+    .pop   (d_fifo_pop),
+    .empty (d_fifo_empty),
+    .full  (d_fifo_full),
+    .wdata (fifo_in),
+    .rdata (D_curr)
+  );
+
+  logic      stage2_rdy;
+  logic      stage2_push, stage2_pop, stage2_empty, stage2_full;
+
+  assign d_fifo_push = D.val & !d_fifo_full;
+  assign d_fifo_pop  = !d_fifo_empty & mem.req_rdy & stage2_rdy;
+
+  assign D.rdy = !d_fifo_full;
 
   //----------------------------------------------------------------------
   // Memory Operations
   //----------------------------------------------------------------------
-  
+
   logic [31:0] op1, op2;
-  assign op1 = D_reg.op1;
-  assign op2 = D_reg.op2;
+  assign op1 = D_curr.op1;
+  assign op2 = D_curr.op2;
 
   logic [31:0] addr;
   assign addr = op1 + op2;
 
   rv_uop uop;
-  assign uop = D_reg.uop;
+  assign uop = D_curr.uop;
 
   always_comb begin
     case( uop )
@@ -196,33 +178,32 @@ module LoadStoreUnitL7 #(
   assign mem.req_msg.opaque = '0;
   assign mem.req_msg.strb   = base_strb << stage1_addr_offset;
   assign mem.req_msg.addr   = aligned_addr;
-  assign mem.req_val        = D_reg.val & stage2_rdy;
+  assign mem.req_val        = !d_fifo_empty & stage2_rdy;
 
   always_comb begin
     case( stage1_addr_offset )
-      2'd0: mem.req_msg.data = D_reg.mem_data;
-      2'd1: mem.req_msg.data = D_reg.mem_data << 8;
-      2'd2: mem.req_msg.data = D_reg.mem_data << 16;
-      2'd3: mem.req_msg.data = D_reg.mem_data << 24;
+      2'd0: mem.req_msg.data = D_curr.mem_data;
+      2'd1: mem.req_msg.data = D_curr.mem_data << 8;
+      2'd2: mem.req_msg.data = D_curr.mem_data << 16;
+      2'd3: mem.req_msg.data = D_curr.mem_data << 24;
     endcase
   end
 
   stage2_msg stage1_output;
 
-  assign stage1_output.val     = D_reg.val;
-  assign stage1_output.pc      = D_reg.pc;
-  assign stage1_output.seq_num = D_reg.seq_num;
-  assign stage1_output.waddr   = D_reg.waddr;
+  assign stage1_output.val     = 1'b1;
+  assign stage1_output.pc      = D_curr.pc;
+  assign stage1_output.seq_num = D_curr.seq_num;
+  assign stage1_output.waddr   = D_curr.waddr;
   assign stage1_output.uop     = uop;
   assign stage1_output.offset  = stage1_addr_offset;
-  assign stage1_output.preg    = D_reg.preg;
-  assign stage1_output.ppreg   = D_reg.ppreg;
+  assign stage1_output.preg    = D_curr.preg;
+  assign stage1_output.ppreg   = D_curr.ppreg;
 
-  assign stage2_val = D_reg.val & mem.req_rdy;
-  assign D.rdy      = (stage2_rdy & mem.req_rdy) | (!D_reg.val);
+  assign stage2_push = d_fifo_pop;
 
   stage2_msg stage2_input;
-  
+
   Fifo #(
     .p_entry_bits ($bits(stage2_msg)),
     .p_depth      (p_num_in_flight) // Must be at least as long as memory pipeline
@@ -238,17 +219,20 @@ module LoadStoreUnitL7 #(
   );
 
   assign stage2_rdy = !stage2_full;
-  assign stage2_push = stage2_val;
 
   //----------------------------------------------------------------------
   // Stage 2: Response
   //----------------------------------------------------------------------
 
+  stage2_msg stage2_reg;
+  stage2_msg stage2_reg_next;
+  logic W_xfer;
+
   // verilator lint_off ENUMVALUE
   always_ff @( posedge clk ) begin
     if ( rst )
-      stage2_reg <= '{ 
-        val:     1'b0, 
+      stage2_reg <= '{
+        val:     1'b0,
         pc:      'x,
         seq_num: 'x,
         waddr:   'x,
@@ -267,8 +251,8 @@ module LoadStoreUnitL7 #(
     if ( stage2_pop )
       stage2_reg_next = stage2_input;
     else if ( W_xfer )
-      stage2_reg_next = '{ 
-        val:     1'b0, 
+      stage2_reg_next = '{
+        val:     1'b0,
         pc:      'x,
         seq_num: 'x,
         waddr:   'x,
@@ -369,15 +353,15 @@ module LoadStoreUnitL7 #(
                     ceil_div_4(p_seq_num_bits) + 1 + // seq_num
                     8                          + 1 + // addr
                     8;                               // data
-                    
+
 
   function string trace( int trace_level );
-    if( stage2_val & stage2_rdy ) begin
+    if( d_fifo_pop ) begin
       if( trace_level > 0 )
-        trace = $sformatf("%11s:%h:%h:%h", uop.name(), 
-                          D_reg.seq_num, addr, D_reg.mem_data );
+        trace = $sformatf("%11s:%h:%h:%h", uop.name(),
+                          D_curr.seq_num, addr, D_curr.mem_data );
       else
-        trace = $sformatf("%h", D_reg.seq_num);
+        trace = $sformatf("%h", D_curr.seq_num);
     end else begin
       if( trace_level > 0 )
         trace = {req_len{" "}};
