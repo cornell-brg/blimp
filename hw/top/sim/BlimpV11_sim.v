@@ -50,7 +50,9 @@ module BlimpV11_sim;
     .p_opaq_bits (p_opaq_bits)
   ) dmem_intf();
 
-  InstTraceNotif inst_trace_notif [p_num_be_lanes]();
+  InstTraceNotif #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) inst_trace_notif [p_num_be_lanes]();
 
   BlimpV11 #(
     .p_opaq_bits     (p_opaq_bits),
@@ -66,20 +68,22 @@ module BlimpV11_sim;
     .*
   );
 
-  logic [31:0] inst_trace_pc    [p_num_be_lanes];
-  logic  [4:0] inst_trace_waddr [p_num_be_lanes];
-  logic [31:0] inst_trace_wdata [p_num_be_lanes];
-  logic        inst_trace_wen   [p_num_be_lanes];
-  logic        inst_trace_val   [p_num_be_lanes];
+  logic [31:0]              inst_trace_pc      [p_num_be_lanes];
+  logic  [4:0]              inst_trace_waddr   [p_num_be_lanes];
+  logic [31:0]              inst_trace_wdata   [p_num_be_lanes];
+  logic                     inst_trace_wen     [p_num_be_lanes];
+  logic                     inst_trace_val     [p_num_be_lanes];
+  logic [p_seq_num_bits-1:0] inst_trace_seq_num [p_num_be_lanes];
 
   genvar i;
   generate
     for( i = 0; i < p_num_be_lanes; i++ ) begin : GEN_INST_TRACE_ASSIGN
-      assign inst_trace_pc[i]    = inst_trace_notif[i].pc;
-      assign inst_trace_waddr[i] = inst_trace_notif[i].waddr;
-      assign inst_trace_wdata[i] = inst_trace_notif[i].wdata;
-      assign inst_trace_wen[i]   = inst_trace_notif[i].wen;
-      assign inst_trace_val[i]   = inst_trace_notif[i].val;
+      assign inst_trace_pc[i]      = inst_trace_notif[i].pc;
+      assign inst_trace_waddr[i]   = inst_trace_notif[i].waddr;
+      assign inst_trace_wdata[i]   = inst_trace_notif[i].wdata;
+      assign inst_trace_wen[i]     = inst_trace_notif[i].wen;
+      assign inst_trace_val[i]     = inst_trace_notif[i].val;
+      assign inst_trace_seq_num[i] = inst_trace_notif[i].seq_num;
     end
   endgenerate
 
@@ -169,6 +173,51 @@ module BlimpV11_sim;
     end
 
     t.trace( trace );
+  end
+  // verilator lint_on BLKSEQ
+
+  //----------------------------------------------------------------------
+  // JSON Tracing
+  //----------------------------------------------------------------------
+
+  string json_line;
+  string commit_json;
+
+  // verilator lint_off BLKSEQ
+  always @( posedge clk ) begin
+    #2;
+    if( t.dump_json & !rst ) begin
+      json_line = $sformatf("{\"cycle\":%0d", t.cycles);
+
+      // Memory interfaces
+      json_line = {json_line, ",", fl_imem.trace_json("imem")};
+      json_line = {json_line, ",", fl_dmem.trace_json("dmem")};
+
+      // Processor pipeline
+      json_line = {json_line, ",", dut.trace_json()};
+
+      // Committed instructions
+      commit_json = "";
+      for( int j = 0; j < p_num_be_lanes; j++ ) begin
+        if( inst_trace_val[j] ) begin
+          if( commit_json != "" )
+            commit_json = {commit_json, ","};
+          if( inst_trace_wen[j] )
+            commit_json = {commit_json, $sformatf("{\"pc\":\"%h\",\"seq\":\"%h\",\"wdata\":\"%h\",\"waddr\":\"%0d\"}",
+              inst_trace_pc[j], inst_trace_seq_num[j], inst_trace_wdata[j], inst_trace_waddr[j])};
+          else
+            commit_json = {commit_json, $sformatf("{\"pc\":\"%h\",\"seq\":\"%h\",\"wdata\":null,\"waddr\":null}",
+              inst_trace_pc[j], inst_trace_seq_num[j])};
+        end
+      end
+      if( commit_json != "" )
+        json_line = {json_line, ",\"commit\":[", commit_json, "]"};
+      else
+        json_line = {json_line, ",\"commit\":[]"};
+
+      json_line = {json_line, "}"};
+      $fwrite(t.json_fd, "%s\n", json_line);
+    end
   end
   // verilator lint_on BLKSEQ
 

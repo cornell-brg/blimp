@@ -266,7 +266,8 @@ module SSRenameTableL3 #(
 
       assign alloc_rdy[i] = |preg_alloc_sel_in & (
         alloc_areg[i] == 0 ||
-        !rename_table[alloc_areg[i]].pending
+        !rename_table[alloc_areg[i]].pending ||
+        got_complete_pend[alloc_areg[i]]
       ) & !is_dup_areg;
     end
   endgenerate

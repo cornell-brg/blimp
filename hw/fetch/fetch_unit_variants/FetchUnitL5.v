@@ -378,6 +378,41 @@ module FetchUnitL5
         trace = {(total_w){" "}};
     end
   endfunction
+
+  function string trace_json();
+    string seqs;
+    seqs = "";
+
+    trace_json = "{";
+
+    // Memory request side
+    trace_json = {trace_json, $sformatf("\"req_addr\":\"%h\"", mem.req_msg.addr)};
+    trace_json = {trace_json, $sformatf(",\"req_val\":\"%b\"", mem.req_val)};
+    trace_json = {trace_json, $sformatf(",\"req_rdy\":\"%b\"", mem.req_rdy)};
+
+    // Memory response / D-side
+    trace_json = {trace_json, $sformatf(",\"resp_addr\":\"%h\"", mem.resp_msg.addr)};
+    trace_json = {trace_json, $sformatf(",\"resp_val\":\"%b\"", mem.resp_val)};
+    trace_json = {trace_json, $sformatf(",\"resp_rdy\":\"%b\"", D_rdy_all)};
+
+    // Sequence numbers (allocated this cycle, if D transfer occurs)
+    if( D_xfer_all ) begin
+      for( int i = 0; i < p_num_fe_lanes; i++ ) begin
+        if( i != 0 )
+          seqs = {seqs, ","};
+        if( D_xfer[i] )
+          seqs = {seqs, $sformatf("%h", alloc_seq_num[i])};
+      end
+      trace_json = {trace_json, $sformatf(",\"seqs\":\"%0s\"", seqs)};
+    end else begin
+      trace_json = {trace_json, ",\"seqs\":null"};
+    end
+
+    trace_json = {trace_json, $sformatf(",\"xfer\":\"%b\"", D_xfer_all)};
+    trace_json = {trace_json, $sformatf(",\"squash\":%0s", (should_drop ? "true" : "false"))};
+    trace_json = {trace_json, $sformatf(",\"in_flight\":\"%0d\"", num_in_flight)};
+    trace_json = {trace_json, "}"};
+  endfunction
 `endif
 
 endmodule

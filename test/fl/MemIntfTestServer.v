@@ -224,6 +224,39 @@ module MemIntfTestServer #(
     trace = $sformatf("%s > %s", req_linetrace, resp_linetrace);
   endfunction
 
+  function string trace_json( string prefix );
+    string req_json, resp_json;
+    string op_str;
+
+    // Request side — show val/rdy even when no transfer
+    case( dut.req_msg.op )
+      MEM_MSG_READ:  op_str = "rd";
+      MEM_MSG_WRITE: op_str = "wr";
+      default:       op_str = "??";
+    endcase
+
+    if( dut.req_val )
+      req_json = $sformatf("{\"op\":\"%0s\",\"addr\":\"%h\",\"data\":\"%h\",\"val\":\"%b\",\"rdy\":\"%b\"}",
+        op_str, dut.req_msg.addr, dut.req_msg.data, dut.req_val, dut.req_rdy);
+    else
+      req_json = "null";
+
+    // Response side — show val/rdy even when no transfer
+    case( dut.resp_msg.op )
+      MEM_MSG_READ:  op_str = "rd";
+      MEM_MSG_WRITE: op_str = "wr";
+      default:       op_str = "??";
+    endcase
+
+    if( dut.resp_val )
+      resp_json = $sformatf("{\"op\":\"%0s\",\"addr\":\"%h\",\"data\":\"%h\",\"val\":\"%b\",\"rdy\":\"%b\"}",
+        op_str, dut.resp_msg.addr, dut.resp_msg.data, dut.resp_val, dut.resp_rdy);
+    else
+      resp_json = "null";
+
+    trace_json = $sformatf("\"%0s_req\":%0s,\"%0s_resp\":%0s", prefix, req_json, prefix, resp_json);
+  endfunction
+
 endmodule
 
 `endif // TEST_FL_MEM_INTF_TEST_SERVER_V

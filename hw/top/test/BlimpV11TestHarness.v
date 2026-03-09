@@ -56,7 +56,9 @@ module BlimpV11TestHarness #(
     .p_opaq_bits (p_opaq_bits)
   ) dmem_intf();
 
-  InstTraceNotif inst_trace_notif[p_num_be_lanes]();
+  InstTraceNotif #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) inst_trace_notif[p_num_be_lanes]();
 
   BlimpV11 #(
     .p_opaq_bits     (p_opaq_bits),

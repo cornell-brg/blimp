@@ -98,6 +98,20 @@ module SimUtils
     end
   end
 
+  // verilator lint_off UNUSEDSIGNAL
+  int    json_fd;
+  logic  dump_json;
+  string json_filename;
+  // verilator lint_on UNUSEDSIGNAL
+  initial begin
+    if ( $value$plusargs( "trace-json=%s", json_filename ) ) begin
+      json_fd   = $fopen (json_filename, "w");
+      dump_json = 1'b1;
+    end else begin
+      dump_json = 1'b0;
+    end
+  end
+
   // ---------------------------------------------------------------------
   // Timeout
   // ---------------------------------------------------------------------

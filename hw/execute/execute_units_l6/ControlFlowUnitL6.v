@@ -198,6 +198,16 @@ module ControlFlowUnitL6 #(
         trace = {(ceil_div_4(p_seq_num_bits)){" "}};
     end
   endfunction
+
+  function string trace_json();
+    if( !fifo_empty )
+      trace_json = $sformatf("{\"uop\":\"%0s\",\"seq\":\"%h\",\"waddr\":\"%h\",\"wdata\":\"%h\",\"branch\":\"%b\",\"target\":\"%h\",\"val\":\"%b\",\"rdy\":\"%b\",\"xfer\":\"%b\"}",
+        D_curr.uop.name(), W.seq_num, W.waddr, W.wdata,
+        should_branch, squash.target,
+        W.val, W.rdy, W.val & W.rdy );
+    else
+      trace_json = "null";
+  endfunction
 `endif
 
 endmodule

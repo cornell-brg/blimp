@@ -385,6 +385,31 @@ module LoadStoreUnitL7 #(
         trace = {trace, {(ceil_div_4(p_seq_num_bits)){" "}}};
     end
   endfunction
+
+  function string trace_json();
+    string req_json, resp_json;
+
+    // Stage 1: D-side FIFO head (request waiting to go to memory)
+    if( !d_fifo_empty )
+      req_json = $sformatf("\"req_uop\":\"%0s\",\"req_seq\":\"%h\",\"req_addr\":\"%h\",\"req_data\":\"%h\",\"req_val\":\"%b\",\"req_rdy\":\"%b\"",
+        uop.name(), D_curr.seq_num, addr, D_curr.mem_data,
+        mem.req_val, mem.req_rdy );
+    else
+      req_json = "\"req_uop\":null,\"req_seq\":null,\"req_addr\":null,\"req_data\":null,\"req_val\":\"0\",\"req_rdy\":\"0\"";
+
+    // Stage 2: pipeline register (waiting for memory response)
+    if( stage2_reg.val )
+      resp_json = $sformatf("\"resp_uop\":\"%0s\",\"resp_seq\":\"%h\",\"resp_addr\":\"%h\",\"resp_data\":\"%h\",\"resp_val\":\"%b\",\"resp_rdy\":\"%b\"",
+        stage2_reg.uop.name(), stage2_reg.seq_num, mem.resp_msg.addr, W.wdata,
+        W.val, W.rdy );
+    else
+      resp_json = "\"resp_uop\":null,\"resp_seq\":null,\"resp_addr\":null,\"resp_data\":null,\"resp_val\":\"0\",\"resp_rdy\":\"0\"";
+
+    if( !d_fifo_empty | stage2_reg.val | !stage2_empty )
+      trace_json = $sformatf("{%0s,%0s}", req_json, resp_json);
+    else
+      trace_json = "null";
+  endfunction
 `endif
 
 endmodule
