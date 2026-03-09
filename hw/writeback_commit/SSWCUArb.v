@@ -1,5 +1,5 @@
 //========================================================================
-// SSWBArb.v
+// SSWCUArb.v
 //========================================================================
 // An age-based iSLIP arbiter for writeback with integrated selection
 // muxing. Selects up to m of the oldest requesting inputs across
@@ -9,14 +9,14 @@
 //
 // The message struct (t_msg) must contain .val and .seq_num fields.
 
-`ifndef HW_WRITEBACK_SSWBARB_V
-`define HW_WRITEBACK_SSWBARB_V
+`ifndef HW_WRITEBACK_SSWCUARB_V
+`define HW_WRITEBACK_SSWCUARB_V
 
 `include "hw/common/ISLIPCore.v"
 `include "hw/util/SSSeqAge.v"
 `include "intf/CommitNotif.v"
 
-module SSWBArb #(
+module SSWCUArb #(
   parameter type t_msg         = logic,
   parameter p_num_pipes        = 8,
   parameter p_num_be_lanes     = 2,
@@ -177,4 +177,4 @@ module SSWBArb #(
 
 endmodule
 
-`endif // HW_WRITEBACK_SSWBARB_V
+`endif // HW_WRITEBACK_SSWCUARB_V

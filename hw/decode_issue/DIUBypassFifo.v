@@ -1,5 +1,5 @@
 //========================================================================
-// DecodeIssueUnitBypassFifo.v
+// DIUBypassFifo.v
 //========================================================================
 // Wraps FifoBypass and presents an instruction-window FIFO with
 // per-lane editable head state.
@@ -13,13 +13,13 @@
 //
 // Shadow state resets to zero on pop (new head gets clean state).
 
-`ifndef HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
-`define HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
+`ifndef HW_DECODEISSUE_DIUBYPASSFIFO_V
+`define HW_DECODEISSUE_DIUBYPASSFIFO_V
 
 `include "hw/common/FifoBypass.v"
 `include "intf/F__DIntf.v"
 
-module DecodeIssueUnitBypassFifo
+module DIUBypassFifo
 #(
   parameter type t_msg     = logic [31:0],
   parameter p_seq_num_bits = 5,
@@ -180,4 +180,4 @@ module DecodeIssueUnitBypassFifo
 
 endmodule
 
-`endif // HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
+`endif // HW_DECODEISSUE_DIUBYPASSFIFO_V

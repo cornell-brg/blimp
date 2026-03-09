@@ -11,18 +11,54 @@ supports a superscalar architecture, allowing it to arbitrate multiple completed
 instructions to send to the ROB, which, in turn, can also commit multiple
 instructions in the same cycle.
 
+The WCU L4 pipeline consists of three main stages: (1) arbitration and
+selection, which picks up to ``p_num_be_lanes`` completed instructions from the
+``p_num_pipes`` execute pipes; (2) completion notification, which broadcasts
+the selected instructions' write-back data to the decode-issue unit's rename
+table and register file before entering the FIFO; and (3) reorder and commit
+via the MROB, which buffers instructions and dequeues them in program order.
+
+The arbiter is configurable via the ``p_use_age_arb`` parameter: when set (the
+default), the age-based ``SSWCUArb`` is used; when cleared, the round-robin
+``MRRArb`` is used instead. Both arbiters receive a budget
+(``avail_slots_arb``) computed as the minimum of the MROB's available slots and
+the number of backend lanes, capped further when the bypass FIFO is full. A
+``WCUBypassFifo`` sits between the arbiter output and the MROB, decoupling
+the arbitration stage from the reorder buffer.
+
 .. image:: img/WritebackCommitUnitL4.png
    :align: center
    :width: 70%
    :alt: A picture of the Level 4 Writeback Commit Unit supporting superscalar writeback and commit
    :class: bottompadding
 
-Instruction Arbiter: MRRArb
+Age-Based Instruction Arbiter: SSWCUArb
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The multi-round-robin arbiter (MRRArb) is responsible for selecting multiple
-completed instructions from multiple XUs to send to the ROB, as opposed to
-choosing a single instruction. `This paper
+The age-based arbiter (SSWCUArb) selects up to ``m`` of the oldest requesting
+pipes each cycle using the shared ``ISLIPCore`` matching engine. It is the
+default arbiter for the WCU L4 and is analogous to the ``SSDIURouter`` used on
+the decode-issue side, but routing in the opposite direction (N pipes → M
+backend lanes).
+
+SSWCUArb builds a compatibility matrix where every valid pipe is compatible with
+every backend lane, then limits the number of active output lanes via an
+``output_free_init`` mask derived from the ``m`` budget. ``ISLIPCore`` performs
+the matching using an age-based grant phase (each output lane grants to the
+oldest requesting pipe via ``AgePE``) and a lowest-index accept phase (each pipe
+accepts the lowest-indexed output lane that granted to it). Age comparison uses
+``SSSeqAge`` with the oldest committed sequence number for wrap-around-safe
+ordering.
+
+After matching, granted pipes are packed into sequential output lanes and ready
+signals are driven back to the execute interfaces.
+
+Round-Robin Instruction Arbiter: MRRArb
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The multi-round-robin arbiter (MRRArb) is the alternative arbiter, selected
+when ``p_use_age_arb`` is 0. It selects multiple completed instructions from
+multiple XUs using a round-robin priority scheme. `This paper
 <https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=6673286>`_ describes
 an implementation for an m-select round-robin arbiter, which performs exactly
 the operation desired for this case, albeit with a fixed number of instructions
@@ -59,6 +95,22 @@ grants from ``mPEth2`` are used to select the grant to use to update the head
 pointer as the order reflects the original request order. The final selected
 grant is then rotated by one to get the next highest-priority input for the next
 cycle, which is stored in the head pointer register.
+
+When MRRArb is used, an additional selection mux packs the granted pipe data
+into sequential output lanes, and ready signals are driven directly from the
+grant vector.
+
+Bypass FIFO: WCUBypassFifo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``WCUBypassFifo`` is a multi-lane FIFO that sits between the arbiter output
+and the MROB. It wraps a ``FifoBypass`` and packs all ``p_num_be_lanes`` lanes
+into a single FIFO entry. The FIFO is pushed whenever any selected instruction
+is valid and there is space, and popped whenever it is not empty. Completion
+notifications are driven from the arbiter output (before the FIFO) to minimize
+the latency of broadcasting write-back results to the rename table and register
+file. The FIFO depth and bypass behavior are controlled by the
+``p_x_intf_fifo_depth`` and ``p_x_intf_fifo_bypass`` parameters.
 
 Multi-Reorder Buffer (MROB)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

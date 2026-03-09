@@ -17,17 +17,16 @@
 import TestEnv::*;
 
 module BlimpV11TestHarness #(
-  parameter p_opaq_bits     = 8,
-  parameter p_seq_num_bits  = 5,
-  parameter p_num_phys_regs = 36,
-  parameter p_num_fe_lanes  = 2,
-  parameter p_num_be_lanes  = 2,
-  parameter p_iq_depth      = 4,
-
-  parameter p_mem_send_intv_delay = 1,
-  parameter p_mem_recv_intv_delay = 1,
-  parameter p_f_intf_fifo_bypass = 0,
-  parameter p_x_intf_fifo_bypass = 0,
+  parameter p_opaq_bits              = 8,
+  parameter p_seq_num_bits           = 5,
+  parameter p_num_phys_regs          = 36,
+  parameter p_num_fe_lanes           = 2,
+  parameter p_num_be_lanes           = 2,
+  parameter p_iq_depth               = 4,
+  parameter p_mem_send_intv_delay    = 1,
+  parameter p_mem_recv_intv_delay    = 1,
+  parameter p_f_intf_fifo_bypass     = 0,
+  parameter p_x_intf_fifo_bypass     = 0,
   parameter p_mem_d_intf_fifo_bypass = 0
 );
 
@@ -64,14 +63,14 @@ module BlimpV11TestHarness #(
   ) inst_trace_notif[p_num_be_lanes]();
 
   BlimpV11 #(
-    .p_opaq_bits     (p_opaq_bits),
-    .p_seq_num_bits  (p_seq_num_bits),
-    .p_num_phys_regs (p_num_phys_regs),
-    .p_num_be_lanes  (p_num_be_lanes),
-    .p_num_fe_lanes  (p_num_fe_lanes),
-    .p_iq_depth      (p_iq_depth),
-    .p_f_intf_fifo_bypass (p_f_intf_fifo_bypass),
-    .p_x_intf_fifo_bypass (p_x_intf_fifo_bypass),
+    .p_opaq_bits              (p_opaq_bits),
+    .p_seq_num_bits           (p_seq_num_bits),
+    .p_num_phys_regs          (p_num_phys_regs),
+    .p_num_be_lanes           (p_num_be_lanes),
+    .p_num_fe_lanes           (p_num_fe_lanes),
+    .p_iq_depth               (p_iq_depth),
+    .p_f_intf_fifo_bypass     (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass     (p_x_intf_fifo_bypass),
     .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) dut (
     .inst_mem   (imem_intf),

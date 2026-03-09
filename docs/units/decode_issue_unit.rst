@@ -99,11 +99,10 @@ generate the immediate value independently. The ``SSRenameTableL3`` allocates
 physical registers for all lanes simultaneously, with inter-lane forwarding of
 destination register mappings to handle intra-block dependencies (described
 further below). Instructions are then routed from the ``p_num_fe_lanes`` input
-lanes to ``p_num_pipes`` output issue queues via a new ``SSInstXbar``
-instruction crossbar, replacing the single-instruction ``SSInstRouter`` from
-L7. Each issue queue is the same ``IssueQueueInOrder`` used in L7, with its
-own rename table lookup ports and register file read ports for independent
-operand resolution.
+lanes to ``p_num_pipes`` output issue queues via the ``SSDIURouter`` crossbar
+router, replacing the single-instruction ``SSInstRouter`` from L7. Each issue
+queue is the same ``IssueQueueInOrder`` used in L7, with its own rename table
+lookup ports and register file read ports for independent operand resolution.
 
 .. image:: img/DecodeIssueUnitL8.png
    :align: center
@@ -111,32 +110,91 @@ operand resolution.
    :alt: A picture of the Level 8 Decode Issue Unit supporting superscalar decode and issue
    :class: bottompadding
 
+Instruction Window FIFO: DIUBypassFifo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The DIU L8 uses a ``DIUBypassFifo`` to buffer fetched instruction blocks
+between the fetch and decode-issue stages. The FIFO wraps a ``FifoBypass`` and
+presents an instruction-window abstraction with per-lane editable head state.
+Each lane in the head entry carries a 2-bit ``inst_status`` field with three
+states: ``INVALID`` (2'b00), ``READY`` (2'b01), and ``DISPATCHED`` (2'b10).
+
+The decode-issue pipeline reads the head entry each cycle and writes back
+per-lane status edits: lanes that fail instruction checks are marked
+``INVALID``, and lanes that successfully dispatch are marked ``DISPATCHED``.
+These edits are maintained in shadow registers that overlay the FIFO head entry
+and reset when the head is popped or the FIFO is cleared. The head entry is
+popped (and the window advances) only when every lane in the current entry is
+either invalid, dispatching this cycle, or already dispatched.
+
+The FIFO is reset on ``squash_sub.val`` (an external squash from an XU) and
+cleared on ``squash_pub_val_comb`` (an internal squash from a JAL/JALR dispatch
+in the current window).
+
+Instruction Check Stages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Dispatch eligibility is evaluated through four cascaded ``InstCheck`` stages
+per lane, each gating on the result of the previous stage:
+
+- **S1 — Validity:** Checks that the FIFO entry is valid (``F_curr[i].val``),
+  the instruction status is not ``INVALID``, and the decoder recognizes the
+  instruction. This is the first filter and its ``pass`` output gates all
+  subsequent stages.
+
+- **S2 — Control instruction ordering:** Enforces ordering constraints around
+  control flow instructions (branches and jumps). The DIU scans the current
+  window for the oldest undispatched control instruction (JAL/JALR/BRX) using
+  wrap-around-safe sequence number age comparisons via ``SSSeqAge``. For BRX
+  instructions, younger instructions in the window are blocked from dispatching
+  until the branch's source operands are ready and it can be dispatched. For
+  JAL/JALR instructions, the oldest control instruction must be able to
+  dispatch (pass S4) before younger instructions proceed. Instructions younger
+  than the oldest control instruction are also blocked when a squash is pending
+  on ``squash_sub``.
+
+- **S3 — Physical register allocation:** Checks that a free physical register
+  is available for allocation (via ``alloc_rdy``) for instructions that write a
+  destination register. Lanes are checked in order, with each lane gating on
+  the previous lane's allocation success to prevent over-allocation.
+
+- **S4 — Structural hazard (crossbar routing):** Checks that the instruction
+  was successfully routed to an issue queue by the ``SSDIURouter`` (i.e., the
+  ``lane_val`` signal is asserted). Lanes are again checked in order to
+  preserve dispatch ordering.
+
+The ``invalidate`` outputs from all four stages are OR-reduced per lane to
+determine whether to mark a lane ``INVALID`` in the instruction window.
+
+Control Flow Handling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 Because multiple instructions are decoded simultaneously, the DIU L8 must
-handle the case where a fetch block contains control flow instructions
+handle the case where the current window contains control flow instructions
 alongside younger instructions that should not be issued. The DIU scans all
-lanes each cycle to find the oldest JAL/JALR and the oldest branch (BRX)
-instruction in the current fetch block using sequence number age comparisons.
+lanes each cycle to find the oldest undispatched control instruction
+(JAL/JALR/BRX), tracking its lane index, sequence number, and whether it is a
+branch (BRX) via ``oldest_ctrl_inst_found``, ``oldest_ctrl_inst_idx``, and
+``oldest_ctrl_inst_is_brx``.
 
-For JAL/JALR instructions, the DIU computes the jump target and publishes a
-squash on the ``squash_pub`` interface using the oldest JAL/JALR's sequence
-number. Instructions in lanes younger than the JAL/JALR within the same fetch
-block are invalidated by clearing ``F_reg_next`` for those lanes (gated by
-``oldest_jal_idx``). A ``squash_sent`` flag prevents re-publishing the same
-squash on subsequent cycles before the next fetch block arrives.
+For JAL/JALR instructions, when the oldest control instruction dispatches, the
+DIU computes the jump target and publishes a squash on the ``squash_pub``
+interface. The squash publication outputs (``squash_pub.val``,
+``squash_pub.target``, ``squash_pub.seq_num``) are registered to break the
+combinational loop through the squash unit and fetch unit back to the bypass
+FIFO. A ``squash_sent`` flag prevents re-publishing the same squash on
+subsequent cycles before the window advances. The combinational
+``squash_pub_val_comb`` signal is used internally to clear the FIFO immediately
+when a jump dispatches.
 
-For BRX instructions (conditional branches resolved in the control-flow XU),
-the DIU ensures that only instructions at or older than the oldest branch in
-the fetch block are issued. The ``xbar_inst_val`` signal masks out any
-instruction whose sequence number is younger than the oldest BRX's sequence
-number, preventing younger instructions from being routed to issue queues
-before the branch is resolved. This avoids speculatively issuing instructions
-past an unresolved branch within the same fetch block.
+For BRX instructions, the DIU checks whether the oldest control instruction's
+source operands are ready by performing a rename table lookup through a
+dedicated port (port index ``p_num_pipes``). If the sources are not ready,
+the S2 check blocks all instructions in the window from dispatching, ensuring
+no instruction younger than an unresolved branch is speculatively issued.
 
-When a squash arrives on the ``squash_sub`` interface (from an XU), the DIU
-checks whether the squash targets an instruction older than the oldest
-instruction in the current fetch block. If so, ``should_squash`` is asserted,
-invalidating all instructions in the current block and signaling readiness to
-accept a new fetch block, as depicted in the diagram below.
+When a squash arrives on the ``squash_sub`` interface (from an XU), the FIFO
+is reset, discarding all instructions in the current window.
 
 .. image:: img/DecodeIssueUnitL8Squash.png
    :align: center
@@ -144,18 +202,17 @@ accept a new fetch block, as depicted in the diagram below.
    :alt: A depiction of how the Level 8 Decode Issue Unit handles squashes from JAL(R) and BRX instructions, showing how fetch blocks are handled properly
    :class: bottompadding
 
-Instruction Crossbar for Issue Queues: SSInstXbar
+Crossbar Router for Issue Queues: SSDIURouter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The instruction crossbar for issue queues (SSInstXbar) routes
+The crossbar router for issue queues (SSDIURouter) routes
 ``p_num_input_lanes`` decoded instructions to ``p_num_pipes`` issue queues each
-cycle using a modified version of the iSLIP algorithm (`McKeown, 1999
-<https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=748793>`_). The
-original iSLIP algorithm solves the input-output matching problem in crossbar
-switches using iterative rounds of grant and accept phases with round-robin
-arbiters to achieve fair, high-throughput scheduling. SSInstXbar adapts this
-for instruction routing by replacing the round-robin arbiters with
-domain-specific priority functions.
+cycle using a shared ``ISLIPCore`` matching engine, which implements a modified
+version of the iSLIP algorithm (`McKeown, 1999
+<https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=748793>`_). Unlike
+the previous ``SSInstXbar``, the ``SSDIURouter`` integrates data muxing
+directly, selecting per-lane instruction data into per-pipe outputs based on
+the matching results.
 
 First, a compatibility matrix is computed: for each (input lane, output pipe)
 pair, ``iq_compat_op`` is asserted when the instruction's micro-op is supported
@@ -163,13 +220,13 @@ by the pipe's ISA subset, the instruction is valid, the queue is ready, and the
 queue has available slots. This matrix defines which input-output matches are
 legal.
 
-The matching then proceeds over ``p_num_iter`` iterations, each consisting of
-two phases:
+The matching is performed by ``ISLIPCore``, which proceeds over ``p_num_iter``
+iterations, each consisting of two phases:
 
 - **Grant phase (age-based):** Each output pipe examines all compatible,
-  unmatched inputs and grants to the oldest one (smallest sequence number),
-  determined by an ``AgePE`` priority element using ``SSSeqAge`` for
-  wrap-around-safe age comparison.
+  unmatched inputs and grants to the oldest one, determined by an ``AgePE``
+  priority element using wrap-around-safe age comparison via the oldest
+  committed sequence number.
 
 - **Accept phase (slot-based):** Each input lane examines all outputs that
   granted to it and accepts the one with the most available issue queue slots,
@@ -181,9 +238,11 @@ consideration (via ``input_free`` and ``output_free`` masks), and the next
 iteration attempts to match the remaining unmatched ports. Multiple iterations
 improve matching efficiency when several inputs compete for the same output.
 The final match results across all iterations are OR-reduced to produce
-per-pipe ``iq_val`` and ``iq_route_idx`` signals (selecting which lane feeds
-each pipe) and per-lane ``xfer`` signals (indicating that the lane's
-instruction was successfully routed).
+per-pipe ``iq_val`` and ``route_idx`` signals (selecting which lane feeds each
+pipe) and per-lane ``lane_val`` signals (indicating that the lane's instruction
+was successfully routed). The router also computes ``dispatch_go`` per lane,
+which is asserted when the lane passes all instruction checks and the target
+issue queue is ready.
 
 Rename Table with Allocated Destination Register Forwarding: SSRenameTableL3
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

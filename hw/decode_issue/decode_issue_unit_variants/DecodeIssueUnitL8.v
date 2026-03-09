@@ -22,7 +22,7 @@
 `include "hw/decode_issue/SSRenameTableL3.v"
 `include "hw/decode_issue/IssueQueueInOrder.v"
 `include "hw/util/SSSeqAge.v"
-`include "hw/decode_issue/DecodeIssueUnitBypassFifo.v"
+`include "hw/decode_issue/DIUBypassFifo.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
@@ -134,7 +134,7 @@ module DecodeIssueUnitL8 #(
 
   t_diu_msg F_curr [p_num_fe_lanes];
 
-  DecodeIssueUnitBypassFifo #(
+  DIUBypassFifo #(
     .t_msg          (t_diu_msg),
     .p_seq_num_bits (p_seq_num_bits),
     .p_depth        (p_f_intf_fifo_depth),
@@ -168,7 +168,7 @@ module DecodeIssueUnitL8 #(
   logic F_rdy_all;
 
   always_comb begin
-    F_rdy_all = oldest_ctrl_inst_srcs_ready;
+    F_rdy_all = 1'b1;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
       F_rdy_all &= (
         !inst_chk_s1_pass[j] |

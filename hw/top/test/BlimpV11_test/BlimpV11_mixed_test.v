@@ -33,7 +33,10 @@ module BlimpV11TestSuite_mixed #(
     .p_iq_depth            (p_iq_depth),
     .p_mem_send_intv_delay (p_mem_send_intv_delay),
     .p_mem_recv_intv_delay (p_mem_recv_intv_delay),
-    .p_num_fe_lanes        (p_num_fe_lanes)
+    .p_num_fe_lanes        (p_num_fe_lanes),
+    .p_f_intf_fifo_bypass  (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass  (p_x_intf_fifo_bypass),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) h();
 
   `include "hw/top/test/test_cases/directed/mixed_test_cases.v"

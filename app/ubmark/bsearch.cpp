@@ -56,5 +56,5 @@ int main( void )
       blimp_exit( 1 );
     }
   }
-  blimp_wprintf( L"All indeces match!\n" );
+  blimp_wprintf( L"All indices match!\n" );
 }

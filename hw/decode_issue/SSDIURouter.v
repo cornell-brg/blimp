@@ -5,7 +5,7 @@
 // muxing. Routes instructions from front-end lanes to issue queues
 // using a modified iSLIP algorithm with age-based priority and
 // slot-based accept. Muxes per-lane instruction data to per-pipe
-// outputs directly. Analogous to SSWBArb but for the decode-issue
+// outputs directly. Analogous to SSWCUArb but for the decode-issue
 // side (N FE lanes -> M pipes).
 //
 // The message struct (t_msg) must contain .uop and .seq_num fields.

@@ -15,7 +15,10 @@ module BlimpV11TestSuite_addi #(
   parameter p_mem_send_intv_delay = 1,
   parameter p_mem_recv_intv_delay = 1,
 
-  parameter p_num_fe_lanes        = 2
+  parameter p_num_fe_lanes        = 2,
+  parameter p_f_intf_fifo_bypass = 0,
+  parameter p_x_intf_fifo_bypass = 0,
+  parameter p_mem_d_intf_fifo_bypass = 0
 );
   string suite_name = $sformatf("%0d: BlimpV11TestSuite_%0d_%0d_%0d_%0d_%0d_%0d_%0d_%0d", 
                                 p_suite_num,
@@ -30,7 +33,10 @@ module BlimpV11TestSuite_addi #(
     .p_iq_depth            (p_iq_depth),
     .p_mem_send_intv_delay (p_mem_send_intv_delay),
     .p_mem_recv_intv_delay (p_mem_recv_intv_delay),
-    .p_num_fe_lanes        (p_num_fe_lanes)
+    .p_num_fe_lanes        (p_num_fe_lanes),
+    .p_f_intf_fifo_bypass  (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass  (p_x_intf_fifo_bypass),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) h();
 
   `include "hw/top/test/test_cases/directed/addi_test_cases.v"
@@ -151,6 +157,20 @@ module BlimpV11_addi_test;
     .p_mem_recv_intv_delay  (1),
     .p_num_fe_lanes         (4)
   ) suite_11();
+  BlimpV11TestSuite_addi #(
+    .p_suite_num              (12),
+    .p_opaq_bits              (8),
+    .p_seq_num_bits           (2),
+    .p_num_phys_regs          (35),
+    .p_num_be_lanes           (4),
+    .p_iq_depth               (4),
+    .p_mem_send_intv_delay    (1),
+    .p_mem_recv_intv_delay    (1),
+    .p_num_fe_lanes           (4),
+    .p_f_intf_fifo_bypass     (1),
+    .p_x_intf_fifo_bypass     (1),
+    .p_mem_d_intf_fifo_bypass (1)
+  ) suite_12();
   int s;
 
   initial begin
@@ -168,6 +188,7 @@ module BlimpV11_addi_test;
     if ((s <= 0) || (s ==  9)) suite_9.run_test_suite();
     if ((s <= 0) || (s == 10)) suite_10.run_test_suite();
     if ((s <= 0) || (s == 11)) suite_11.run_test_suite();
+    if ((s <= 0) || (s == 12)) suite_12.run_test_suite();
 
     test_bench_end();
   end

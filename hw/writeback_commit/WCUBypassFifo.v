@@ -1,5 +1,5 @@
 //========================================================================
-// WritebackCommitUnitBypassFifo.v
+// WCUBypassFifo.v
 //========================================================================
 // Wraps FifoBypass and presents a multi-lane FIFO for the writeback
 // pipeline registers.
@@ -7,12 +7,12 @@
 // Push side:  accepts t_msg array, packs all lanes into one FIFO entry.
 // Read side:  outputs per-lane t_msg from the FIFO head.
 
-`ifndef HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
-`define HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
+`ifndef HW_WRITEBACK_WCUBYPASSFIFO_V
+`define HW_WRITEBACK_WCUBYPASSFIFO_V
 
 `include "hw/common/FifoBypass.v"
 
-module WritebackCommitUnitBypassFifo
+module WCUBypassFifo
 #(
   parameter type t_msg  = logic [31:0],
   parameter p_depth     = 2,
@@ -100,4 +100,4 @@ module WritebackCommitUnitBypassFifo
 
 endmodule
 
-`endif // HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
+`endif // HW_WRITEBACK_WCUBYPASSFIFO_V

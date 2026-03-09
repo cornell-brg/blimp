@@ -136,27 +136,56 @@ module SeqNumGenL5 #(
     end
   end
 
-  // Check that alloc_rdy_cntr consecutive entries from head are free
+  // Check that alloc_rdy_cntr consecutive entries from head are free.
+  // During a squash, entries younger than squash.seq_num are being freed
+  // this cycle (registered), so bypass the check — those entries are
+  // guaranteed to become free at the next posedge.
   logic alloc_entries_free;
   always_comb begin
     alloc_entries_free = 1'b1;
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
-        alloc_entries_free = 1'b0;
+    if( !squash.val ) begin
+      for( int k = 0; k < p_num_fe_lanes; k++ ) begin
+        if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
+          alloc_entries_free = 1'b0;
+      end
     end
   end
 
   // Can only allocate if there's enough space for all entries we need to
-  // allocate and all those entries are free
-  // With (p_seq_num_bits+1)-bit pointers, we can use all p_num_entries
+  // allocate and all those entries are free.
+  // During a squash, use the effective head (squash.seq_num + 1) instead
+  // of the stale curr_head_ptr so entries_allocated reflects the post-
+  // squash state.
+  // Compute the correct (p_seq_num_bits+1)-bit head pointer after a squash.
+  // squash.seq_num is only p_seq_num_bits wide, so we must reconstruct the
+  // wrap-around MSB from the current head pointer to keep entries_allocated
+  // correct.
+  logic [p_seq_num_bits:0] squash_head_ptr;
+  always_comb begin
+    squash_head_ptr[p_seq_num_bits-1:0] = p_seq_num_bits'(squash.seq_num + 1);
+    // If the new position is ahead of the current head position (in the lower
+    // bits), the squash rolled back across the wrap boundary, so decrement
+    // the wrap bit.
+    if( p_seq_num_bits'(squash.seq_num + 1) > curr_head_ptr[p_seq_num_bits-1:0] )
+      squash_head_ptr[p_seq_num_bits] = curr_head_ptr[p_seq_num_bits] - 1'b1;
+    else
+      squash_head_ptr[p_seq_num_bits] = curr_head_ptr[p_seq_num_bits];
+  end
+
   logic can_alloc;
   logic [p_seq_num_bits:0] space_needed;
   logic [p_seq_num_bits:0] space_available;
+  logic [p_seq_num_bits:0] eff_entries_allocated;
 
   always_comb begin
-    space_needed = entries_allocated + p_seq_num_bits'(alloc_rdy_cntr);
-    space_available = p_num_entries;  // Can use all entries now
-    can_alloc = (space_needed <= space_available) & alloc_entries_free;
+    if( squash.val )
+      eff_entries_allocated = squash_head_ptr - curr_tail_ptr;
+    else
+      eff_entries_allocated = entries_allocated;
+
+    space_needed    = eff_entries_allocated + (p_seq_num_bits+1)'(alloc_rdy_cntr);
+    space_available = p_num_entries;
+    can_alloc       = (space_needed <= space_available) & alloc_entries_free;
   end
 
   // Allocate consecutive sequence numbers starting from head pointer for each
@@ -192,8 +221,8 @@ module SeqNumGenL5 #(
     curr_head_ptr_next = curr_head_ptr;
 
     // On a squash, head pointer goes to inst after squashed inst
-    // Extend squash.seq_num to (p_seq_num_bits+1) bits to match pointer width
-    if( squash.val ) curr_head_ptr_next = squash.seq_num + 1;
+    // Use squash_head_ptr which preserves the wrap-around MSB
+    if( squash.val ) curr_head_ptr_next = squash_head_ptr;
 
     // If allocating (possibly also during a squash), head pointer moves forward
     // by number of entries allocated (starting from new squash head pointer if

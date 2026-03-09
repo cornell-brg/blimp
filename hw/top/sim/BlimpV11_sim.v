@@ -15,12 +15,15 @@ import "DPI-C" context function void load_elf ( string elf_file );
 module BlimpV11_sim;
 
   // Define default simulation parameters
-  localparam p_num_phys_regs = 40;
-  localparam p_opaq_bits     = 8;
-  localparam p_seq_num_bits  = 5;
-  localparam p_num_be_lanes  = 4;
-  localparam p_num_fe_lanes  = 4;
-  localparam p_iq_depth      = 4;
+  localparam p_num_phys_regs          = 40;
+  localparam p_opaq_bits              = 8;
+  localparam p_seq_num_bits           = 5;
+  localparam p_num_be_lanes           = 4;
+  localparam p_num_fe_lanes           = 4;
+  localparam p_iq_depth               = 4;
+  localparam p_f_intf_fifo_bypass     = 0;
+  localparam p_x_intf_fifo_bypass     = 0;
+  localparam p_mem_d_intf_fifo_bypass = 0;
   
   //----------------------------------------------------------------------
   // Setup
@@ -60,7 +63,10 @@ module BlimpV11_sim;
     .p_num_phys_regs (p_num_phys_regs),
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes),
-    .p_iq_depth      (p_iq_depth)
+    .p_iq_depth      (p_iq_depth),
+    .p_f_intf_fifo_bypass  (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass  (p_x_intf_fifo_bypass),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) dut (
     .inst_mem   (imem_intf),
     .data_mem   (dmem_intf),

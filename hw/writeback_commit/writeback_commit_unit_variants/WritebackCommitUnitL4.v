@@ -9,9 +9,9 @@
 `define HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
 
 `include "hw/writeback_commit/MROB.v"
-`include "hw/writeback_commit/WritebackCommitUnitBypassFifo.v"
+`include "hw/writeback_commit/WCUBypassFifo.v"
 `include "hw/common/MRRArb.v"
-`include "hw/writeback_commit/SSWBArb.v"
+`include "hw/writeback_commit/SSWCUArb.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 `include "intf/X__WIntf.v"
@@ -103,7 +103,7 @@ module WritebackCommitUnitL4 #(
   //----------------------------------------------------------------------
   // Arbitration and selection
   //----------------------------------------------------------------------
-  // SSWBArb (age-based) handles arbitration + selection muxing internally.
+  // SSWCUArb (age-based) handles arbitration + selection muxing internally.
   // MRRArb (round-robin) only provides grant; muxing is done here.
 
   t_wb_msg Ex_msg_sel [p_num_be_lanes];
@@ -111,7 +111,7 @@ module WritebackCommitUnitL4 #(
   generate
     if (p_use_age_arb) begin : gen_age_arb
 
-      SSWBArb #(
+      SSWCUArb #(
         .t_msg          (t_wb_msg),
         .p_num_pipes    (p_num_pipes),
         .p_num_be_lanes (p_num_be_lanes),
@@ -208,7 +208,7 @@ module WritebackCommitUnitL4 #(
 
   t_wb_msg X_curr [p_num_be_lanes];
 
-  WritebackCommitUnitBypassFifo #(
+  WCUBypassFifo #(
     .t_msg       (t_wb_msg),
     .p_depth     (p_x_intf_fifo_depth),
     .p_bypass    (p_x_intf_fifo_bypass),
