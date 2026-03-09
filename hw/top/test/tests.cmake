@@ -316,6 +316,7 @@ set(BlimpV10_TESTS
   BlimpV10_test/BlimpV10_remu_test.v
 
   BlimpV10_test/BlimpV10_mixed_test.v
+  BlimpV10_test/BlimpV10_torture_test.v
 )
 
 
@@ -377,4 +378,5 @@ set(BlimpV11_TESTS
   BlimpV11_test/BlimpV11_remu_test.v
 
   BlimpV11_test/BlimpV11_mixed_test.v
+  BlimpV11_test/BlimpV11_torture_test.v
 )
