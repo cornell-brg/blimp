@@ -8,6 +8,7 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L7_ITERATIVEMULDIVREML7_V
 
 `include "defs/UArch.v"
+`include "hw/common/FifoBypass.v"
 `include "intf/D__XIntf.v"
 `include "intf/X__WIntf.v"
 
@@ -47,7 +48,7 @@ module IterativeMulDivRemStepL7 (
       adj_b_shift = {31'b0, b_shift};
     end
   end
-  
+
   always_comb begin
     case( uop )
       OP_MUL:    next_a = a << 1;
@@ -142,7 +143,10 @@ endmodule
 // IterativeMulDivRemL7
 //------------------------------------------------------------------------
 
-module IterativeMulDivRemL7 (
+module IterativeMulDivRemL7 #(
+  parameter p_d_intf_fifo_depth  = 4,
+  parameter p_d_intf_fifo_bypass = 0
+)(
   input  logic clk,
   input  logic rst,
 
@@ -161,15 +165,17 @@ module IterativeMulDivRemL7 (
 
   localparam p_seq_num_bits   = D.p_seq_num_bits;
   localparam p_phys_addr_bits = D.p_phys_addr_bits;
-  
+
   //----------------------------------------------------------------------
-  // Register inputs
+  // Bypass FIFO for D interface
   //----------------------------------------------------------------------
 
   typedef struct packed {
     logic                        val;
     logic                 [31:0] pc;
     logic   [p_seq_num_bits-1:0] seq_num;
+    logic                 [31:0] op1;
+    logic                 [31:0] op2;
     logic                  [4:0] waddr;
     rv_uop                       uop;
     logic [p_phys_addr_bits-1:0] preg;
@@ -187,57 +193,47 @@ module IterativeMulDivRemL7 (
     logic [p_phys_addr_bits-1:0] ppreg;
   } W_input;
 
-  D_input D_reg;
-  D_input D_reg_next;
-  logic   D_xfer;
-  logic   W_xfer;
-
   // verilator lint_off ENUMVALUE
 
-  always_ff @( posedge clk ) begin
-    if ( rst )
-      D_reg <= '{ 
-        val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        uop:     'x,
-        preg:    'x,
-        ppreg:   'x
-      };
-    else
-      D_reg <= D_reg_next;
-  end
-
-  always_comb begin
-    D_xfer = D.val & D.rdy;
-    W_xfer = W.val & W.rdy;
-
-    if ( D_xfer )
-      D_reg_next = '{ 
-        val:     1'b1, 
-        pc:      D.pc,
-        seq_num: D.seq_num,
-        waddr:   D.waddr,
-        uop:     D.uop,
-        preg:    D.preg,
-        ppreg:   D.ppreg
-      };
-    else if ( W_xfer )
-      D_reg_next = '{ 
-        val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        uop:     'x,
-        preg:    'x,
-        ppreg:   'x
-      };
-    else
-      D_reg_next = D_reg;
-  end
+  D_input fifo_in;
+  assign fifo_in = '{
+    val:     1'b1,
+    pc:      D.pc,
+    seq_num: D.seq_num,
+    op1:     D.op1,
+    op2:     D.op2,
+    waddr:   D.waddr,
+    uop:     D.uop,
+    preg:    D.preg,
+    ppreg:   D.ppreg
+  };
 
   // verilator lint_on ENUMVALUE
+
+  logic fifo_full, fifo_empty;
+  logic fifo_push, fifo_pop;
+  logic W_xfer;
+
+  assign fifo_push = D.val & !fifo_full;
+  assign W_xfer    = W.val & W.rdy;
+  assign fifo_pop  = (curr_state == DONE) & W.rdy & !fifo_empty;
+
+  D_input D_curr;
+
+  FifoBypass #(
+    .p_entry_bits ($bits(D_input)),
+    .p_depth      (p_d_intf_fifo_depth),
+    .p_bypass     (p_d_intf_fifo_bypass)
+  ) d_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (fifo_push),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_in),
+    .rdata (D_curr)
+  );
 
   //----------------------------------------------------------------------
   // State Machine
@@ -263,15 +259,15 @@ module IterativeMulDivRemL7 (
 
   logic calc_done;
   logic need_to_sign_restore;
-  
+
   always_comb begin
     next_state = curr_state;
 
     case( curr_state )
-      IDLE: if( D_xfer ) begin
-        if ( 
-          D.op2[31] &
-          ( D.uop == OP_DIV | D.uop == OP_REM )
+      IDLE: if( !fifo_empty ) begin
+        if (
+          D_curr.op2[31] &
+          ( D_curr.uop == OP_DIV | D_curr.uop == OP_REM )
         )    next_state = SWAP_SIGN;
         else next_state = CALC;
       end
@@ -286,14 +282,7 @@ module IterativeMulDivRemL7 (
       RESTORE_SIGN: next_state = DONE;
 
       DONE: if( W_xfer ) begin
-        if( D_xfer ) begin
-          if ( 
-            D.op2[31] &
-            ( D.uop == OP_DIV | D.uop == OP_REM )
-          )    next_state = SWAP_SIGN;
-          else next_state = CALC;
-        end else
-          next_state = IDLE;
+        next_state = IDLE;
       end
     endcase
   end
@@ -309,27 +298,27 @@ module IterativeMulDivRemL7 (
   logic [63:0] init_opa, init_opb;
 
   always_comb begin
-    case( D.uop )
-      OP_MUL:    init_opa = { 32'b0,           D.op1 };
-      OP_MULH:   init_opa = { {32{D.op1[31]}}, D.op1 };
-      OP_MULHU:  init_opa = { 32'b0,           D.op1 };
-      OP_MULHSU: init_opa = { {32{D.op1[31]}}, D.op1 };
-      OP_DIV:    init_opa = { {32{D.op1[31]}}, D.op1 };
-      OP_DIVU:   init_opa = { 32'b0,           D.op1 };
-      OP_REM:    init_opa = { {32{D.op1[31]}}, D.op1 };
-      OP_REMU:   init_opa = { 32'b0,           D.op1 };
+    case( D_curr.uop )
+      OP_MUL:    init_opa = { 32'b0,                D_curr.op1 };
+      OP_MULH:   init_opa = { {32{D_curr.op1[31]}}, D_curr.op1 };
+      OP_MULHU:  init_opa = { 32'b0,                D_curr.op1 };
+      OP_MULHSU: init_opa = { {32{D_curr.op1[31]}}, D_curr.op1 };
+      OP_DIV:    init_opa = { {32{D_curr.op1[31]}}, D_curr.op1 };
+      OP_DIVU:   init_opa = { 32'b0,                D_curr.op1 };
+      OP_REM:    init_opa = { {32{D_curr.op1[31]}}, D_curr.op1 };
+      OP_REMU:   init_opa = { 32'b0,                D_curr.op1 };
       default:   init_opa = 'x;
     endcase
 
-    case( D.uop )
-      OP_MUL:    init_opb = { 32'b0,           D.op2 };
-      OP_MULH:   init_opb = { {32{D.op2[31]}}, D.op2 };
-      OP_MULHU:  init_opb = { 32'b0,           D.op2 };
-      OP_MULHSU: init_opb = { 32'b0,           D.op2 };
-      OP_DIV:    init_opb = { D.op2,           32'b0 };
-      OP_DIVU:   init_opb = { D.op2,           32'b0 };
-      OP_REM:    init_opb = { D.op2,           32'b0 };
-      OP_REMU:   init_opb = { D.op2,           32'b0 };
+    case( D_curr.uop )
+      OP_MUL:    init_opb = { 32'b0,                D_curr.op2 };
+      OP_MULH:   init_opb = { {32{D_curr.op2[31]}}, D_curr.op2 };
+      OP_MULHU:  init_opb = { 32'b0,                D_curr.op2 };
+      OP_MULHSU: init_opb = { 32'b0,                D_curr.op2 };
+      OP_DIV:    init_opb = { D_curr.op2,            32'b0 };
+      OP_DIVU:   init_opb = { D_curr.op2,            32'b0 };
+      OP_REM:    init_opb = { D_curr.op2,            32'b0 };
+      OP_REMU:   init_opb = { D_curr.op2,            32'b0 };
       default:   init_opb = 'x;
     endcase
   end
@@ -343,7 +332,7 @@ module IterativeMulDivRemL7 (
       need_to_sign_restore <= 1'b0;
     else if( curr_state == SWAP_SIGN )
       // Need to ensure that the sign is the same as dividend
-      need_to_sign_restore <= ( D_reg.uop == OP_REM );
+      need_to_sign_restore <= ( D_curr.uop == OP_REM );
   end
 
   logic [63:0] opa,      opb;
@@ -376,7 +365,7 @@ module IterativeMulDivRemL7 (
     .a       (opa),
     .b       (opb),
     .b_shift (b_shift),
-    .uop     (D_reg.uop),
+    .uop     (D_curr.uop),
     .result  (result),
 
     .next_a       (next_opa),
@@ -390,18 +379,18 @@ module IterativeMulDivRemL7 (
   // Assign outputs
   //----------------------------------------------------------------------
 
-  assign D.rdy = ( curr_state == IDLE ) || ( ( curr_state == DONE ) & W.rdy );
-  
+  assign D.rdy = !fifo_full;
+
   assign W.val     = ( curr_state == DONE );
-  assign W.pc      = D_reg.pc;
-  assign W.seq_num = D_reg.seq_num;
-  assign W.waddr   = D_reg.waddr;
-  assign W.preg    = D_reg.preg;
-  assign W.ppreg   = D_reg.ppreg;
+  assign W.pc      = D_curr.pc;
+  assign W.seq_num = D_curr.seq_num;
+  assign W.waddr   = D_curr.waddr;
+  assign W.preg    = D_curr.preg;
+  assign W.ppreg   = D_curr.ppreg;
   assign W.wen     = 1'b1;
 
   always_comb begin
-    case( D_reg.uop )
+    case( D_curr.uop )
       OP_MUL:    W.wdata = result[31:0];
       OP_MULH:   W.wdata = result[63:32];
       OP_MULHU:  W.wdata = result[63:32];

@@ -11,7 +11,7 @@ task test_case_1_basic_single_fetch_block();
   logic [31:0]               insts      [p_num_fe_lanes];
   logic [31:0]               pcs        [p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [p_num_fe_lanes];
-  logic                      insn_valid [p_num_fe_lanes];
+  logic                      inst_valid [p_num_fe_lanes];
   logic                      valid      [p_num_fe_lanes];
 
   t.test_case_begin( "test_case_1_basic_single_fetch_block" );
@@ -21,7 +21,7 @@ task test_case_1_basic_single_fetch_block();
     insts[i]      = 32'($urandom());
     pcs[i]        = 'h200 + (i << 2);
     seq_num[i]    = p_seq_num_bits'(i);
-    insn_valid[i] = 1;
+    inst_valid[i] = 1;
     valid[i]      = 1;
     fl_mem.init_mem( pcs[i], insts[i] );
   end
@@ -30,7 +30,7 @@ task test_case_1_basic_single_fetch_block();
     insts,
     pcs,
     seq_num,
-    insn_valid,
+    inst_valid,
     valid
   );
 
@@ -49,7 +49,7 @@ task automatic test_case_2_basic_many_fetch_blocks();
   logic [31:0]               insts      [num_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [num_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [num_blocks][p_num_fe_lanes];
-  logic                      insn_valid [num_blocks][p_num_fe_lanes];
+  logic                      inst_valid [num_blocks][p_num_fe_lanes];
   logic                      valid      [num_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -69,7 +69,7 @@ task automatic test_case_2_basic_many_fetch_blocks();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      insn_valid[block][i] = 1;
+      inst_valid[block][i] = 1;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -85,7 +85,7 @@ task automatic test_case_2_basic_many_fetch_blocks();
       insts[block],
       pcs[block],
       seq_num[block],
-      insn_valid[block],
+      inst_valid[block],
       valid[block]
     );
 
@@ -134,7 +134,7 @@ task automatic test_case_3_seq_nums_not_avail();
   logic [31:0]               insts      [total_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [total_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [total_blocks][p_num_fe_lanes];
-  logic                      insn_valid [total_blocks][p_num_fe_lanes];
+  logic                      inst_valid [total_blocks][p_num_fe_lanes];
   logic                      valid      [total_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -153,7 +153,7 @@ task automatic test_case_3_seq_nums_not_avail();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      insn_valid[block][i] = 1;
+      inst_valid[block][i] = 1;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -170,7 +170,7 @@ task automatic test_case_3_seq_nums_not_avail();
       insts[block],
       pcs[block],
       seq_num[block],
-      insn_valid[block],
+      inst_valid[block],
       valid[block]
     );
   end
@@ -208,7 +208,7 @@ task automatic test_case_3_seq_nums_not_avail();
       insts[block],
       pcs[block],
       seq_num[block],
-      insn_valid[block],
+      inst_valid[block],
       valid[block]
     );
 

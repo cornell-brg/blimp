@@ -7,12 +7,16 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L6_ALUL6_V
 
 `include "defs/UArch.v"
+`include "hw/common/FifoBypass.v"
 `include "intf/D__XIntf.v"
 `include "intf/X__WIntf.v"
 
 import UArch::*;
 
-module ALUL6 (
+module ALUL6 #(
+  parameter p_d_intf_fifo_depth  = 4,
+  parameter p_d_intf_fifo_bypass = 0
+)(
   input  logic clk,
   input  logic rst,
 
@@ -31,9 +35,9 @@ module ALUL6 (
 
   localparam p_seq_num_bits   = D.p_seq_num_bits;
   localparam p_phys_addr_bits = D.p_phys_addr_bits;
-  
+
   //----------------------------------------------------------------------
-  // Register inputs
+  // Bypass FIFO for D interface
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -48,54 +52,56 @@ module ALUL6 (
     logic [p_phys_addr_bits-1:0] ppreg;
   } D_input;
 
-  D_input D_reg;
-  D_input D_reg_next;
-  logic   D_xfer;
-  logic   W_xfer;
-
   // verilator lint_off ENUMVALUE
 
-  always_ff @( posedge clk ) begin
-    if ( rst )
-      D_reg <= '0;
-    else
-      D_reg <= D_reg_next;
-  end
-
-  always_comb begin
-    D_xfer = D.val & D.rdy;
-    W_xfer = W.val & W.rdy;
-
-    if ( D_xfer )
-      D_reg_next = '{ 
-        val:     1'b1, 
-        pc:      D.pc,
-        seq_num: D.seq_num,
-        op1:     D.op1, 
-        op2:     D.op2,
-        waddr:   D.waddr,
-        uop:     D.uop,
-        preg:    D.preg,
-        ppreg:   D.ppreg
-      };
-    else if ( W_xfer )
-      D_reg_next = '0;
-    else
-      D_reg_next = D_reg;
-  end
+  D_input fifo_in;
+  assign fifo_in = '{
+    val:     1'b1,
+    pc:      D.pc,
+    seq_num: D.seq_num,
+    op1:     D.op1,
+    op2:     D.op2,
+    waddr:   D.waddr,
+    uop:     D.uop,
+    preg:    D.preg,
+    ppreg:   D.ppreg
+  };
 
   // verilator lint_on ENUMVALUE
+
+  logic fifo_full, fifo_empty;
+  logic fifo_push, fifo_pop;
+
+  assign fifo_push = D.val & !fifo_full;
+  assign fifo_pop  = !fifo_empty & W.rdy;
+
+  D_input D_curr;
+
+  FifoBypass #(
+    .p_entry_bits ($bits(D_input)),
+    .p_depth      (p_d_intf_fifo_depth),
+    .p_bypass     (p_d_intf_fifo_bypass)
+  ) d_fifo (
+    .clk   (clk),
+    .rst   (rst),
+    .push  (fifo_push),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_in),
+    .rdata (D_curr)
+  );
 
   //----------------------------------------------------------------------
   // Arithmetic Operations
   //----------------------------------------------------------------------
-  
+
   logic [31:0] op1, op2;
-  assign op1 = D_reg.op1;
-  assign op2 = D_reg.op2;
+  assign op1 = D_curr.op1;
+  assign op2 = D_curr.op2;
 
   rv_uop uop;
-  assign uop = D_reg.uop;
+  assign uop = D_curr.uop;
 
   always_comb begin
     case( uop )
@@ -110,7 +116,7 @@ module ALUL6 (
       OP_SRL:   W.wdata = op1           >> op2[4:0];
       OP_SLL:   W.wdata = op1           << op2[4:0];
       OP_LUI:   W.wdata = op2;
-      OP_AUIPC: W.wdata = D_reg.pc + op2;
+      OP_AUIPC: W.wdata = D_curr.pc + op2;
       default:  W.wdata = 'x;
     endcase
   end
@@ -119,15 +125,15 @@ module ALUL6 (
   // Assign remaining signals
   //----------------------------------------------------------------------
 
-  assign D.rdy = W.rdy | (!D_reg.val);
-  assign W.val = D_reg.val;
+  assign D.rdy = !fifo_full;
+  assign W.val = !fifo_empty;
 
-  assign W.pc      = D_reg.pc;
+  assign W.pc      = D_curr.pc;
   assign W.wen     = 1'b1;
-  assign W.seq_num = D_reg.seq_num;
-  assign W.waddr   = D_reg.waddr;
-  assign W.preg    = D_reg.preg;
-  assign W.ppreg   = D_reg.ppreg;
+  assign W.seq_num = D_curr.seq_num;
+  assign W.waddr   = D_curr.waddr;
+  assign W.preg    = D_curr.preg;
+  assign W.ppreg   = D_curr.ppreg;
 
   //----------------------------------------------------------------------
   // Linetracing
@@ -149,7 +155,7 @@ module ALUL6 (
   function string trace( int trace_level );
     if( W.val & W.rdy ) begin
       if( trace_level > 0 )
-        trace = $sformatf("%h: %11s:%h:%h:%h:%h", W.seq_num, D_reg.uop.name(), 
+        trace = $sformatf("%h: %11s:%h:%h:%h:%h", W.seq_num, D_curr.uop.name(),
                           W.waddr, op1, op2, W.wdata );
       else
         trace = $sformatf("%h", W.seq_num);

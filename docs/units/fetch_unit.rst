@@ -46,7 +46,7 @@ the lane offset is zero), the restart is straightforward. The fetch unit begins
 requesting the aligned fetch block starting at the squash target, and since the
 target corresponds to lane 0, all lanes in the first post-squash fetch block
 contain valid instructions. The ``squash_restart_offset`` is zero, so
-``D_insn_valid`` and ``alloc_rdy`` are asserted for every lane, and each lane
+``D_inst_valid`` and ``alloc_rdy`` are asserted for every lane, and each lane
 receives a sequence number allocation as normal.
 
 .. image:: img/FetchUnitL5FBMiddle.png
@@ -60,7 +60,7 @@ lane offset is nonzero), the fetch unit still fetches the entire aligned block
 but must invalidate the lanes before the target. The ``squash_restart_offset``
 register captures which lane the squash target corresponds to, computed as the
 word offset within the fetch block. On the first post-squash fetch block,
-``D_insn_valid`` and ``alloc_rdy`` are only asserted for lanes at or above
+``D_inst_valid`` and ``alloc_rdy`` are only asserted for lanes at or above
 ``squash_restart_offset`` — earlier lanes are marked invalid (as seen later in
 decode) and do not receive sequence number allocations. The
 ``do_squash_restart`` and ``do_squash_restart_reg`` signals ensure this

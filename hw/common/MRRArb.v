@@ -270,8 +270,11 @@ module MRRArb #(
       else
         gnt_ed[i] = gnt_th[i] & ~( gnt_th[i] << 1 );
     end
-    if (en) gnt = gnt_ed.or();
-    else    gnt = '0;
+    gnt = '0;
+    if (en) begin
+      for (int i = 0; i < p_max_m; i++)
+        gnt = gnt | gnt_ed[i];
+    end
   end
 
 endmodule

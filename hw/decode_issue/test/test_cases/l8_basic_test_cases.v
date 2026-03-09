@@ -5,14 +5,14 @@
 // functionality)
 
 //----------------------------------------------------------------------
-// test_case_1_fetch_block_no_ctrl_insns
+// test_case_1_fetch_block_no_ctrl_insts
 //----------------------------------------------------------------------
 
-task automatic test_case_1_fetch_block_no_ctrl_insns();
+task automatic test_case_1_fetch_block_no_ctrl_insts();
   logic               [31:0] send_pc         [p_num_fe_lanes];
   string                     send_assembly   [p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] send_seq_num    [p_num_fe_lanes];
-  logic                      send_insn_valid [p_num_fe_lanes];
+  logic                      send_inst_valid [p_num_fe_lanes];
   logic                      send_valid      [p_num_fe_lanes];
 
   localparam p_num_recv_msgs = p_num_fe_lanes;
@@ -26,7 +26,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insns();
   rv_uop                       recv_uop     [p_num_recv_msgs];
   logic  [p_pipe_idx_bits-1:0] recv_pipe    [p_num_recv_msgs];
 
-  t.test_case_begin( "test_case_1_fetch_block_no_ctrl_insns" );
+  t.test_case_begin( "test_case_1_fetch_block_no_ctrl_insts" );
   if( !t.run_test ) return;
 
   // Form fetch block
@@ -34,7 +34,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insns();
     send_pc[i]         = 'h200 + i*4;
     send_assembly[i]   = $sformatf("addi x%0d, x0, %0d", i+1, (i+1)*10);
     send_seq_num[i]    = p_seq_num_bits'(i);
-    send_insn_valid[i] = 1'b1;
+    send_inst_valid[i] = 1'b1;
     send_valid[i]      = 1'b1;
   end
 
@@ -57,7 +57,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insns();
         send_pc,
         send_assembly,
         send_seq_num,
-        send_insn_valid,
+        send_inst_valid,
         send_valid
       );
     end
@@ -135,6 +135,6 @@ endtask
 //----------------------------------------------------------------------
 
 task run_basic_test_cases();
-  test_case_1_fetch_block_no_ctrl_insns();
+  test_case_1_fetch_block_no_ctrl_insts();
   // test_case_pending();
 endtask

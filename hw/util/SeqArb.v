@@ -196,7 +196,11 @@ module SeqArb #(
     int trace_level
     // verilator lint_on UNUSEDSIGNAL
   );
-    if( val.or() )
+    logic any_val;
+    any_val = 1'b0;
+    for (int i = 0; i < p_num_arb; i++)
+      any_val = any_val | val[i];
+    if( any_val )
       trace = $sformatf("%h", gnt_seq_num);
     else
       trace = {(ceil_div_4(p_seq_num_bits)){" "}};
