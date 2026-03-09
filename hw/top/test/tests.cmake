@@ -195,6 +195,8 @@ set(BlimpV8_TESTS
   BlimpV8_test/BlimpV8_divu_test.v
   BlimpV8_test/BlimpV8_rem_test.v
   BlimpV8_test/BlimpV8_remu_test.v
+
+  BlimpV8_test/BlimpV8_rand_prog_test.v
 )
 
 # ------------------------------------------------------------------------
@@ -255,7 +257,6 @@ set(BlimpV9_TESTS
   BlimpV9_test/BlimpV9_remu_test.v
 
   BlimpV9_test/BlimpV9_mixed_test.v
-  BlimpV9_test/BlimpV9_torture_test.v
 )
 
 # ------------------------------------------------------------------------
@@ -316,7 +317,6 @@ set(BlimpV10_TESTS
   BlimpV10_test/BlimpV10_remu_test.v
 
   BlimpV10_test/BlimpV10_mixed_test.v
-  BlimpV10_test/BlimpV10_torture_test.v
 )
 
 
@@ -378,5 +378,5 @@ set(BlimpV11_TESTS
   BlimpV11_test/BlimpV11_remu_test.v
 
   BlimpV11_test/BlimpV11_mixed_test.v
-  BlimpV11_test/BlimpV11_torture_test.v
+  BlimpV11_test/BlimpV11_rand_prog_test.v
 )

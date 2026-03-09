@@ -1,10 +1,10 @@
 //========================================================================
-// BlimpV11_torture_test.v
+// BlimpV11_rand_prog_test.v
 //========================================================================
 
 `include "hw/top/test/BlimpV11TestHarness.v"
 
-module BlimpV11TestSuite_torture #(
+module BlimpV11TestSuite_rand_prog #(
   parameter p_suite_num     = 0,
   parameter p_opaq_bits     = 8,
   parameter p_seq_num_bits  = 5,
@@ -33,18 +33,26 @@ module BlimpV11TestSuite_torture #(
     .p_num_fe_lanes        (p_num_fe_lanes)
   ) h();
 
-  `include "hw/top/test/test_cases/torture/basic_test_case.v"
+  `include "hw/top/test/test_cases/rand_prog/basic_test_case.v"
+  `include "hw/top/test/test_cases/rand_prog/memory_test_case.v"
+  `include "hw/top/test/test_cases/rand_prog/m_ext_test_case.v"
+  // `include "hw/top/test/test_cases/rand_prog/control_test_case.v"
+  // `include "hw/top/test/test_cases/rand_prog/mixed_test_case.v"
   task run_test_suite();
     h.t.test_suite_begin( suite_name );
-    run_torture_basic_test();
+    run_rand_prog_basic_test();
+    run_rand_prog_memory_test();
+    run_rand_prog_m_ext_test();
+    // run_rand_prog_control_test();
+    // run_rand_prog_mixed_test();
   endtask
 endmodule
 
-module BlimpV11_torture_test;
-  BlimpV11TestSuite_torture #(
+module BlimpV11_rand_prog_test;
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (1)
   ) suite_1();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (2),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (5),
@@ -54,7 +62,7 @@ module BlimpV11_torture_test;
     .p_mem_send_intv_delay  (1),
     .p_mem_recv_intv_delay  (1)
   ) suite_2();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (3),
     .p_opaq_bits            (4),
     .p_seq_num_bits         (3),
@@ -64,7 +72,7 @@ module BlimpV11_torture_test;
     .p_mem_send_intv_delay  (1),
     .p_mem_recv_intv_delay  (1)
   ) suite_3();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (4),
     .p_opaq_bits            (32),
     .p_seq_num_bits         (4),
@@ -74,7 +82,7 @@ module BlimpV11_torture_test;
     .p_mem_send_intv_delay  (1),
     .p_mem_recv_intv_delay  (1)
   ) suite_4();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (5),
     .p_opaq_bits            (2),
     .p_seq_num_bits         (2),
@@ -84,7 +92,7 @@ module BlimpV11_torture_test;
     .p_mem_send_intv_delay  (1),
     .p_mem_recv_intv_delay  (3)
   ) suite_5();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (6),
     .p_opaq_bits            (4),
     .p_seq_num_bits         (6),
@@ -94,7 +102,7 @@ module BlimpV11_torture_test;
     .p_mem_send_intv_delay  (3),
     .p_mem_recv_intv_delay  (3)
   ) suite_6();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (7),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (5),
@@ -105,7 +113,7 @@ module BlimpV11_torture_test;
     .p_mem_recv_intv_delay  (1),
     .p_num_fe_lanes         (4)
   ) suite_7();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (8),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (5),
@@ -116,7 +124,7 @@ module BlimpV11_torture_test;
     .p_mem_recv_intv_delay  (1),
     .p_num_fe_lanes         (4)
   ) suite_8();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (9),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (5),
@@ -127,7 +135,7 @@ module BlimpV11_torture_test;
     .p_mem_recv_intv_delay  (1),
     .p_num_fe_lanes         (2)
   ) suite_9();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (10),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (5),
@@ -138,7 +146,7 @@ module BlimpV11_torture_test;
     .p_mem_recv_intv_delay  (1),
     .p_num_fe_lanes         (3)
   ) suite_10();
-  BlimpV11TestSuite_torture #(
+  BlimpV11TestSuite_rand_prog #(
     .p_suite_num            (11),
     .p_opaq_bits            (8),
     .p_seq_num_bits         (2),
