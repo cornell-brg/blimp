@@ -255,6 +255,7 @@ set(BlimpV9_TESTS
   BlimpV9_test/BlimpV9_remu_test.v
 
   BlimpV9_test/BlimpV9_mixed_test.v
+  BlimpV9_test/BlimpV9_torture_test.v
 )
 
 # ------------------------------------------------------------------------
