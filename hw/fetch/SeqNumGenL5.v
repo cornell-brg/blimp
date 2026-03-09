@@ -276,7 +276,11 @@ module SeqNumGenL5 #(
     end
   endgenerate
 
-  assign curr_tail_incr = curr_tail_incr_arr.or();
+  always_comb begin
+    curr_tail_incr = '0;
+    for (int j = 0; j < p_reclaim_width; j++)
+      curr_tail_incr = curr_tail_incr | curr_tail_incr_arr[j];
+  end
 
   always_ff @( posedge clk ) begin
     if( rst ) begin

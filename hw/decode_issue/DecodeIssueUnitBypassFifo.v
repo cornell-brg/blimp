@@ -72,21 +72,38 @@ module DecodeIssueUnitBypassFifo
   logic [p_fifo_entry_bits-1:0] fifo_wdata;
   logic [p_num_lanes-1:0]       F_val_vec;
 
+  // Extract interface fields into arrays (interfaces can't be runtime-indexed).
+  logic                      F_val_arr        [p_num_lanes];
+  logic [31:0]               F_inst_arr       [p_num_lanes];
+  logic [31:0]               F_pc_arr         [p_num_lanes];
+  logic [p_seq_num_bits-1:0] F_seq_num_arr    [p_num_lanes];
+  logic                      F_inst_valid_arr [p_num_lanes];
+
   genvar i;
   generate
     for( i = 0; i < p_num_lanes; i++ ) begin: PACK_GEN
-      assign fifo_wdata[i*p_fifo_lane_bits +: p_fifo_lane_bits] = {
-        F[i].val,
-        F[i].inst,
-        F[i].pc,
-        F[i].seq_num,
-        F[i].inst_valid,
-        1'b0
-      };
-      assign F[i].rdy    = !fifo_full;
-      assign F_val_vec[i] = F[i].val;
+      assign F[i].rdy            = !fifo_full;
+      assign F_val_vec[i]        = F[i].val;
+      assign F_val_arr[i]        = F[i].val;
+      assign F_inst_arr[i]       = F[i].inst;
+      assign F_pc_arr[i]         = F[i].pc;
+      assign F_seq_num_arr[i]    = F[i].seq_num;
+      assign F_inst_valid_arr[i] = F[i].inst_valid;
     end
   endgenerate
+
+  always_comb begin
+    for( int ii = 0; ii < p_num_lanes; ii++ ) begin
+      t_msg packed_lane;
+      packed_lane            = '0;
+      packed_lane.val        = F_val_arr[ii];
+      packed_lane.inst       = F_inst_arr[ii];
+      packed_lane.pc         = F_pc_arr[ii];
+      packed_lane.seq_num    = F_seq_num_arr[ii];
+      packed_lane.inst_valid = F_inst_valid_arr[ii];
+      fifo_wdata[ii*p_fifo_lane_bits +: p_fifo_lane_bits] = packed_lane;
+    end
+  end
 
   logic fifo_push;
   assign fifo_push = |F_val_vec & !fifo_full;
@@ -140,15 +157,10 @@ module DecodeIssueUnitBypassFifo
     for( int j = 0; j < p_num_lanes; j++ ) begin
       t_msg lane;
       lane = fifo_rdata[j*p_fifo_lane_bits +: p_fifo_lane_bits];
-      
-      o_msg[j] = '{
-        !fifo_empty & lane.val & !invalid_r[j],
-        lane.inst,
-        lane.pc,
-        lane.seq_num,
-        lane.inst_valid,
-        dispatched_r[j]
-      };
+
+      o_msg[j]            = lane;
+      o_msg[j].val        = !fifo_empty & lane.val & !invalid_r[j];
+      o_msg[j].dispatched = dispatched_r[j];
     end
   end
 

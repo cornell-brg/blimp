@@ -11,6 +11,7 @@
 `include "hw/writeback_commit/MROB.v"
 `include "hw/writeback_commit/WritebackCommitUnitBypassFifo.v"
 `include "hw/common/MRRArb.v"
+`include "hw/writeback_commit/SSWBArb.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 `include "intf/X__WIntf.v"
@@ -19,7 +20,8 @@ module WritebackCommitUnitL4 #(
   parameter p_num_pipes          = 1,
   parameter p_num_be_lanes       = 2,
   parameter p_x_intf_fifo_depth  = 4,
-  parameter p_x_intf_fifo_bypass = 0
+  parameter p_x_intf_fifo_bypass = 0,
+  parameter p_use_age_arb        = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -48,114 +50,7 @@ module WritebackCommitUnitL4 #(
   localparam p_rob_depth      = 2 ** p_seq_num_bits;
 
   //----------------------------------------------------------------------
-  // Select which pipe to get from
-  //----------------------------------------------------------------------
-
-  logic                 [31:0] Ex_pc      [p_num_pipes];
-  logic   [p_seq_num_bits-1:0] Ex_seq_num [p_num_pipes];
-  logic                  [4:0] Ex_waddr   [p_num_pipes];
-  logic                 [31:0] Ex_wdata   [p_num_pipes];
-  logic                        Ex_wen     [p_num_pipes];
-  logic [p_phys_addr_bits-1:0] Ex_preg    [p_num_pipes];
-  logic [p_phys_addr_bits-1:0] Ex_ppreg   [p_num_pipes];
-  logic                        Ex_val     [p_num_pipes];
-  logic                        Ex_rdy     [p_num_pipes];
-
-  genvar i;
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: UNPACK_FROM_INTF
-      assign Ex_pc[i]      = Ex[i].pc;
-      assign Ex_seq_num[i] = Ex[i].seq_num;
-      assign Ex_waddr[i]   = Ex[i].waddr;
-      assign Ex_wdata[i]   = Ex[i].wdata;
-      assign Ex_wen[i]     = Ex[i].wen;
-      assign Ex_preg[i]    = Ex[i].preg;
-      assign Ex_ppreg[i]   = Ex[i].ppreg;
-      assign Ex_val[i]     = Ex[i].val;
-      assign Ex[i].rdy     = Ex_rdy[i];
-    end
-  endgenerate
-
-  logic [p_num_pipes-1:0] Ex_val_packed;
-  logic [p_num_pipes-1:0] Ex_gnt_packed;
-  logic                   Ex_gnt         [p_num_pipes];
-
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: UNPACK
-      assign Ex_val_packed[i] = Ex_val[i];
-      assign Ex_gnt[i] = Ex_gnt_packed[i];
-    end
-  endgenerate
-
-  logic fifo_full;
-
-  logic [p_seq_num_bits:0]         avail_slots_mrob;
-  logic [$clog2(p_num_be_lanes):0] avail_slots_mrrarb;
-
-  assign avail_slots_mrrarb = fifo_full ? '0 :
-                             ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
-                                                    p_num_be_lanes :
-                                                    avail_slots_mrob);
-
-  MRRArb #(
-    .p_width (p_num_pipes),
-    .p_max_m (p_num_be_lanes)
-  ) ex_arb (
-    .clk     (clk),
-    .rst     (rst),
-    .en      (1'b1),
-    .m       (avail_slots_mrrarb),
-    .req     (Ex_val_packed),
-    .gnt     (Ex_gnt_packed)
-  );
-
-  logic                 [31:0] Ex_pc_sel      [p_num_be_lanes];
-  logic   [p_seq_num_bits-1:0] Ex_seq_num_sel [p_num_be_lanes];
-  logic                  [4:0] Ex_waddr_sel   [p_num_be_lanes];
-  logic                 [31:0] Ex_wdata_sel   [p_num_be_lanes];
-  logic                        Ex_wen_sel     [p_num_be_lanes];
-  logic [p_phys_addr_bits-1:0] Ex_preg_sel    [p_num_be_lanes];
-  logic [p_phys_addr_bits-1:0] Ex_ppreg_sel   [p_num_be_lanes];
-  logic                        Ex_val_sel     [p_num_be_lanes];
-  int j, k;
-
-  always_comb begin
-    for ( j = 0; j < p_num_be_lanes; j++) begin
-      Ex_pc_sel[j]      = '0;
-      Ex_seq_num_sel[j] = '0;
-      Ex_waddr_sel[j]   = '0;
-      Ex_wdata_sel[j]   = '0;
-      Ex_wen_sel[j]     = '0;
-      Ex_preg_sel[j]    = '0;
-      Ex_ppreg_sel[j]   = '0;
-      Ex_val_sel[j]     = '0;
-    end
-
-    k = 0;
-    for( j = 0; j < p_num_pipes; j++ ) begin
-      if( Ex_gnt[j] && (k < p_num_be_lanes) ) begin
-        Ex_pc_sel[k]      = Ex_pc[j];
-        Ex_seq_num_sel[k] = Ex_seq_num[j];
-        Ex_waddr_sel[k]   = Ex_waddr[j];
-        Ex_wdata_sel[k]   = Ex_wdata[j];
-        Ex_wen_sel[k]     = Ex_wen[j];
-        Ex_preg_sel[k]    = Ex_preg[j];
-        Ex_ppreg_sel[k]   = Ex_ppreg[j];
-        Ex_val_sel[k]     = Ex_val[j];
-        k++;
-      end
-    end
-  end
-
-  // No backpressure - always ready
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: ASSIGN_RDY
-      assign Ex_rdy[i] = Ex_gnt[i];
-    end
-  endgenerate
-  
-  //----------------------------------------------------------------------
-  // Bypass FIFO for X interface
+  // Writeback message struct (used throughout the pipeline)
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -165,37 +60,145 @@ module WritebackCommitUnitL4 #(
     logic                  [4:0] waddr;
     logic                 [31:0] wdata;
     logic                        wen;
+    logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
-  } X_input;
+  } t_wb_msg;
 
-  // Complete notifications (driven from pre-FIFO arbiter output)
+  //----------------------------------------------------------------------
+  // Unpack interface signals
+  //----------------------------------------------------------------------
+
+  t_wb_msg Ex_msg [p_num_pipes];
+  logic    Ex_rdy [p_num_pipes];
+
+  genvar i;
   generate
-    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: COMPLETE_GEN
-      assign complete[i].val     = Ex_val_sel[i];
-      assign complete[i].seq_num = Ex_seq_num_sel[i];
-      assign complete[i].waddr   = Ex_waddr_sel[i];
-      assign complete[i].wdata   = Ex_wdata_sel[i];
-      assign complete[i].wen     = ( Ex_waddr_sel[i] == '0 ) ? 0 : Ex_wen_sel[i];
-      assign complete[i].preg    = Ex_preg_sel[i];
+    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: UNPACK_FROM_INTF
+      assign Ex_msg[i].val     = Ex[i].val;
+      assign Ex_msg[i].pc      = Ex[i].pc;
+      assign Ex_msg[i].seq_num = Ex[i].seq_num;
+      assign Ex_msg[i].waddr   = Ex[i].waddr;
+      assign Ex_msg[i].wdata   = Ex[i].wdata;
+      assign Ex_msg[i].wen     = Ex[i].wen;
+      assign Ex_msg[i].preg    = Ex[i].preg;
+      assign Ex_msg[i].ppreg   = Ex[i].ppreg;
+      assign Ex[i].rdy         = Ex_rdy[i];
     end
   endgenerate
 
-  // Pack post-arbiter data into X_input for FIFO
-  X_input fifo_in [p_num_be_lanes];
+  //----------------------------------------------------------------------
+  // Arbiter budget
+  //----------------------------------------------------------------------
+
+  logic fifo_full;
+
+  logic [p_seq_num_bits:0]         avail_slots_mrob;
+  logic [$clog2(p_num_be_lanes):0] avail_slots_arb;
+
+  assign avail_slots_arb = fifo_full ? '0 :
+                           ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
+                                                  p_num_be_lanes :
+                                                  avail_slots_mrob);
+
+  //----------------------------------------------------------------------
+  // Arbitration and selection
+  //----------------------------------------------------------------------
+  // SSWBArb (age-based) handles arbitration + selection muxing internally.
+  // MRRArb (round-robin) only provides grant; muxing is done here.
+
+  t_wb_msg Ex_msg_sel [p_num_be_lanes];
+
+  generate
+    if (p_use_age_arb) begin : gen_age_arb
+
+      SSWBArb #(
+        .t_msg          (t_wb_msg),
+        .p_num_pipes    (p_num_pipes),
+        .p_num_be_lanes (p_num_be_lanes),
+        .p_seq_num_bits (p_seq_num_bits)
+      ) ex_arb (
+        .clk     (clk),
+        .rst     (rst),
+        .en      (1'b1),
+        .m       (avail_slots_arb),
+        .in_msg  (Ex_msg),
+        .rdy     (Ex_rdy),
+        .sel_msg (Ex_msg_sel),
+        .commit  (commit)
+      );
+
+    end else begin : gen_rr_arb
+
+      logic [p_num_pipes-1:0] Ex_val_packed;
+      logic [p_num_pipes-1:0] Ex_gnt_packed;
+
+      for( i = 0; i < p_num_pipes; i = i + 1 ) begin: GEN_PACK
+        assign Ex_val_packed[i] = Ex_msg[i].val;
+      end
+
+      MRRArb #(
+        .p_width (p_num_pipes),
+        .p_max_m (p_num_be_lanes)
+      ) ex_arb (
+        .clk     (clk),
+        .rst     (rst),
+        .en      (1'b1),
+        .m       (avail_slots_arb),
+        .req     (Ex_val_packed),
+        .gnt     (Ex_gnt_packed)
+      );
+
+      // Selection muxing: granted pipes -> sequential output lanes
+      int j_rr, k_rr;
+
+      always_comb begin
+        for (j_rr = 0; j_rr < p_num_be_lanes; j_rr++)
+          Ex_msg_sel[j_rr] = '0;
+
+        k_rr = 0;
+        for (j_rr = 0; j_rr < p_num_pipes; j_rr++) begin
+          if (Ex_gnt_packed[j_rr] && (k_rr < p_num_be_lanes)) begin
+            Ex_msg_sel[k_rr] = Ex_msg[j_rr];
+            k_rr++;
+          end
+        end
+      end
+
+      // Ready = granted
+      for( i = 0; i < p_num_pipes; i = i + 1 ) begin: GEN_RDY
+        assign Ex_rdy[i] = Ex_gnt_packed[i];
+      end
+
+    end
+  endgenerate;
+
+  //----------------------------------------------------------------------
+  // Complete notifications (driven from pre-FIFO arbiter output)
+  //----------------------------------------------------------------------
+
+  generate
+    for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: COMPLETE_GEN
+      assign complete[i].val     = Ex_msg_sel[i].val;
+      assign complete[i].seq_num = Ex_msg_sel[i].seq_num;
+      assign complete[i].waddr   = Ex_msg_sel[i].waddr;
+      assign complete[i].wdata   = Ex_msg_sel[i].wdata;
+      assign complete[i].wen     = ( Ex_msg_sel[i].waddr == '0 ) ? 0 : 
+                                     Ex_msg_sel[i].wen;
+      assign complete[i].preg    = Ex_msg_sel[i].preg;
+    end
+  endgenerate
+
+  //----------------------------------------------------------------------
+  // Bypass FIFO for X interface
+  //----------------------------------------------------------------------
+
+  t_wb_msg                   fifo_in          [p_num_be_lanes];
   logic [p_num_be_lanes-1:0] Ex_val_sel_packed;
 
   generate
     for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin: FIFO_IN_GEN
-      assign Ex_val_sel_packed[i] = Ex_val_sel[i];
-      assign fifo_in[i] = '{
-        val:     Ex_val_sel[i],
-        pc:      Ex_pc_sel[i],
-        seq_num: Ex_seq_num_sel[i],
-        waddr:   Ex_waddr_sel[i],
-        wdata:   Ex_wdata_sel[i],
-        wen:     Ex_wen_sel[i],
-        ppreg:   Ex_ppreg_sel[i]
-      };
+      assign Ex_val_sel_packed[i] = Ex_msg_sel[i].val;
+      assign fifo_in[i]          = Ex_msg_sel[i];
     end
   endgenerate
 
@@ -203,10 +206,10 @@ module WritebackCommitUnitL4 #(
   assign fifo_push = |Ex_val_sel_packed & !fifo_full;
   assign fifo_pop  = !fifo_empty;
 
-  X_input X_curr [p_num_be_lanes];
+  t_wb_msg X_curr [p_num_be_lanes];
 
   WritebackCommitUnitBypassFifo #(
-    .t_msg       (X_input),
+    .t_msg       (t_wb_msg),
     .p_depth     (p_x_intf_fifo_depth),
     .p_bypass    (p_x_intf_fifo_bypass),
     .p_num_lanes (p_num_be_lanes)
@@ -225,48 +228,35 @@ module WritebackCommitUnitL4 #(
   // ROB
   //----------------------------------------------------------------------
 
-  typedef struct packed {
-    logic                 [31:0] pc;
-    logic                  [4:0] waddr;
-    logic                 [31:0] wdata;
-    logic                        wen;
-    logic [p_phys_addr_bits-1:0] ppreg;
-  } t_rob_msg;
+  t_wb_msg rob_input [p_num_be_lanes], rob_output [p_num_be_lanes];
 
-  t_rob_msg rob_input [p_num_be_lanes], rob_output [p_num_be_lanes];
+  logic [p_seq_num_bits-1:0]  X_curr_seq_num [p_num_be_lanes];
+  logic                       X_curr_val     [p_num_be_lanes];
+  logic [p_num_be_lanes-1:0]  X_curr_val_packed;
 
-  generate
-    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_ROB_INPUT
-      assign rob_input[i].pc      = X_curr[i].pc;
-      assign rob_input[i].waddr   = X_curr[i].waddr;
-      assign rob_input[i].wdata   = X_curr[i].wdata;
-      assign rob_input[i].wen     = ( X_curr[i].waddr == '0 ) ? 0 : X_curr[i].wen;
-      assign rob_input[i].ppreg   = X_curr[i].ppreg;
+  always_comb begin
+    for (int j = 0; j < p_num_be_lanes; j++) begin
+      rob_input[j]          = X_curr[j];
+      rob_input[j].wen      = ( X_curr[j].waddr == '0 ) ? 1'b0 : X_curr[j].wen;
+      X_curr_seq_num[j]     = X_curr[j].seq_num;
+      X_curr_val[j]         = X_curr[j].val & !fifo_empty;
+      X_curr_val_packed[j]  = X_curr[j].val & !fifo_empty;
     end
-  endgenerate
+  end
 
-  logic [p_seq_num_bits-1:0] X_curr_seq_num [p_num_be_lanes];
-  logic                      X_curr_val     [p_num_be_lanes];
-  generate
-    for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_X_CURR_PACKED
-      assign X_curr_seq_num[i] = X_curr[i].seq_num;
-      assign X_curr_val[i]     = X_curr[i].val & !fifo_empty;
-    end
-  endgenerate
-
-  logic deq_rdy;
-  logic deq_msg_val [p_num_be_lanes];
+  logic                      deq_rdy;
+  logic                      deq_msg_val        [p_num_be_lanes];
   logic [p_seq_num_bits-1:0] rob_output_seq_num [p_num_be_lanes];
 
   MROB #(
     .p_depth     (p_rob_depth),
     .p_num_lanes (p_num_be_lanes),
-    .p_msg_bits  ($bits(t_rob_msg))
+    .p_msg_bits  ($bits(t_wb_msg))
   ) rob (
     .ins_idx     (X_curr_seq_num),
     .ins_msg     (rob_input),
     .ins_msg_val (X_curr_val),
-    .ins_en      (X_curr_val.or()),
+    .ins_en      (|X_curr_val_packed),
     .ins_rdy     (),
     .avail_slots (avail_slots_mrob),
 
@@ -304,7 +294,7 @@ module WritebackCommitUnitL4 #(
                    1                            + 1 + // wen
                    ceil_div_4( 5 )              + 1 + // addr
                    8;                                 // data
-  
+
   function string trace( int trace_level );
     trace = "";
     for( int i = 0; i < p_num_be_lanes; i++ ) begin

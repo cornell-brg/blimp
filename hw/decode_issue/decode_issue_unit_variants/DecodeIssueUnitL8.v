@@ -17,7 +17,7 @@
 `include "defs/ISA.v"
 `include "hw/decode_issue/InstDecoder.v"
 `include "hw/decode_issue/ImmGen.v"
-`include "hw/decode_issue/SSInstXbarCtrl.v"
+`include "hw/decode_issue/SSDIURouter.v"
 `include "hw/decode_issue/SSRegfileL2.v"
 `include "hw/decode_issue/SSRenameTableL3.v"
 `include "hw/decode_issue/IssueQueueInOrder.v"
@@ -77,18 +77,38 @@ module DecodeIssueUnitL8 #(
   localparam p_seq_num_bits     = F[0].p_seq_num_bits;
   localparam p_phys_addr_bits   = $clog2(p_num_phys_regs);
   localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
-  localparam p_pipe_bits        = p_num_pipes    > 1 ? $clog2(p_num_pipes)    : 1;
+
+  //----------------------------------------------------------------------
+  // Decode-issue message struct (accumulated through the pipeline)
+  //----------------------------------------------------------------------
+
+  typedef struct packed {
+    logic                        val;
+    logic                 [31:0] inst;
+    logic                        inst_valid;
+    logic                        dispatched;
+    logic                 [31:0] pc;
+    logic   [p_seq_num_bits-1:0] seq_num;
+    rv_uop                       uop;
+    logic [p_phys_addr_bits-1:0] src_preg0;
+    logic [p_phys_addr_bits-1:0] src_preg1;
+    logic                  [4:0] waddr;
+    logic                 [31:0] imm;
+    logic                        op2_sel;
+    logic                        op3_sel;
+    logic [p_phys_addr_bits-1:0] alloc_preg;
+    logic [p_phys_addr_bits-1:0] alloc_ppreg;
+  } t_diu_msg;
 
   //----------------------------------------------------------------------
   // Forward declarations
   //----------------------------------------------------------------------
   // Signals referenced before they are driven (cross-stage dependencies).
 
-  logic [p_fe_lane_idx_bits-1:0] pipe_to_lane_map          [p_num_pipes];
-  logic                          dispatch_go               [p_num_fe_lanes];
-  logic                          alloc_rdy                 [p_num_fe_lanes];
-  logic                          oldest_ctrl_inst_srcs_ready;
-  logic                          invalidate_inst           [p_num_fe_lanes];
+  logic dispatch_go                  [p_num_fe_lanes];
+  logic alloc_rdy                    [p_num_fe_lanes];
+  logic oldest_ctrl_inst_srcs_ready;
+  logic invalidate_inst              [p_num_fe_lanes];
 
   // Instruction check interfaces -- one per stage per lane.
   InstCheckIntf inst_chk_s1 [p_num_fe_lanes] ();
@@ -110,19 +130,10 @@ module DecodeIssueUnitL8 #(
   logic [p_num_fe_lanes-1:0] fifo_set_invalid;
   logic [p_num_fe_lanes-1:0] fifo_set_dispatched;
 
-  typedef struct packed {
-    logic                      val;
-    logic               [31:0] inst;
-    logic               [31:0] pc;
-    logic [p_seq_num_bits-1:0] seq_num;
-    logic                      inst_valid;
-    logic                      dispatched;
-  } fifo_lane_t;
-
-  fifo_lane_t F_curr [p_num_fe_lanes];
+  t_diu_msg F_curr [p_num_fe_lanes];
 
   DecodeIssueUnitBypassFifo #(
-    .t_msg          (fifo_lane_t),
+    .t_msg          (t_diu_msg),
     .p_seq_num_bits (p_seq_num_bits),
     .p_depth        (p_f_intf_fifo_depth),
     .p_bypass       (p_f_intf_fifo_bypass),
@@ -237,7 +248,11 @@ module DecodeIssueUnitL8 #(
 
       if( (is_brx || is_jal) && is_valid &&
           (!oldest_ctrl_inst_found ||
-           seq_age.is_older(F_curr[k].seq_num, oldest_ctrl_inst_seq_num))
+           seq_age.is_older(
+            F_curr[k].seq_num,
+             oldest_ctrl_inst_seq_num
+           )
+          )
         )
       begin
         oldest_ctrl_inst_idx     = p_fe_lane_idx_bits'(k);
@@ -285,7 +300,7 @@ module DecodeIssueUnitL8 #(
       assign inst_chk_s1[i].inst_valid      = F_curr[i].inst_valid;
 
       InstCheckS1 check_s1 (
-        .chk_intf    (inst_chk_s1[i]),
+        .chk_intf       (inst_chk_s1[i]),
         .entry_val      (F_curr[i].val),
         .entry_inst_val (F_curr[i].inst_valid),
         .decoder_val    (decoder_val[i])
@@ -332,7 +347,7 @@ module DecodeIssueUnitL8 #(
       assign inst_chk_s3[i].inst_valid      = F_curr[i].inst_valid;
 
       InstCheckS3 check_s3 (
-        .chk_intf   (inst_chk_s3[i]),
+        .chk_intf    (inst_chk_s3[i]),
         .decoder_wen (decoder_wen[i]),
         .alloc_rdy   (alloc_rdy[i]),
         .dispatched  (F_curr[i].dispatched)
@@ -344,24 +359,8 @@ module DecodeIssueUnitL8 #(
   // Instruction check stage 4 -- Structural hazard (crossbar routing)
   //----------------------------------------------------------------------
 
-  logic                   lane_val         [p_num_fe_lanes];
-  logic [p_pipe_bits-1:0] lane_to_pipe_map [p_num_fe_lanes];
-  logic                   iq_val           [p_num_pipes];
-
-  // Build reverse map: for each FE lane, find which pipe (if any) the
-  // crossbar routed to it.
-  always_comb begin
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      lane_to_pipe_map[i] = '0;
-      lane_val[i]         = 1'b0;
-      for( int j = 0; j < p_num_pipes; j++ ) begin
-        if( iq_val[j] && pipe_to_lane_map[j] == p_fe_lane_idx_bits'(i) ) begin
-          lane_to_pipe_map[i] = p_pipe_bits'(j);
-          lane_val[i]         = 1'b1;
-        end
-      end
-    end
-  end
+  logic lane_val [p_num_fe_lanes];
+  logic iq_val   [p_num_pipes];
 
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S4_GEN
@@ -431,26 +430,26 @@ module DecodeIssueUnitL8 #(
     .p_num_fe_lanes     (p_num_fe_lanes),
     .p_num_be_lanes     (p_num_be_lanes)
   ) rename_table (
-    .clk (clk),
-    .rst (rst),
+    .clk                  (clk),
+    .rst                  (rst),
 
-    .alloc_areg  (decoder_waddr),
-    .alloc_preg  (alloc_preg),
-    .alloc_ppreg (alloc_ppreg),
-    .alloc_try   (alloc_try),
-    .alloc_val   (alloc_val),
-    .alloc_rdy   (alloc_rdy),
+    .alloc_areg           (decoder_waddr),
+    .alloc_preg           (alloc_preg),
+    .alloc_ppreg          (alloc_ppreg),
+    .alloc_try            (alloc_try),
+    .alloc_val            (alloc_val),
+    .alloc_rdy            (alloc_rdy),
 
     .lookup_new_inst_areg (lookup_new_inst_areg),
     .lookup_new_inst_en   (lookup_new_inst_en),
     .lookup_new_inst_preg (lookup_new_inst_preg),
 
-    .lookup_preg    (lookup_preg),
-    .lookup_preg_en (lookup_preg_en),
-    .lookup_pending (lookup_pending),
+    .lookup_preg          (lookup_preg),
+    .lookup_preg_en       (lookup_preg_en),
+    .lookup_pending       (lookup_pending),
 
-    .complete (complete),
-    .commit   (commit)
+    .complete             (complete),
+    .commit               (commit)
   );
 
   // Extract completion signals for the register file write port.
@@ -555,22 +554,38 @@ module DecodeIssueUnitL8 #(
   // Crossbar routing
   //----------------------------------------------------------------------
   // Route each valid, undispatched instruction to an issue queue based
-  // on its micro-op.
+  // on its micro-op.  The router also muxes per-lane data to per-pipe
+  // outputs and computes lane_val / dispatch_go internally.
 
   logic                       iq_rdy         [p_num_pipes];
   logic [p_iq_entries_bits:0] iq_avail_slots [p_num_pipes];
 
-  logic                        xbar_val    [p_num_fe_lanes];
-  logic [p_seq_num_bits-1:0]   seq_num_arr [p_num_fe_lanes];
+  // Pack router input data
+  t_diu_msg router_in_msg [p_num_fe_lanes];
+  logic     router_val    [p_num_fe_lanes];
 
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      xbar_val[i]    = inst_chk_s1_pass[i] && !F_curr[i].dispatched;
-      seq_num_arr[i] = F_curr[i].seq_num;
+      router_val[i]                = inst_chk_s1_pass[i] && !F_curr[i].dispatched;
+      router_in_msg[i]             = F_curr[i];
+      router_in_msg[i].uop         = decoder_uop[i];
+      router_in_msg[i].src_preg0   = lookup_new_inst_preg[i][0];
+      router_in_msg[i].src_preg1   = lookup_new_inst_preg[i][1];
+      router_in_msg[i].waddr       = decoder_waddr[i];
+      router_in_msg[i].imm         = imm[i];
+      router_in_msg[i].op2_sel     = decoder_op2_sel[i];
+      router_in_msg[i].op3_sel     = decoder_op3_sel[i];
+      router_in_msg[i].alloc_preg  = alloc_preg[i];
+      router_in_msg[i].alloc_ppreg = alloc_ppreg[i];
     end
   end
 
-  SSInstXbarCtrl #(
+  // Per-pipe routed instruction data from the router
+  t_diu_msg iq_msg    [p_num_pipes];
+  logic     iq_ins_val [p_num_pipes];
+
+  SSDIURouter #(
+    .t_msg             (t_diu_msg),
     .p_num_pipes       (p_num_pipes),
     .p_pipe_subsets    (p_pipe_subsets),
     .p_ctrl_subset     (p_ctrl_subset),
@@ -579,26 +594,21 @@ module DecodeIssueUnitL8 #(
     .p_seq_num_bits    (p_seq_num_bits),
     .p_num_iter        (p_num_fe_lanes),
     .p_num_be_lanes    (p_num_be_lanes)
-  ) inst_xbar (
+  ) inst_router (
     .clk            (clk),
     .rst            (rst),
-    .uop            (decoder_uop),
-    .seq_num        (seq_num_arr),
-    .val            (xbar_val),
+    .val            (router_val),
+    .in_msg         (router_in_msg),
+    .chk_pass       (inst_chk_s4_pass),
     .iq_rdy         (iq_rdy),
     .iq_avail_slots (iq_avail_slots),
-    .iq_route_idx   (pipe_to_lane_map),
+    .iq_msg         (iq_msg),
+    .iq_ins_val     (iq_ins_val),
     .iq_val         (iq_val),
+    .lane_val       (lane_val),
+    .dispatch_go    (dispatch_go),
     .commit         (commit)
   );
-
-  // Final dispatch decision: all four check stages pass AND the target
-  // issue queue is ready.
-  always_comb begin
-    for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      dispatch_go[i] = inst_chk_s4_pass[i] && iq_rdy[lane_to_pipe_map[i]];
-    end
-  end
 
   //----------------------------------------------------------------------
   // Issue queues
@@ -608,32 +618,24 @@ module DecodeIssueUnitL8 #(
   generate
     for( i = 0; i < p_num_pipes; i++ ) begin: IQ_GEN
       IssueQueueInOrder #(
+        .t_msg          (t_diu_msg),
         .p_depth        (p_iq_depth),
         .p_num_regs     (p_num_phys_regs),
         .p_seq_num_bits (p_seq_num_bits),
         .p_num_be_lanes (p_num_be_lanes),
         .p_bypass       (p_pipe_subsets[i] == p_ctrl_subset)
       ) issue_queue (
-        .clk (clk),
-        .rst (rst),
+        .clk               (clk),
+        .rst               (rst),
 
-        // Insert
-        .ins_msg_pc              (F_curr[pipe_to_lane_map[i]].pc),
-        .ins_msg_preg            (lookup_new_inst_preg[pipe_to_lane_map[i]]),
-        .ins_msg_decoder_uop     (decoder_uop[pipe_to_lane_map[i]]),
-        .ins_msg_decoder_waddr   (decoder_waddr[pipe_to_lane_map[i]]),
-        .ins_msg_imm             (imm[pipe_to_lane_map[i]]),
-        .ins_msg_decoder_op2_sel (decoder_op2_sel[pipe_to_lane_map[i]]),
-        .ins_msg_decoder_op3_sel (decoder_op3_sel[pipe_to_lane_map[i]]),
-        .ins_msg_seq_num         (F_curr[pipe_to_lane_map[i]].seq_num),
-        .ins_msg_alloc_preg      (alloc_preg[pipe_to_lane_map[i]]),
-        .ins_msg_alloc_ppreg     (alloc_ppreg[pipe_to_lane_map[i]]),
-        .ins_en                  (inst_chk_s4_pass[pipe_to_lane_map[i]] && iq_val[i]),
-        .ins_rdy                 (iq_rdy[i]),
-        .avail_slots             (iq_avail_slots[i]),
+        // Insert (data from router)
+        .ins_msg           (iq_msg[i]),
+        .ins_val           (iq_ins_val[i]),
+        .ins_rdy           (iq_rdy[i]),
+        .avail_slots       (iq_avail_slots[i]),
 
         // Dequeue
-        .Ex (Ex[i]),
+        .Ex                (Ex[i]),
 
         // Rename table access
         .rt_lookup_preg    (lookup_preg[i]),
@@ -641,11 +643,11 @@ module DecodeIssueUnitL8 #(
         .rt_lookup_en      (lookup_preg_en[i]),
 
         // Register file access
-        .rf_raddr (raddr[i]),
-        .rf_rdata (rdata[i]),
+        .rf_raddr          (raddr[i]),
+        .rf_rdata          (rdata[i]),
 
         // Completion interface
-        .complete (complete)
+        .complete          (complete)
       );
 
       // JALR base register read -- assumes exactly one control pipe.

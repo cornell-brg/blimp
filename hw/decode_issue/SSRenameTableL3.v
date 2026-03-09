@@ -28,14 +28,14 @@ module SSRenameTableL3 #(
 
   // Allocation must be successful on all lanes with alloc_try set in order
   // to continue
-  input  logic                  [4:0] alloc_areg   [p_num_fe_lanes],
+  input  logic                  [4:0] alloc_areg  [p_num_fe_lanes],
   /* verilator lint_off UNOPTFLAT */
-  output logic [p_phys_addr_bits-1:0] alloc_preg   [p_num_fe_lanes],
+  output logic [p_phys_addr_bits-1:0] alloc_preg  [p_num_fe_lanes],
   /* verilator lint_on UNOPTFLAT */
-  output logic [p_phys_addr_bits-1:0] alloc_ppreg  [p_num_fe_lanes],
-  input  logic                        alloc_try    [p_num_fe_lanes],
-  input  logic                        alloc_val    [p_num_fe_lanes],
-  output logic                        alloc_rdy    [p_num_fe_lanes],
+  output logic [p_phys_addr_bits-1:0] alloc_ppreg [p_num_fe_lanes],
+  input  logic                        alloc_try   [p_num_fe_lanes],
+  input  logic                        alloc_val   [p_num_fe_lanes],
+  output logic                        alloc_rdy   [p_num_fe_lanes],
 
   // ---------------------------------------------------------------------
   // Lookup
@@ -61,7 +61,8 @@ module SSRenameTableL3 #(
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
-  localparam p_num_fe_lanes_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
+  localparam p_num_fe_lanes_idx_bits = p_num_fe_lanes > 1 ? 
+                                       $clog2(p_num_fe_lanes) : 1;
 
   // ---------------------------------------------------------------------
   // Data Structures
@@ -76,17 +77,6 @@ module SSRenameTableL3 #(
   rt_entry_t rename_table_next [31:1];
   logic      free_list         [p_num_phys_regs-1:1];
   logic      free_list_next    [p_num_phys_regs-1:1];
-  
-  logic [31:1] debug_pending;
-  logic [31:1] debug_pending_next;
-  localparam p_debug_pending_idx_width = $clog2(31);
-  genvar y;
-  generate
-    for( y = 1; y <= 31; y++ ) begin: DEBUG_PENDING
-      assign debug_pending[p_debug_pending_idx_width'(y)] = rename_table[p_debug_pending_idx_width'(y)].pending;
-      assign debug_pending_next[p_debug_pending_idx_width'(y)] = rename_table_next[p_debug_pending_idx_width'(y)].pending;
-    end
-  endgenerate
 
   // ---------------------------------------------------------------------
   // Update Logic
@@ -116,13 +106,14 @@ module SSRenameTableL3 #(
   genvar i;
   generate
     for( i = 1; i < 32; i = i + 1 ) begin: RENAME_UPDATE
-      logic do_commit_rename_reg;
-      logic [p_num_fe_lanes_idx_bits-1:0] do_commit_rename_lane;
+      logic                               do_rename_reg;
+      logic [p_num_fe_lanes_idx_bits-1:0] do_rename_lane;
 
       always_ff @( posedge clk ) begin
         if( rst ) begin
           rename_table[i] <= '{pending: 1'b0, preg: p_phys_addr_bits'(i)};
-        end else if( got_complete_pend[i] || (do_commit_rename_reg && alloc_val[do_commit_rename_lane]) ) begin
+        end else if( got_complete_pend[i] || 
+          (do_rename_reg && alloc_val[do_rename_lane]) ) begin
           rename_table[i] <= rename_table_next[i];
         end
       end
@@ -131,7 +122,8 @@ module SSRenameTableL3 #(
       always_comb begin
         got_complete_pend[i] = '0;
         for( int j = 0; j < p_num_be_lanes; j++ ) begin: COMPLETE_PEND
-          if( complete_val[j] & ( complete_preg[j] == rename_table[i].preg ) ) got_complete_pend[i] = 1'b1;
+          if( complete_val[j] & ( complete_preg[j] == rename_table[i].preg ) ) 
+            got_complete_pend[i] = 1'b1;
         end
       end
     
@@ -143,14 +135,14 @@ module SSRenameTableL3 #(
           rename_table_next[i].pending = 1'b0;
 
         // We just allocated this areg (i), so update preg and set pending
-        do_commit_rename_reg = 1'b0;
-        do_commit_rename_lane = '0;
+        do_rename_reg  = 1'b0;
+        do_rename_lane = '0;
         for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_UPDATE
           if( alloc_xfer[j] & ( alloc_areg[j] == i )) begin
             rename_table_next[i].pending = 1'b1;
             rename_table_next[i].preg    = alloc_preg[j];
-            do_commit_rename_reg = 1'b1;
-            do_commit_rename_lane = p_num_fe_lanes_idx_bits'(j);
+            do_rename_reg = 1'b1;
+            do_rename_lane = p_num_fe_lanes_idx_bits'(j);
           end
         end
       end
@@ -159,8 +151,8 @@ module SSRenameTableL3 #(
 
   generate
     for( i = 1; i < p_num_phys_regs; i++ ) begin: FREE_UPDATE
-      logic do_commit_free_reg;
-      logic [p_num_fe_lanes_idx_bits-1:0] do_commit_free_lane;
+      logic                               do_free_reg;
+      logic [p_num_fe_lanes_idx_bits-1:0] do_free_lane;
 
       always_ff @( posedge clk ) begin
         if( rst ) begin
@@ -168,7 +160,8 @@ module SSRenameTableL3 #(
             free_list[i] <= 1'b0;
           else
             free_list[i] <= 1'b1;
-        end else if( got_free[i] || (do_commit_free_reg && alloc_val[do_commit_free_lane]) ) begin
+        end else if( got_free[i] || 
+          (do_free_reg && alloc_val[do_free_lane]) ) begin
           free_list[i] <= free_list_next[i];
         end
       end
@@ -190,13 +183,13 @@ module SSRenameTableL3 #(
 
         // The preg (i) that was just allocated on some lane is no longer free,
         // so remove it from the free list
-        do_commit_free_reg = 1'b0;
-        do_commit_free_lane = '0;
+        do_free_reg  = 1'b0;
+        do_free_lane = '0;
         for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_FREE
           if( alloc_xfer[j] & ( alloc_preg[j] == i ) ) begin
             free_list_next[i] = 1'b0;
-            do_commit_free_reg = 1'b1;
-            do_commit_free_lane = p_num_fe_lanes_idx_bits'(j);
+            do_free_reg = 1'b1;
+            do_free_lane = p_num_fe_lanes_idx_bits'(j);
           end
         end
       end
@@ -241,17 +234,22 @@ module SSRenameTableL3 #(
       logic [p_phys_addr_bits-1:0] preg_alloc_mask [p_num_phys_regs-1:1];
 
       for( j = 1; j < p_num_phys_regs; j++ ) begin: SELECT_PHYS
-        assign preg_alloc_mask[j] = ( preg_alloc_sel_out[j] ) ? p_phys_addr_bits'(j)
-                                                              : '0;
+        assign preg_alloc_mask[j] = 
+          ( preg_alloc_sel_out[j] ) ? p_phys_addr_bits'(j) : '0;
       end
 
       // Allocated preg for this lane is output from priority encoder
-      assign alloc_preg[i]  = ( alloc_areg[i] != 0 ) ? preg_alloc_mask.or()
-                                              : 0;
+      logic [p_phys_addr_bits-1:0] alloc_preg_or;
+      always_comb begin
+        alloc_preg_or = '0;
+        for (int k = 1; k < p_num_phys_regs; k++)
+          alloc_preg_or = alloc_preg_or | preg_alloc_mask[k];
+      end
+      assign alloc_preg[i] = ( alloc_areg[i] != 0 ) ? alloc_preg_or : '0;
 
       // Allocated ppreg for this lane is the previous preg for this areg
-      assign alloc_ppreg[i] = ( alloc_areg[i] != 0 ) ? rename_table[alloc_areg[i]].preg
-                                              : 0;
+      assign alloc_ppreg[i] = ( alloc_areg[i] != 0 ) ? 
+        rename_table[alloc_areg[i]].preg : 0;
       
       // Only allocate on this lane when we have an entry to give and that entry
       // is not pending, if multiple lanes are allocating the same areg then
@@ -260,7 +258,8 @@ module SSRenameTableL3 #(
       always_comb begin
         is_dup_areg = 1'b0;
         for( int k = 0; k < i; k++ ) begin: DUP_AREG
-          if( ( alloc_areg[k] != 0 ) & ( alloc_areg[k] == alloc_areg[i] ) && alloc_try[k] )
+          if( ( alloc_areg[k] != 0 ) & ( alloc_areg[k] == alloc_areg[i] ) && 
+            alloc_try[k] )
             is_dup_areg = 1'b1;
         end
       end
@@ -296,7 +295,8 @@ module SSRenameTableL3 #(
     for( int j = 0; j < p_num_be_lanes; j++ ) begin: GOT_COMPLETE_OUTER
       for( int k = 0; k < p_num_lookup_ports; k++ ) begin: GOT_COMPLETE_MIDDLE
         for( int l = 0; l < 2; l++ ) begin: GOT_COMPLETE_INNER
-          if( complete_preg[j] == lookup_preg[k][l] ) got_complete_lookup[k][l] = 1'b1;
+          if( complete_preg[j] == lookup_preg[k][l] ) 
+            got_complete_lookup[k][l] = 1'b1;
         end
       end
     end
@@ -345,7 +345,8 @@ module SSRenameTableL3 #(
         // Check if previous lanes have renamed this areg, use that for the preg
         // if so, use lane closest to this lane
         end else begin
-          lookup_new_inst_preg[k][l] = rename_table[lookup_new_inst_areg[k][l]].preg;
+          lookup_new_inst_preg[k][l] = 
+            rename_table[lookup_new_inst_areg[k][l]].preg;
           for( int m = 0; m < k; m++ ) begin
             if( alloc_try[m] && 
                 alloc_areg[m] == lookup_new_inst_areg[k][l]) begin

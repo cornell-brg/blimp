@@ -26,7 +26,7 @@ set(V_TEST_FILES
   hw/decode_issue/test/DecodeIssueUnitL8_test.v
   hw/decode_issue/test/ImmGen_test.v
   hw/decode_issue/test/IssueQueueInOrder_test.v
-  hw/decode_issue/test/SSInstXbar_test.v
+  hw/decode_issue/test/SSDIURouter_test.v
   hw/decode_issue/test/RegfilePending_test.v
   hw/decode_issue/test/SSRegfileL1_test.v
   hw/decode_issue/test/RenameTable_test.v

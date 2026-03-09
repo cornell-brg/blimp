@@ -1,9 +1,9 @@
 //========================================================================
-// SSInstXbar_test.v
+// SSDIURouter_test.v
 //========================================================================
-// A testbench for the SSInstXbar crossbar scheduler
+// A testbench for the SSDIURouter crossbar scheduler
 
-`include "hw/decode_issue/SSInstXbar.v"
+`include "hw/decode_issue/SSDIURouter.v"
 `include "test/TestUtils.v"
 `include "intf/CommitNotif.v"
 `include "test/fl/TestMPub.v"
@@ -12,10 +12,10 @@ import TestEnv::*;
 import UArch::*;
 
 //========================================================================
-// SSInstXbarTestSuite
+// SSDIURouterTestSuite
 //========================================================================
 
-module SSInstXbarTestSuite #(
+module SSDIURouterTestSuite #(
   parameter p_suite_num        = 0,
   parameter p_num_pipes        = 4,
   parameter p_num_input_lanes  = 4,
@@ -46,7 +46,7 @@ module SSInstXbarTestSuite #(
     OP_DIV_VEC    | OP_DIVU_VEC   | OP_REM_VEC    | OP_REMU_VEC
   };
 
-  string suite_name = $sformatf("%0d: SSInstXbarTestSuite_%0d_%0d_%0d_%0d_%0d",
+  string suite_name = $sformatf("%0d: SSDIURouterTestSuite_%0d_%0d_%0d_%0d_%0d",
                                 p_suite_num, p_num_pipes, p_num_input_lanes,
                                 p_iq_depth, p_seq_num_bits, p_num_iter);
 
@@ -79,7 +79,7 @@ module SSInstXbarTestSuite #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) commit_notif [p_num_be_lanes] ();
 
-  SSInstXbar #(
+  SSDIURouter #(
     .p_num_pipes       (p_num_pipes),
     .p_pipe_subsets    (p_pipe_subsets),
     .p_num_input_lanes (p_num_input_lanes),
@@ -576,15 +576,15 @@ module SSInstXbarTestSuite #(
 endmodule
 
 //========================================================================
-// SSInstXbar_test
+// SSDIURouter_test
 //========================================================================
 
-module SSInstXbar_test;
+module SSDIURouter_test;
 
   // Test with different configurations
 
   // Default config: 4 pipes, 4 lanes, 8-depth IQ, 8-bit seq num, 2 iterations
-  SSInstXbarTestSuite suite_1();
+  SSDIURouterTestSuite suite_1();
 
   int s;
 
