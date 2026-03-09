@@ -64,7 +64,13 @@ class TraceViewer(tk.Tk):
         open_btn = tk.Button(toolbar, text="Open", command=self._open_file,
                              bg=COLORS["button_bg"], fg=COLORS["button_fg"],
                              font=FONTS["toolbar"], relief="flat", padx=8)
-        open_btn.pack(side="left", padx=(0, 12))
+        open_btn.pack(side="left", padx=(0, 4))
+
+        # Reload button
+        reload_btn = tk.Button(toolbar, text="Reload", command=self._reload_file,
+                               bg=COLORS["button_bg"], fg=COLORS["button_fg"],
+                               font=FONTS["toolbar"], relief="flat", padx=8)
+        reload_btn.pack(side="left", padx=(0, 12))
 
         # Cycle label
         cycle_label = tk.Label(toolbar, text="Cycle:",
@@ -149,6 +155,7 @@ class TraceViewer(tk.Tk):
         self.bind("<Control-g>", lambda e: self._goto_cycle())
         self.bind("<Control-f>", lambda e: self._search())
         self.bind("<Control-o>", lambda e: self._open_file())
+        self.bind("<Control-r>", lambda e: self._reload_file())
         self.bind("<Escape>", lambda e: self._clear_highlight())
 
     # ------------------------------------------------------------------
@@ -186,6 +193,13 @@ class TraceViewer(tk.Tk):
         self.total_label.configure(text=f"/ {len(self.cycles) - 1}")
         self.title(f"Blimp Trace Viewer - {os.path.basename(path)}")
         self._update_display()
+
+    def _reload_file(self):
+        if self.trace_path:
+            saved_cycle = self.current_cycle
+            self._load_file(self.trace_path)
+            self._go_to(saved_cycle)
+            self.status_bar.configure(text=f"Reloaded {os.path.basename(self.trace_path)}")
 
     # ------------------------------------------------------------------
     # Navigation

@@ -67,9 +67,11 @@ module FetchUnitL5
                                           $clog2(p_num_fe_lanes) : 1;
 
   logic [31:0] target_base_bm;
-  assign target_base_bm = {{(32-$clog2(p_num_fe_lanes)){1'b1}}, {$clog2(p_num_fe_lanes){1'b0}}} << 2;
+  assign target_base_bm = {{(32-$clog2(p_num_fe_lanes)){1'b1}}, 
+                           {$clog2(p_num_fe_lanes){1'b0}}} << 2;
   logic [31:0] target_offset_bm;
-  assign target_offset_bm = {{(32-$clog2(p_num_fe_lanes)){1'b0}}, {$clog2(p_num_fe_lanes){1'b1}}};
+  assign target_offset_bm = {{(32-$clog2(p_num_fe_lanes)){1'b0}}, 
+                             {$clog2(p_num_fe_lanes){1'b1}}};
 
   //----------------------------------------------------------------------
   // D Interface Signal Arrays
@@ -225,7 +227,8 @@ module FetchUnitL5
       mem_req_addr = curr_fetch_block_base;
   end
 
-  assign mem.req_val        = (num_in_flight + num_to_squash < p_max_in_flight);
+  assign mem.req_val        = squash.val | 
+                              (num_in_flight + num_to_squash < p_max_in_flight);
   assign mem.req_msg.op     = MEM_MSG_READ;
   assign mem.req_msg.opaque = '0;
   assign mem.req_msg.addr   = mem_req_addr;

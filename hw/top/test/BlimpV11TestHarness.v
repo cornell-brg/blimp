@@ -25,7 +25,10 @@ module BlimpV11TestHarness #(
   parameter p_iq_depth      = 4,
 
   parameter p_mem_send_intv_delay = 1,
-  parameter p_mem_recv_intv_delay = 1
+  parameter p_mem_recv_intv_delay = 1,
+  parameter p_f_intf_fifo_bypass = 0,
+  parameter p_x_intf_fifo_bypass = 0,
+  parameter p_mem_d_intf_fifo_bypass = 0
 );
 
   //----------------------------------------------------------------------
@@ -66,7 +69,10 @@ module BlimpV11TestHarness #(
     .p_num_phys_regs (p_num_phys_regs),
     .p_num_be_lanes  (p_num_be_lanes),
     .p_num_fe_lanes  (p_num_fe_lanes),
-    .p_iq_depth      (p_iq_depth)
+    .p_iq_depth      (p_iq_depth),
+    .p_f_intf_fifo_bypass (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass (p_x_intf_fifo_bypass),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) dut (
     .inst_mem   (imem_intf),
     .data_mem   (dmem_intf),

@@ -96,7 +96,7 @@ module LoadStoreUnitL7 #(
 
   // verilator lint_on ENUMVALUE
 
-  logic d_fifo_full, d_fifo_empty;
+  logic d_fifo_full, d_fifo_empty, d_fifo_bypassing;
   logic d_fifo_push, d_fifo_pop;
 
   D_input D_curr;
@@ -106,14 +106,16 @@ module LoadStoreUnitL7 #(
     .p_depth      (p_d_intf_fifo_depth),
     .p_bypass     (p_d_intf_fifo_bypass)
   ) d_fifo (
-    .clk   (clk),
-    .rst   (rst),
-    .push  (d_fifo_push),
-    .pop   (d_fifo_pop),
-    .empty (d_fifo_empty),
-    .full  (d_fifo_full),
-    .wdata (fifo_in),
-    .rdata (D_curr)
+    .clk       (clk),
+    .rst       (rst),
+    .clear     (1'b0),
+    .push      (d_fifo_push),
+    .pop       (d_fifo_pop),
+    .empty     (d_fifo_empty),
+    .full      (d_fifo_full),
+    .bypassing (d_fifo_bypassing),
+    .wdata     (fifo_in),
+    .rdata     (D_curr)
   );
 
   logic      stage2_rdy;

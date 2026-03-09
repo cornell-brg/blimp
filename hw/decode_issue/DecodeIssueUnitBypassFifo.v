@@ -29,6 +29,7 @@ module DecodeIssueUnitBypassFifo
 )(
   input  logic clk,
   input  logic rst,
+  input  logic clear,
 
   //----------------------------------------------------------------------
   // Fetch Interface (push side)
@@ -53,8 +54,7 @@ module DecodeIssueUnitBypassFifo
   // Per-lane Edit Signals (head entry only)
   //----------------------------------------------------------------------
 
-  input  logic [p_num_lanes-1:0] edit_set_invalid,
-  input  logic [p_num_lanes-1:0] edit_set_dispatched
+  input  logic [1:0] edit_inst_state [p_num_lanes]
 );
 
   //----------------------------------------------------------------------
@@ -117,6 +117,7 @@ module DecodeIssueUnitBypassFifo
   //----------------------------------------------------------------------
 
   logic                         fifo_empty;
+  logic                         fifo_bypassing;
   logic [p_fifo_entry_bits-1:0] fifo_rdata;
 
   FifoBypass #(
@@ -124,32 +125,38 @@ module DecodeIssueUnitBypassFifo
     .p_depth      (p_depth),
     .p_bypass     (p_bypass)
   ) fifo (
-    .clk   (clk),
-    .rst   (rst),
-    .push  (fifo_push),
-    .pop   (pop),
-    .empty (fifo_empty),
-    .full  (fifo_full),
-    .wdata (fifo_wdata),
-    .rdata (fifo_rdata)
+    .clk       (clk),
+    .rst       (rst),
+    .clear     (clear),
+    .push      (fifo_push),
+    .pop       (pop),
+    .empty     (fifo_empty),
+    .full      (fifo_full),
+    .bypassing (fifo_bypassing),
+    .wdata     (fifo_wdata),
+    .rdata     (fifo_rdata)
   );
 
-  assign empty = fifo_empty;
+  assign empty = fifo_empty & ~fifo_bypassing;
 
   //----------------------------------------------------------------------
   // Shadow State
   //----------------------------------------------------------------------
 
-  logic [p_num_lanes-1:0] invalid_r;
-  logic [p_num_lanes-1:0] dispatched_r;
+  logic [1:0] inst_state_r [p_num_lanes];
 
   always_ff @( posedge clk ) begin
-    if ( rst || pop ) begin
-      invalid_r    <= '0;
-      dispatched_r <= '0;
+    if ( rst || pop || clear ) begin
+      for( int j = 0; j < p_num_lanes; j++ )
+        inst_state_r[j] <= INST_STATUS_READY;
     end else begin
-      invalid_r    <= invalid_r    | edit_set_invalid;
-      dispatched_r <= dispatched_r | edit_set_dispatched;
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        if( inst_state_r[j] == INST_STATUS_INVALID ||
+            edit_inst_state[j] == INST_STATUS_INVALID )
+          inst_state_r[j] <= INST_STATUS_INVALID;
+        else if( edit_inst_state[j] == INST_STATUS_DISPATCHED )
+          inst_state_r[j] <= INST_STATUS_DISPATCHED;
+      end
     end
   end
 
@@ -163,12 +170,11 @@ module DecodeIssueUnitBypassFifo
       lane = fifo_rdata[j*p_fifo_lane_bits +: p_fifo_lane_bits];
 
       o_msg[j]     = lane;
-      o_msg[j].val = !fifo_empty & lane.val & !invalid_r[j];
+      o_msg[j].val = (!fifo_empty | fifo_bypassing) & lane.val &
+                     (inst_state_r[j] != INST_STATUS_INVALID);
 
-      if( invalid_r[j] )
-        o_msg[j].inst_status = INST_STATUS_INVALID;
-      else if( dispatched_r[j] )
-        o_msg[j].inst_status = INST_STATUS_DISPATCHED;
+      if( inst_state_r[j] != INST_STATUS_READY )
+        o_msg[j].inst_status = inst_state_r[j];
     end
   end
 

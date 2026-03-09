@@ -23,10 +23,12 @@ module FifoBypass
   // Control/Status Signals
   //----------------------------------------------------------------------
 
+  input  logic clear,  // Synchronous clear: empties FIFO, allows same-cycle push
   input  logic push,
   input  logic pop,
   output logic empty,
   output logic full,
+  output logic bypassing,
 
   //----------------------------------------------------------------------
   // Data Signals
@@ -44,10 +46,18 @@ module FifoBypass
 
   logic [p_addr_bits:0] rptr, wptr;
 
+  // Raw pointer-based empty (no bypass consideration) used internally
+  // to drive bypass logic without combinational loops.
+  logic ptr_empty;
+  assign ptr_empty = ( wptr == rptr );
+
   // Bypass mux: show wdata on rdata when empty and pushing, independent
   // of pop to avoid combinational loops (pop may depend on rdata).
+  // Note: clear does not affect bypass_mux to avoid combinational loops.
+  // verilator lint_off UNOPTFLAT
   logic bypass_mux;
-  assign bypass_mux = p_bypass[0] & empty & push;
+  // verilator lint_on UNOPTFLAT
+  assign bypass_mux = p_bypass[0] & ptr_empty & push & ~rst;
 
   // Bypass enqueue suppression: when empty, pushing, and popping
   // simultaneously, don't actually store — data flows straight through.
@@ -62,19 +72,25 @@ module FifoBypass
     if( rst ) begin
       rptr <= '0;
       wptr <= '0;
+    end else if( clear ) begin
+      rptr <= '0;
+      wptr <= '0;
     end else begin
       if( do_push ) wptr <= wptr + {(p_addr_bits + 1){1'b1}};
       if( do_pop  ) rptr <= rptr + {(p_addr_bits + 1){1'b1}};
     end
   end
 
-  assign empty = ( wptr == rptr );
+  assign empty     = ptr_empty;
+  assign bypassing = bypass_mux;
+
   generate
-    if( p_depth == 1 )
+    if( p_depth == 1 ) begin : gen_full_depth_1
       assign full = ( wptr != rptr );
-    else
+    end else begin : gen_full_depth_gt_1
       assign full  = ( wptr[p_addr_bits-1:0] == rptr[p_addr_bits-1:0] )
                    & ( wptr[p_addr_bits]     != rptr[p_addr_bits]     );
+    end
   endgenerate
 
   //----------------------------------------------------------------------
@@ -84,7 +100,7 @@ module FifoBypass
   logic [p_entry_bits-1:0] arr_rdata;
 
   generate
-    if( p_depth == 1 ) begin
+    if( p_depth == 1 ) begin : gen_depth_1
       logic [p_entry_bits-1:0] arr;
 
       always @( posedge clk ) begin
@@ -96,13 +112,13 @@ module FifoBypass
       end
       assign arr_rdata = arr;
 
-    end else begin
+    end else begin : gen_depth_gt_1
       logic [p_entry_bits-1:0] arr [p_depth-1:0];
 
       always @( posedge clk ) begin
         if( rst ) begin
           arr <= '{default: '0};
-        end else if( do_push ) begin
+        end else if( do_push & ~clear ) begin
           arr[wptr[p_addr_bits-1:0]] <= wdata;
         end
       end

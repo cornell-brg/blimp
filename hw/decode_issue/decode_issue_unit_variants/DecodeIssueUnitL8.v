@@ -130,8 +130,7 @@ module DecodeIssueUnitL8 #(
 
   logic                      fifo_pop;
   logic                      fifo_empty;
-  logic [p_num_fe_lanes-1:0] fifo_set_invalid;
-  logic [p_num_fe_lanes-1:0] fifo_set_dispatched;
+  logic [1:0]                fifo_edit_inst_state [p_num_fe_lanes];
 
   t_diu_msg F_curr [p_num_fe_lanes];
 
@@ -143,20 +142,24 @@ module DecodeIssueUnitL8 #(
     .p_num_lanes    (p_num_fe_lanes)
   ) f_fifo (
     .clk                 (clk),
-    .rst                 (rst | squash_sub.val | squash_pub_val_comb),
+    .rst                 (rst | squash_sub.val),
+    .clear               (squash_pub_val_comb),
     .F                   (F),
     .pop                 (fifo_pop),
     .empty               (fifo_empty),
     .o_msg               (F_curr),
-    .edit_set_invalid    (fifo_set_invalid),
-    .edit_set_dispatched (fifo_set_dispatched)
+    .edit_inst_state     (fifo_edit_inst_state)
   );
 
   // Wire invalidation / dispatch decisions back to the FIFO.
   always_comb begin
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      fifo_set_invalid[j]    = invalidate_inst[j];
-      fifo_set_dispatched[j] = dispatch_go[j];
+      if( invalidate_inst[j] )
+        fifo_edit_inst_state[j] = INST_STATUS_INVALID;
+      else if( dispatch_go[j] )
+        fifo_edit_inst_state[j] = INST_STATUS_DISPATCHED;
+      else
+        fifo_edit_inst_state[j] = INST_STATUS_READY;
     end
   end
 

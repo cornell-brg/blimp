@@ -210,7 +210,7 @@ module IterativeMulDivRemL7 #(
 
   // verilator lint_on ENUMVALUE
 
-  logic fifo_full, fifo_empty;
+  logic fifo_full, fifo_empty, fifo_bypassing;
   logic fifo_push, fifo_pop;
   logic W_xfer;
 
@@ -225,14 +225,16 @@ module IterativeMulDivRemL7 #(
     .p_depth      (p_d_intf_fifo_depth),
     .p_bypass     (p_d_intf_fifo_bypass)
   ) d_fifo (
-    .clk   (clk),
-    .rst   (rst),
-    .push  (fifo_push),
-    .pop   (fifo_pop),
-    .empty (fifo_empty),
-    .full  (fifo_full),
-    .wdata (fifo_in),
-    .rdata (D_curr)
+    .clk       (clk),
+    .rst       (rst),
+    .clear     (1'b0),
+    .push      (fifo_push),
+    .pop       (fifo_pop),
+    .empty     (fifo_empty),
+    .full      (fifo_full),
+    .bypassing (fifo_bypassing),
+    .wdata     (fifo_in),
+    .rdata     (D_curr)
   );
 
   //----------------------------------------------------------------------

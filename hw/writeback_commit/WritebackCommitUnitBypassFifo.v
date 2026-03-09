@@ -65,6 +65,7 @@ module WritebackCommitUnitBypassFifo
 
   logic                    fifo_empty;
   logic                    fifo_full;
+  logic                    fifo_bypassing;
   logic [p_entry_bits-1:0] fifo_rdata;
 
   FifoBypass #(
@@ -72,14 +73,16 @@ module WritebackCommitUnitBypassFifo
     .p_depth      (p_depth),
     .p_bypass     (p_bypass)
   ) fifo (
-    .clk   (clk),
-    .rst   (rst),
-    .push  (push),
-    .pop   (pop),
-    .empty (fifo_empty),
-    .full  (fifo_full),
-    .wdata (fifo_wdata),
-    .rdata (fifo_rdata)
+    .clk       (clk),
+    .rst       (rst),
+    .clear     (1'b0),
+    .push      (push),
+    .pop       (pop),
+    .empty     (fifo_empty),
+    .full      (fifo_full),
+    .bypassing (fifo_bypassing),
+    .wdata     (fifo_wdata),
+    .rdata     (fifo_rdata)
   );
 
   assign empty = fifo_empty;
