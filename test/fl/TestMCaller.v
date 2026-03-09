@@ -76,7 +76,11 @@ module TestMCaller #(
   string test_trace;
   int trace_len;
   initial begin
+`ifdef VERILATOR
+    test_trace = $sformatf("%x:%x", call_msg, ret_msg);
+`else
     test_trace = $sformatf("%p:%p", call_msg, ret_msg);
+`endif
     trace_len = test_trace.len();
   end
 

@@ -1,7 +1,6 @@
 __pycache__
 build/
 _build/
-build_vcs/
-build_verilator/
+build_*/
 .vscode
 .DS_Store

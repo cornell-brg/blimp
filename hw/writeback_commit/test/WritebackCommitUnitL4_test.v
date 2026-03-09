@@ -348,7 +348,10 @@ endmodule
 //========================================================================
 
 module WritebackCommitUnitL4_test;
-  WritebackCommitUnitL4TestSuite #(1, 2) suite_1();
+  WritebackCommitUnitL4TestSuite #(1, 2)             suite_1();
+  WritebackCommitUnitL4TestSuite #(2, 2, 5, 6, 0, 2) suite_2();
+  WritebackCommitUnitL4TestSuite #(3, 4, 5, 6, 0, 3) suite_3();
+  WritebackCommitUnitL4TestSuite #(4, 6, 5, 6, 0, 4) suite_4();
 
   int s;
 
@@ -357,6 +360,9 @@ module WritebackCommitUnitL4_test;
     s = get_test_suite();
 
     if ((s <= 0) || (s == 1)) suite_1.run_test_suite();
+    if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
+    if ((s <= 0) || (s == 2)) suite_3.run_test_suite();
+    if ((s <= 0) || (s == 2)) suite_4.run_test_suite();
 
     test_bench_end();
   end

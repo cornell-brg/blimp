@@ -54,40 +54,13 @@ module MRRArbTestSuite #(
   );
 
   //----------------------------------------------------------------------
-  // Setup for code & functional coverage
+  // Setup for functional coverage
   //----------------------------------------------------------------------
 
-  `ifndef VERILATOR
-
-  MRRArbTestIntf #(
-    .p_width (p_width),
-    .p_max_m (p_max_m)
-  ) intf (
-    .clk (clk)
-  );
-
-  assign intf.rst      = rst;
-  assign intf.en       = dut_en;
-  assign intf.m        = dut_m;
-  assign intf.req      = dut_req;
-  assign intf.gnt      = dut_gnt;
-  assign intf.head_ptr = DUT.head_ptr;
-
   MRRArbCoverage #(
     .p_width (p_width),
     .p_max_m (p_max_m)
-  ) mrrarb_cov_obj;
-
-  initial begin
-    mrrarb_cov_obj = new( intf );
-  end
-
-  `else
-
-  MRRArbCoverage #(
-    .p_width (p_width),
-    .p_max_m (p_max_m)
-  ) Coverage (
+  ) func_coverage (
     .clk      (clk),
     .rst      (rst),
     .en       (dut_en),
@@ -96,8 +69,6 @@ module MRRArbTestSuite #(
     .gnt      (dut_gnt),
     .head_ptr (DUT.head_ptr)
   );
-
-  `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // check
@@ -122,20 +93,6 @@ module MRRArbTestSuite #(
       if ( t.verbose ) begin
         $display( "%3d: en=%b, m=%d, %b > %b", t.cycles,
                   dut_en, dut_m, dut_req, dut_gnt );
-        // // TODO: DEBUG
-        // for ( int i = 0; i < p_max_m; i++ ) begin
-        //   $display( "    gnt_ed[%0d]=%b", i, DUT.gnt_ed[i] );
-        // end
-        // for ( int i = 0; i < p_max_m; i++ ) begin
-        //   $display( "    gnt_th[%0d]=%b", i, DUT.gnt_th[i] );
-        // end
-        // for ( int i = 0; i < p_max_m; i++ ) begin
-        //   $display( "    gnt_th_p_1[%0d]=%b", i, DUT.gnt_th_p_1[i] );
-        // end
-        // for ( int i = 0; i < p_max_m; i++ ) begin
-        //   $display( "    gnt_th_p_2[%0d]=%b", i, DUT.gnt_th_p_2[i] );
-        // end
-        $display( "MAX_REQ: %d", $countones($unsigned((1 << p_width) - 1)) );
       end
 
       `CHECK_EQ( dut_gnt, gnt );

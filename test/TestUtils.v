@@ -278,18 +278,51 @@ endmodule
   end                                                           \
   if (1)
 
+// `define CHECK_EQ_SET( __dut, __refs, __refs_val )                                   \
+//   begin                                                                             \
+//     int match_found;                                                            \
+//     match_found = 0;                                                            \
+//     $display( "Checking for match on %s = %h", `"__dut`", __dut ); \
+//     $display( "DUT bitwidth is %0d", $bits(__dut) ); \
+//     foreach ( __refs[i] ) begin                                                     \
+//       $display( "Comparing DUT %s = %h for match on REF %s = %h", `"__dut`", __dut, `"__refs[i]`", __refs[i] ); \
+//       $display( "REFs[i] bitwidth is %0d", $bits(__refs[i]) ); \
+//       if ( __refs_val[i] && __refs[i] === __dut ) begin \
+//         $display( "Match found for %s = %h",  `"__dut`", __dut ); \
+//         match_found = 1;                                                            \
+//         break;                                                                      \
+//       end                                                                           \
+//     end                                                                             \
+//     $display( "Match is %b", match_found ); \
+//     if( match_found != 1 ) begin                                                    \
+//       if ( t.verbose )                                                              \
+//         $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%b)",                 \
+//                   `RED, `RESET, t.cycles, `"__dut`",                                \
+//                   `"__refs`", __dut );                                              \
+//       else                                                                          \
+//         $write( "%sF%s", `RED, `RESET );                                            \
+//       t.failed = 1;                                                                 \
+//       TestEnv::TestStatus::test_fail();                                             \
+//     end else begin                                                                  \
+//       $display( "Printing dot for %s = %h", `"__dut`", __dut ); \
+//       if ( !t.verbose )                                                             \
+//         $write( "%s.%s", `GREEN, `RESET );                                          \
+//     end                                                                             \
+//   end
+
 `define CHECK_EQ_SET( __dut, __refs, __refs_val )                                   \
   begin                                                                             \
-    int match_found = 0;                                                            \
+    int match_found;                                                                \
+    match_found = 0;                                                                \
     foreach ( __refs[i] ) begin                                                     \
       if ( __refs_val[i] && __refs[i] === ( __refs[i] ^ __dut ^ __refs[i] ) ) begin \
         match_found = 1;                                                            \
         break;                                                                      \
       end                                                                           \
     end                                                                             \
-    if( match_found == 0 ) begin                                                    \
+    if( match_found != 1 ) begin                                                    \
       if ( t.verbose )                                                              \
-        $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%b)",                 \
+        $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%h)",                 \
                   `RED, `RESET, t.cycles, `"__dut`",                                \
                   `"__refs`", __dut );                                              \
       else                                                                          \

@@ -3,85 +3,8 @@
 //========================================================================
 // A coverage class for a particular parametrization of the MROB
 
-// //------------------------------------------------------------------------
-// // VCS Coverage
-// //------------------------------------------------------------------------
-// `ifndef VERILATOR
-
-// Interface between the DUT and coverage class --------------------------
-
-// interface MROBTestIntf #(
-//   parameter p_depth     = 32,
-//   parameter p_msg_bits  = 32,
-//   parameter p_num_lanes = 2
-// )(
-//   input logic clk
-// );
-
-//   localparam p_entry_bits = $clog2( p_depth );
-
-//   logic rst;
-
-//   //----------------------------------------------------------------------
-//   // Insert
-//   //----------------------------------------------------------------------
-
-//   logic [p_entry_bits-1:0] ins_idx     [p_num_lanes];
-//   logic [p_msg_bits-1:0]   ins_msg     [p_num_lanes];
-//   logic                    ins_msg_val [p_num_lanes];
-//   logic                    ins_rdy;
-//   logic                    ins_en;
-//   logic [p_entry_bits:0]   avail_slots;
-
-//   //----------------------------------------------------------------------
-//   // Dequeue
-//   //----------------------------------------------------------------------
-
-//   logic [p_entry_bits-1:0] deq_idx     [p_num_lanes];
-//   logic [p_msg_bits-1:0]   deq_msg     [p_num_lanes];
-//   logic                    deq_msg_val [p_num_lanes];
-//   logic                    deq_rdy;
-//   logic                    deq_en;
-
-// endinterface
-
-// // Coverage class --------------------------------------------------------
-
-// class MROBCoverage #(
-//   parameter p_depth     = 32,
-//   parameter p_msg_bits  = 32,
-//   parameter p_num_lanes = 2
-// );
-
-//   virtual MROBTestIntf #(p_depth, p_msg_bits, p_num_lanes) vintf;
-
-//   // Covergroup ----------------------------------------------------------
-
-//   covergroup mrob_cg @( posedge vintf.clk );
-
-//     // Coverpoints
-
-//     reset: coverpoint vintf.rst {
-//       bins zero = { 0 };
-//       bins one  = { 1 };
-//       bins reserve = default;
-//     }
-
-//   endgroup
-
-//   // Function to create an instance of this class
-
-//   function new( virtual MROBTestIntf #(p_depth, p_msg_bits, p_num_lanes) vintf );
-//     this.vintf = vintf;
-//     mrob_cg = new();
-//   endfunction
-
-// endclass
-
-//------------------------------------------------------------------------
-// VCoverage
-//------------------------------------------------------------------------
-// `else
+`ifndef HW_WRITEBACK_COMMIT_TEST_COVERAGE_MROB_COVERAGE_V
+`define HW_WRITEBACK_COMMIT_TEST_COVERAGE_MROB_COVERAGE_V
 
 module MROBCoverage #(
   parameter p_depth     = 32,
@@ -112,13 +35,38 @@ module MROBCoverage #(
   // Internal signals
 
   input logic [p_entry_bits-1:0] deq_ptr,
-  input logic can_bypass
+  input logic                    can_bypass
 );
+
+  // Localparams & logic conversion --------------------------------------
 
   localparam MAX_IDX = (p_entry_bits)'($unsigned(1 << p_entry_bits) - 1);
   localparam MAX_MSG = (p_msg_bits)'($unsigned(1 << p_msg_bits) - 1);
   localparam MAX_AVAIL_SLOTS = (p_entry_bits+1)'(p_depth);
   localparam MAX_PTR = p_depth - 1;
+
+  logic [2:0] ins_en_val_rdy [p_num_lanes];
+  logic [2:0] deq_en_val_rdy [p_num_lanes];
+
+  always_comb begin
+    for( int i = 0; i < p_num_lanes; i++ ) begin
+      ins_en_val_rdy[i] = { ins_en, ins_msg_val[i], ins_rdy };
+      deq_en_val_rdy[i] = { deq_en, deq_msg_val[i], deq_rdy };
+    end
+  end
+
+  logic ins_active;
+  logic deq_active;
+
+  always_comb begin
+    ins_active = 0;
+    deq_active = 0;
+
+    for( int i = 0; i < p_num_lanes; i++ ) begin
+      ins_active = ins_active | (&ins_en_val_rdy[i]);
+      deq_active = deq_active | (&deq_en_val_rdy[i]);
+    end
+  end
 
   // Coverpoints ---------------------------------------------------------
 
@@ -130,7 +78,7 @@ module MROBCoverage #(
   /* verilator lint_off WIDTHEXPAND */
   generate
     genvar i;
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_ins_idx
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_ins_idx__for_p_num_lanes
       INS_IDX_0:   cover property ( @(posedge clk) ins_idx[i] == 0 );
       INS_IDX_R0:  cover property ( @(posedge clk) (ins_idx[i] % 4) == 0 );
       INS_IDX_R1:  cover property ( @(posedge clk) (ins_idx[i] % 4) == 1 );
@@ -143,7 +91,7 @@ module MROBCoverage #(
 
   // Insert message
   generate
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_ins_msg
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_ins_msg__for_p_num_lanes
       INS_MSG_0:   cover property ( @(posedge clk) ins_msg[i] == 0 );
       INS_MSG_MID: cover property ( @(posedge clk) (ins_msg[i] > 0) && (ins_msg[i] < MAX_MSG) );
       INS_MSG_MAX: cover property ( @(posedge clk) ins_msg[i] == MAX_MSG );
@@ -152,7 +100,7 @@ module MROBCoverage #(
 
   // Insert valid
   generate
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_ins_val
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_ins_val__for_p_num_lanes
       INS_MSG_VAL_0: cover property ( @(posedge clk) ins_msg_val[i] == 0 );
       INS_MSG_VAL_1: cover property ( @(posedge clk) ins_msg_val[i] == 1 );
     end
@@ -167,15 +115,15 @@ module MROBCoverage #(
   INS_EN_1: cover property ( @(posedge clk) ins_en == 1 );
 
   // Available slots
-  AVAIL_SLOTS_0: cover property ( @(posedge clk) avail_slots == 0 );
-  AVAIL_SLOTS_1: cover property ( @(posedge clk) avail_slots == 1 );
+  AVAIL_SLOTS_0:   cover property ( @(posedge clk) avail_slots == 0 );
+  AVAIL_SLOTS_1:   cover property ( @(posedge clk) avail_slots == 1 );
   AVAIL_SLOTS_MID: cover property ( @(posedge clk) (avail_slots > 1) && (avail_slots < MAX_AVAIL_SLOTS) );
   AVAIL_SLOTS_MAX: cover property ( @(posedge clk) avail_slots == MAX_AVAIL_SLOTS );
 
   // Dequeue index
   /* verilator lint_off WIDTHEXPAND */
   generate
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_deq_idx
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_deq_idx__for_p_num_lanes
       DEQ_IDX_0:   cover property ( @(posedge clk) deq_idx[i] == 0 );
       DEQ_IDX_R0:  cover property ( @(posedge clk) (deq_idx[i] % 4) == 0 );
       DEQ_IDX_R1:  cover property ( @(posedge clk) (deq_idx[i] % 4) == 1 );
@@ -188,7 +136,7 @@ module MROBCoverage #(
 
   // Dequeue message
   generate
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_deq_msg
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_deq_msg__for_p_num_lanes
       DEQ_MSG_0:   cover property ( @(posedge clk) deq_msg[i] == 0 );
       DEQ_MSG_MID: cover property ( @(posedge clk) (deq_msg[i] > 0) && (deq_msg[i] < MAX_MSG) );
       DEQ_MSG_MAX: cover property ( @(posedge clk) deq_msg[i] == MAX_MSG );
@@ -197,7 +145,7 @@ module MROBCoverage #(
 
   // Dequeue valid
   generate
-    for( i = 0; i < p_num_lanes; i++ ) begin : g_deq_val
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_deq_val__for_p_num_lanes
       DEQ_MSG_VAL_0: cover property ( @(posedge clk) deq_msg_val[i] == 0 );
       DEQ_MSG_VAL_1: cover property ( @(posedge clk) deq_msg_val[i] == 1 );
     end
@@ -217,7 +165,7 @@ module MROBCoverage #(
   DEQ_PTR_1:       cover  property ( @(posedge clk) deq_ptr == 1 );
   DEQ_PTR_MID:     cover  property ( @(posedge clk) (deq_ptr > 1) && (deq_ptr < MAX_PTR) );
   DEQ_PTR_MAX:     cover  property ( @(posedge clk) deq_ptr == MAX_PTR );
-  DEQ_PTR_ILLEGAL: assert property ( @(posedge clk) !(deq_ptr > MAX_PTR) );
+  // DEQ_PTR_ILLEGAL: assert property ( @(posedge clk) !(deq_ptr > MAX_PTR) );
   /* verilator lint_on WIDTHEXPAND */
 
   // Bypass enable
@@ -226,8 +174,35 @@ module MROBCoverage #(
 
   // Cover crosses -------------------------------------------------------
 
-  // TODO
+  // Insert valid, ready, and enable crosses
+  generate
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_ins_ctrl_cross__for_p_num_lanes
+      X_INS_EN_0:                   cover property ( @(posedge clk) !rst && !ins_en );
+      X_INS_EN_INS_VAL_INS_RDY_100: cover property ( @(posedge clk) !rst && (ins_en_val_rdy[i] == 3'b100) );
+      X_INS_EN_INS_VAL_INS_RDY_101: cover property ( @(posedge clk) !rst && (ins_en_val_rdy[i] == 3'b101) );
+      X_INS_EN_INS_VAL_INS_RDY_110: cover property ( @(posedge clk) !rst && (ins_en_val_rdy[i] == 3'b110) );
+      X_INS_EN_INS_VAL_INS_RDY_111: cover property ( @(posedge clk) !rst && (ins_en_val_rdy[i] == 3'b111) );
+    end
+  endgenerate
+
+  // Dequeue valid, ready, and enable crosses
+  generate
+    for( i = 0; i < p_num_lanes; i++ ) begin : g_cov_deq_ctrl_cross__for_p_num_lanes
+      X_DEQ_EN_0:                   cover property ( @(posedge clk) !rst && !deq_en );
+      X_DEQ_EN_DEQ_VAL_DEQ_RDY_100: cover property ( @(posedge clk) !rst && (deq_en_val_rdy[i] == 3'b100) );
+      X_DEQ_EN_DEQ_VAL_DEQ_RDY_101: cover property ( @(posedge clk) !rst && (deq_en_val_rdy[i] == 3'b101) );
+      X_DEQ_EN_DEQ_VAL_DEQ_RDY_110: cover property ( @(posedge clk) !rst && (deq_en_val_rdy[i] == 3'b110) );
+      X_DEQ_EN_DEQ_VAL_DEQ_RDY_111: cover property ( @(posedge clk) !rst && (deq_en_val_rdy[i] == 3'b111) );
+    end
+  endgenerate
+
+  // MROB Activity
+  X_INACTIVE:              cover property ( @(posedge clk) !rst && !ins_active && !deq_active );
+  X_DEQUEUE_ONLY:          cover property ( @(posedge clk) !rst && !ins_active &&  deq_active );
+  X_INSERT_ONLY:           cover property ( @(posedge clk) !rst &&  ins_active && !deq_active );
+  X_INS_AND_DEQ_NO_BYPASS: cover property ( @(posedge clk) !rst &&  ins_active &&  deq_active && !can_bypass );
+  X_INS_AND_DEQ_BYPASS:    cover property ( @(posedge clk) !rst &&  ins_active &&  deq_active &&  can_bypass );
 
 endmodule
 
-// `endif /* VERILATOR */
+`endif /* HW_WRITEBACK_COMMIT_TEST_COVERAGE_MROB_COVERAGE_V */

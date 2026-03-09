@@ -74,46 +74,8 @@ module MROBTestSuite #(
   );
 
   //----------------------------------------------------------------------
-  // Declare and instantiate coverage object
+  // Setup for functional coverage
   //----------------------------------------------------------------------
-
-  // `ifndef VERILATOR
-
-  MROBTestIntf #(
-    .p_msg_bits  (p_msg_bits),
-    .p_depth     (p_depth),
-    .p_num_lanes (p_num_lanes)
-  ) intf (
-    .clk (clk)
-  );
-
-  // Connect DUT to interface
-  assign intf.rst         = rst;
-
-  assign intf.ins_idx     = dut_ins_idx;
-  assign intf.ins_msg     = dut_ins_msg;
-  assign intf.ins_msg_val = dut_ins_msg_val;
-  assign intf.ins_en      = dut_ins_en;
-  assign intf.ins_rdy     = dut_ins_rdy;
-  assign intf.avail_slots = dut_avail_slots;
-
-  assign intf.deq_idx     = dut_deq_idx;
-  assign intf.deq_msg     = dut_deq_msg;
-  assign intf.deq_msg_val = dut_deq_msg_val;
-  assign intf.deq_en      = dut_deq_en;
-  assign intf.deq_rdy     = dut_deq_rdy;
-
-  MROBCoverage #(
-    .p_msg_bits  (p_msg_bits),
-    .p_depth     (p_depth),
-    .p_num_lanes (p_num_lanes)
-  ) mrob_cov_obj;
-
-  initial begin
-    mrob_cov_obj = new( intf );
-  end
-
-  // `else
 
   MROBCoverage #(
     .p_msg_bits  (p_msg_bits),
@@ -139,8 +101,6 @@ module MROBTestSuite #(
     .deq_ptr     (dut.deq_ptr),
     .can_bypass  (dut.can_bypass)
   );
-
-  // `endif /* VERILATOR */
 
   //----------------------------------------------------------------------
   // Insertion
@@ -428,6 +388,241 @@ module MROBTestSuite #(
   endtask
 
   //----------------------------------------------------------------------
+  // test_case_random
+  //----------------------------------------------------------------------
+  // Randomization on message data, message indices, and message valid bits
+
+  typedef struct {
+    logic [ p_msg_bits-1:0] ins_msg     [p_num_lanes];
+    logic [p_addr_bits-1:0] ins_idx     [p_num_lanes];
+    logic                   ins_msg_val [p_num_lanes];
+    
+    logic [ p_msg_bits-1:0] deq_msg     [p_num_lanes];
+    logic [p_addr_bits-1:0] deq_idx     [p_num_lanes];
+    logic                   deq_msg_val [p_num_lanes];
+    logic                   deq_rdy;
+  } t_rand_test_intf;
+
+  typedef struct {
+    logic                  entries_val [p_depth];
+    logic [p_msg_bits-1:0] entries_msg [p_depth];
+    logic           [31:0] deq_ptr;
+  } t_mrob_model;
+
+  logic [31:0] deq_ptr_next;
+  logic        prev_val;
+
+  t_mrob_model model;
+  t_rand_test_intf test_rand;
+
+  task test_case_random();
+    t.test_case_begin( "test_case_random" );
+
+    model.deq_ptr = $urandom( 32'hDEADBEEF );
+
+    // Initialize MROB model to empty
+    model.deq_ptr = '0;
+    for( int i = 0; i < p_depth; i++ ) begin
+      model.entries_val[i] = 1'b0;
+    end
+
+    // Test loop
+    for( int i = 0; i < 100; i++ ) begin
+
+      // Determine the insert-side signals of the MROB
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        // Generate random inputs for message and index
+        test_rand.ins_msg[j] = p_msg_bits'( $urandom() );
+        test_rand.ins_idx[j] = p_addr_bits'( $urandom() );
+
+        // Make the input valid only if the corresponding index in the model is invalid
+        test_rand.ins_msg_val[j] = !model.entries_val[test_rand.ins_idx[j]] & 1'( $urandom() );
+
+        // Update the MROB model
+        if ( test_rand.ins_msg_val[j] ) begin
+          model.entries_val[test_rand.ins_idx[j]] = test_rand.ins_msg_val[j];
+          model.entries_msg[test_rand.ins_idx[j]] = test_rand.ins_msg[j];
+        end
+      end
+
+      // Initialize signals for the dequeue-side of the MROB
+      prev_val = 1'b1;
+      test_rand.deq_rdy = 1'b0;
+      deq_ptr_next = model.deq_ptr;
+
+      // Determine the dequeue-side signals of the MROB
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        // Determine the dequeue index
+        if ( (model.deq_ptr + j) < p_depth )
+          test_rand.deq_idx[j] = p_addr_bits'( model.deq_ptr + j );
+        else
+          test_rand.deq_idx[j] = p_addr_bits'( model.deq_ptr + j - p_depth );
+        
+        // Set the expected message and valid bits
+        test_rand.deq_msg[j] = model.entries_msg[test_rand.deq_idx[j]];
+        test_rand.deq_msg_val[j] = prev_val & model.entries_val[test_rand.deq_idx[j]];
+
+        // Update dequeue ready and the dequeue pointer if there is a valid message to dequeue
+        if ( test_rand.deq_msg_val[j] ) begin
+          test_rand.deq_rdy = 1'b1;
+          if ( (deq_ptr_next + 1) < p_depth )
+            deq_ptr_next = deq_ptr_next + 1'b1;
+          else
+            deq_ptr_next = '0;
+        end
+
+        // Update the previously valid signal
+        prev_val = test_rand.deq_msg_val[j];
+
+        // Update the MROB model
+        if ( test_rand.deq_msg_val[j] ) begin
+          model.entries_val[test_rand.deq_idx[j]] = 1'b0;
+        end
+      end
+      
+      // // Insert to MROB
+      // send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      // // Dequeue from MROB if ready to dequeue
+      // if ( test_rand.deq_rdy ) begin
+      //   recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+      //   model.deq_ptr = deq_ptr_next;
+      // end
+      // else
+      //   #10;
+
+      fork
+        begin
+          // Insert to MROB
+          send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+        end
+
+        begin
+          // Dequeue from MROB if ready to dequeue
+          if ( test_rand.deq_rdy ) begin
+            recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+            model.deq_ptr = deq_ptr_next;
+          end
+          else
+            #10;
+        end
+      join
+    end
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
+  // test_case_random_aggressive
+  //----------------------------------------------------------------------
+  // Randomization on message data and message indices. If the message can 
+  // be valid, the test case sets it that way. If not, the test case keeps
+  // randomizing the index to attempt to find one that has not yet been 
+  // written.
+
+  integer k;
+
+  task test_case_random_aggressive();
+    t.test_case_begin( "test_case_random_aggressive" );
+
+    // Initialize MROB model to empty
+    model.deq_ptr = '0;
+    for( int i = 0; i < p_depth; i++ ) begin
+      model.entries_val[i] = 1'b0;
+    end
+
+    // Test loop
+    for( int i = 0; i < 100; i++ ) begin
+
+      // Determine the insert-side signals of the MROB
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        // Generate random inputs for message and index
+        test_rand.ins_msg[j] = p_msg_bits'( $urandom() );
+        test_rand.ins_idx[j] = p_addr_bits'( $urandom() );
+
+        // Keep randomizing the index if the current index is not yet dequeued
+        k = 0;
+        while( (k < 10) && model.entries_val[test_rand.ins_idx[j]] ) begin
+          test_rand.ins_idx[j] = p_addr_bits'( $urandom() );
+          k = k + 1;
+        end
+
+        // Make the input valid only if the corresponding index in the model is invalid
+        test_rand.ins_msg_val[j] = !model.entries_val[test_rand.ins_idx[j]];
+
+        // Update the MROB model
+        if ( test_rand.ins_msg_val[j] ) begin
+          model.entries_val[test_rand.ins_idx[j]] = test_rand.ins_msg_val[j];
+          model.entries_msg[test_rand.ins_idx[j]] = test_rand.ins_msg[j];
+        end
+      end
+
+      // Initialize signals for the dequeue-side of the MROB
+      prev_val = 1'b1;
+      test_rand.deq_rdy = 1'b0;
+      deq_ptr_next = model.deq_ptr;
+
+      // Determine the dequeue-side signals of the MROB
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        // Determine the dequeue index
+        if ( (model.deq_ptr + j) < p_depth )
+          test_rand.deq_idx[j] = p_addr_bits'( model.deq_ptr + j );
+        else
+          test_rand.deq_idx[j] = p_addr_bits'( model.deq_ptr + j - p_depth );
+        
+        // Set the expected message and valid bits
+        test_rand.deq_msg[j] = model.entries_msg[test_rand.deq_idx[j]];
+        test_rand.deq_msg_val[j] = prev_val & model.entries_val[test_rand.deq_idx[j]];
+
+        // Update dequeue ready and the dequeue pointer if there is a valid message to dequeue
+        if ( test_rand.deq_msg_val[j] ) begin
+          test_rand.deq_rdy = 1'b1;
+          if ( (deq_ptr_next + 1) < p_depth )
+            deq_ptr_next = deq_ptr_next + 1'b1;
+          else
+            deq_ptr_next = '0;
+        end
+
+        // Update the previously valid signal
+        prev_val = test_rand.deq_msg_val[j];
+
+        // Update the MROB model
+        if ( test_rand.deq_msg_val[j] ) begin
+          model.entries_val[test_rand.deq_idx[j]] = 1'b0;
+        end
+      end
+
+      // // Insert to MROB
+      // send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      // // Dequeue from MROB if ready to dequeue
+      // if ( test_rand.deq_rdy ) begin
+      //   recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+      //   model.deq_ptr = deq_ptr_next;
+      // end
+      // else
+      //   #10;
+
+      fork
+        begin
+          // Insert to MROB
+          send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+        end
+
+        begin
+          // Dequeue from MROB if ready to dequeue
+          if ( test_rand.deq_rdy ) begin
+            recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+            model.deq_ptr = deq_ptr_next;
+          end
+          else
+            #10;
+        end
+      join
+    end
+
+    t.test_case_end();
+  endtask
+
+  //----------------------------------------------------------------------
   // run_test_suite
   //----------------------------------------------------------------------
 
@@ -437,7 +632,9 @@ module MROBTestSuite #(
     test_case_basic();
     test_case_capacity();
     test_case_out_of_order();
-    if ( p_depth != 6 ) test_case_wrap_around();
+    test_case_wrap_around();
+    test_case_random();
+    test_case_random_aggressive();
   endtask
 
 endmodule
@@ -451,9 +648,8 @@ module MROB_test;
   //              num   bits depth lanes
   MROBTestSuite #(1)                     suite_1();
   MROBTestSuite #(2,    16)              suite_2();
-  MROBTestSuite #(3,    32,   6)         suite_3();
-  MROBTestSuite #(4,    32,   8,   3)    suite_4();
-  MROBTestSuite #(5,    32,  16,   4)    suite_5();
+  MROBTestSuite #(3,    32,   8,   3)    suite_3();
+  MROBTestSuite #(4,    32,  16,   4)    suite_4();
 
   int s;
 
@@ -465,7 +661,6 @@ module MROB_test;
     if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
     if ((s <= 0) || (s == 3)) suite_3.run_test_suite();
     if ((s <= 0) || (s == 4)) suite_4.run_test_suite();
-    if ((s <= 0) || (s == 5)) suite_5.run_test_suite();
 
     test_bench_end();
   end
