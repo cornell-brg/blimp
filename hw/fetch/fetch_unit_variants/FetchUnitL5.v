@@ -55,11 +55,16 @@ module FetchUnitL5
   // Local Parameters
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  localparam p_rst_addr     = 32'h200;
-  localparam p_seq_num_bits = D[0].p_seq_num_bits;
+  localparam       p_rst_addr          = 32'h200;
 
-  localparam p_flight_bits  = $clog2(p_max_in_flight) + 1;
-  localparam p_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
+  localparam [1:0] INST_STATUS_INVALID = 2'b00,
+                   INST_STATUS_READY   = 2'b01;
+
+  localparam       p_seq_num_bits      = D[0].p_seq_num_bits;
+       
+  localparam       p_flight_bits       = $clog2(p_max_in_flight) + 1;
+  localparam       p_lane_idx_bits     = p_num_fe_lanes > 1 ? 
+                                          $clog2(p_num_fe_lanes) : 1;
 
   logic [31:0] target_base_bm;
   assign target_base_bm = {{(32-$clog2(p_num_fe_lanes)){1'b1}}, {$clog2(p_num_fe_lanes){1'b0}}} << 2;
@@ -77,7 +82,7 @@ module FetchUnitL5
   logic               [31:0] D_inst       [p_num_fe_lanes];
   logic               [31:0] D_pc         [p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] D_seq_num    [p_num_fe_lanes];
-  logic                      D_inst_valid [p_num_fe_lanes];
+  logic                [1:0] D_inst_status [p_num_fe_lanes];
 
   // D interface signals (driven by external)
   logic                      D_rdy     [p_num_fe_lanes];
@@ -85,11 +90,11 @@ module FetchUnitL5
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: D_INTF_CONNECT
       // Outputs to D interface
-      assign D[i].val        = D_val[i];
-      assign D[i].inst       = D_inst[i];
-      assign D[i].pc         = D_pc[i];
-      assign D[i].seq_num    = D_seq_num[i];
-      assign D[i].inst_valid = D_inst_valid[i];
+      assign D[i].val         = D_val[i];
+      assign D[i].inst        = D_inst[i];
+      assign D[i].pc          = D_pc[i];
+      assign D[i].seq_num     = D_seq_num[i];
+      assign D[i].inst_status = D_inst_status[i];
 
       // Inputs from D interface
       assign D_rdy[i] = D[i].rdy;
@@ -290,8 +295,9 @@ module FetchUnitL5
 
       always_comb begin
         if( (needs_squash_restart & !should_drop) ) begin
-          D_inst_valid[i] = mem.resp_val & (i >= squash_restart_offset);
-          alloc_rdy[i]    = mem.resp_val & D_rdy[i] & (i >= squash_restart_offset);
+          D_inst_status[i] = (mem.resp_val & (i >= squash_restart_offset))
+                             ? INST_STATUS_READY : INST_STATUS_INVALID;
+          alloc_rdy[i]     = mem.resp_val & D_rdy[i] & (i >= squash_restart_offset);
           /* verilator lint_off CMPCONST */
           if( p_lane_idx_bits'(i) >= squash_restart_offset )
             D_val[i]        = mem.resp_val & alloc_ok[i];
@@ -299,9 +305,10 @@ module FetchUnitL5
             D_val[i]        = mem.resp_val;
           /* verilator lint_on CMPCONST */
         end else begin
-          D_inst_valid[i] = mem.resp_val & !should_drop;
-          alloc_rdy[i]    = mem.resp_val & D_rdy[i] & !should_drop;
-          D_val[i]        = mem.resp_val & alloc_ok[i] & !should_drop;
+          D_inst_status[i] = (mem.resp_val & !should_drop)
+                             ? INST_STATUS_READY : INST_STATUS_INVALID;
+          alloc_rdy[i]     = mem.resp_val & D_rdy[i] & !should_drop;
+          D_val[i]         = mem.resp_val & alloc_ok[i] & !should_drop;
         end
       end
 

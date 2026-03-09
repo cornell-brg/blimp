@@ -55,6 +55,9 @@ module FetchUnitL5TestSuite #(
   // Instantiate design under test
   //----------------------------------------------------------------------
 
+  localparam [1:0] INST_STATUS_INVALID = 2'b00,
+                   INST_STATUS_READY   = 2'b01;
+
   MemIntf #(
     .p_opaq_bits (p_opaq_bits),
     .p_num_words (p_num_fe_lanes)
@@ -109,18 +112,18 @@ module FetchUnitL5TestSuite #(
     logic               [31:0] inst;
     logic               [31:0] pc;
     logic [p_seq_num_bits-1:0] seq_num;
-    logic                      inst_valid;
+    logic                [1:0] inst_status;
   } t_f__d_msg;
 
   t_f__d_msg f__d_msg [p_num_fe_lanes];
 
   genvar i;
   generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin : F__D_OSTREAMS  
-      assign f__d_msg[i].inst       = F__D_intf[i].inst;
-      assign f__d_msg[i].pc         = F__D_intf[i].pc;
-      assign f__d_msg[i].seq_num    = F__D_intf[i].seq_num;
-      assign f__d_msg[i].inst_valid = F__D_intf[i].inst_valid;
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin : F__D_OSTREAMS
+      assign f__d_msg[i].inst        = F__D_intf[i].inst;
+      assign f__d_msg[i].pc          = F__D_intf[i].pc;
+      assign f__d_msg[i].seq_num     = F__D_intf[i].seq_num;
+      assign f__d_msg[i].inst_status = F__D_intf[i].inst_status;
     end
   endgenerate
 
@@ -165,17 +168,17 @@ module FetchUnitL5TestSuite #(
     input logic               [31:0] inst       [p_num_fe_lanes],
     input logic               [31:0] pc         [p_num_fe_lanes],
     input logic [p_seq_num_bits-1:0] seq_num    [p_num_fe_lanes],
-    input logic                      inst_valid [p_num_fe_lanes],
-    input logic                      valid      [p_num_fe_lanes]
+    input logic                [1:0] inst_status [p_num_fe_lanes],
+    input logic                      valid       [p_num_fe_lanes]
   );
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
       automatic int jj = j;
       fork
         begin
-          pipe_msg[jj].inst       = inst[jj];
-          pipe_msg[jj].pc         = pc[jj];
-          pipe_msg[jj].seq_num    = seq_num[jj];
-          pipe_msg[jj].inst_valid = inst_valid[jj];
+          pipe_msg[jj].inst        = inst[jj];
+          pipe_msg[jj].pc          = pc[jj];
+          pipe_msg[jj].seq_num     = seq_num[jj];
+          pipe_msg[jj].inst_status = inst_status[jj];
           msgs_to_recv[jj]        = pipe_msg[jj];
           msgs_to_recv_val[jj]    = valid[jj];
           while(msgs_to_recv_val[jj])

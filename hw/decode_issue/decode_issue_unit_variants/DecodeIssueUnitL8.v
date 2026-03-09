@@ -58,10 +58,10 @@ module DecodeIssueUnitL8 #(
   input logic rst,
 
   // Fetch -> Decode interface
-  F__DIntf.D_intf   F          [p_num_fe_lanes],
+  F__DIntf.D_intf    F          [p_num_fe_lanes],
 
   // Decode -> Execute interface
-  D__XIntf.D_intf   Ex         [p_num_pipes],
+  D__XIntf.D_intf    Ex         [p_num_pipes],
 
   // Completion notification
   CompleteNotif.sub  complete   [p_num_be_lanes],
@@ -82,11 +82,14 @@ module DecodeIssueUnitL8 #(
   // Decode-issue message struct (accumulated through the pipeline)
   //----------------------------------------------------------------------
 
+  localparam [1:0] INST_STATUS_INVALID    = 2'b00,
+                   INST_STATUS_READY      = 2'b01,
+                   INST_STATUS_DISPATCHED = 2'b10;
+
   typedef struct packed {
     logic                        val;
     logic                 [31:0] inst;
-    logic                        inst_valid;
-    logic                        dispatched;
+    logic                  [1:0] inst_status;
     logic                 [31:0] pc;
     logic   [p_seq_num_bits-1:0] seq_num;
     rv_uop                       uop;
@@ -167,7 +170,7 @@ module DecodeIssueUnitL8 #(
       F_rdy_all &= (
         !inst_chk_s1_pass[j] |
         dispatch_go[j]       |
-        F_curr[j].dispatched
+        (F_curr[j].inst_status == INST_STATUS_DISPATCHED)
       );
     end
   end
@@ -244,7 +247,8 @@ module DecodeIssueUnitL8 #(
       logic is_brx, is_jal, is_valid;
       is_brx   = in_subset(p_brx_subset, num_ops'(1 << decoder_uop[k]));
       is_jal   = (decoder_jal[k] != 2'd0);
-      is_valid = inst_chk_s1_pass[k] && !F_curr[k].dispatched;
+      is_valid = inst_chk_s1_pass[k] && 
+        (F_curr[k].inst_status != INST_STATUS_DISPATCHED);
 
       if( (is_brx || is_jal) && is_valid &&
           (!oldest_ctrl_inst_found ||
@@ -297,12 +301,13 @@ module DecodeIssueUnitL8 #(
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S1_GEN
       assign inst_chk_s1[i].prev_stage_pass = 1'b1;
       assign inst_chk_s1[i].prev_inst_pass  = 1'b1;
-      assign inst_chk_s1[i].inst_valid      = F_curr[i].inst_valid;
+      assign inst_chk_s1[i].inst_valid      = 
+        (F_curr[i].inst_status != INST_STATUS_INVALID);
 
       InstCheckS1 check_s1 (
         .chk_intf       (inst_chk_s1[i]),
         .entry_val      (F_curr[i].val),
-        .entry_inst_val (F_curr[i].inst_valid),
+        .entry_inst_val (F_curr[i].inst_status != INST_STATUS_INVALID),
         .decoder_val    (decoder_val[i])
       );
 
@@ -318,7 +323,8 @@ module DecodeIssueUnitL8 #(
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S2_GEN
       assign inst_chk_s2[i].prev_stage_pass = inst_chk_s1[i].pass;
       assign inst_chk_s2[i].prev_inst_pass  = 1'b1;
-      assign inst_chk_s2[i].inst_valid      = F_curr[i].inst_valid;
+      assign inst_chk_s2[i].inst_valid      = 
+        (F_curr[i].inst_status != INST_STATUS_INVALID);
 
       InstCheckS2 #(
         .inst_idx       (i),
@@ -344,13 +350,13 @@ module DecodeIssueUnitL8 #(
       assign inst_chk_s3[i].prev_stage_pass = inst_chk_s2[i].pass;
       assign inst_chk_s3[i].prev_inst_pass  = (i == 0) ? 1'b1 :
                                                inst_chk_s3[i-1].prev_inst_pass_out;
-      assign inst_chk_s3[i].inst_valid      = F_curr[i].inst_valid;
+      assign inst_chk_s3[i].inst_valid      = (F_curr[i].inst_status != INST_STATUS_INVALID);
 
       InstCheckS3 check_s3 (
         .chk_intf    (inst_chk_s3[i]),
         .decoder_wen (decoder_wen[i]),
         .alloc_rdy   (alloc_rdy[i]),
-        .dispatched  (F_curr[i].dispatched)
+        .dispatched  (F_curr[i].inst_status == INST_STATUS_DISPATCHED)
       );
     end
   endgenerate
@@ -367,12 +373,13 @@ module DecodeIssueUnitL8 #(
       assign inst_chk_s4[i].prev_stage_pass = inst_chk_s3[i].pass;
       assign inst_chk_s4[i].prev_inst_pass  = (i == 0) ? 1'b1 :
                                                inst_chk_s4[i-1].prev_inst_pass_out;
-      assign inst_chk_s4[i].inst_valid      = F_curr[i].inst_valid;
+      assign inst_chk_s4[i].inst_valid      = (F_curr[i].inst_status != INST_STATUS_INVALID);
 
       InstCheckS4 check_s4 (
         .chk_intf             (inst_chk_s4[i]),
-        .dispatched           (F_curr[i].dispatched),
-        .prev_inst_dispatched (i == 0 ? 1'b1 : F_curr[i-1].dispatched),
+        .dispatched           (F_curr[i].inst_status == INST_STATUS_DISPATCHED),
+        .prev_inst_dispatched (i == 0 ? 1'b1 :
+                               (F_curr[i-1].inst_status == INST_STATUS_DISPATCHED)),
         .lane_val             (lane_val[i])
       );
 
@@ -414,7 +421,8 @@ module DecodeIssueUnitL8 #(
       lookup_new_inst_areg[k][1] = decoder_raddr1[k];
       lookup_new_inst_en[k][0]   = 1'b1;
       lookup_new_inst_en[k][1]   = 1'b1;
-      alloc_try[k] = inst_chk_s1_pass[k] & !F_curr[k].dispatched;
+      alloc_try[k] = inst_chk_s1_pass[k] & 
+        (F_curr[k].inst_status != INST_STATUS_DISPATCHED);
     end
   end
 
@@ -509,9 +517,9 @@ module DecodeIssueUnitL8 #(
     if( !oldest_ctrl_inst_is_brx ) begin
       case( decoder_jal[oldest_ctrl_inst_idx] )
         2'd1:    jump_target = F_curr[oldest_ctrl_inst_idx].pc
-                              + imm[oldest_ctrl_inst_idx];              // JAL
+                              + imm[oldest_ctrl_inst_idx];
         2'd2:    jump_target = (jump_base + imm[oldest_ctrl_inst_idx])
-                              & 32'hFFFFFFFE;                           // JALR
+                              & 32'hFFFFFFFE;
         default: jump_target = '0;
       endcase
     end else begin
@@ -566,7 +574,8 @@ module DecodeIssueUnitL8 #(
 
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      router_val[i]                = inst_chk_s1_pass[i] && !F_curr[i].dispatched;
+      router_val[i]                = inst_chk_s1_pass[i] && 
+        (F_curr[i].inst_status != INST_STATUS_DISPATCHED);
       router_in_msg[i]             = F_curr[i];
       router_in_msg[i].uop         = decoder_uop[i];
       router_in_msg[i].src_preg0   = lookup_new_inst_preg[i][0];
@@ -587,13 +596,12 @@ module DecodeIssueUnitL8 #(
   SSDIURouter #(
     .t_msg             (t_diu_msg),
     .p_num_pipes       (p_num_pipes),
-    .p_pipe_subsets    (p_pipe_subsets),
-    .p_ctrl_subset     (p_ctrl_subset),
     .p_num_input_lanes (p_num_fe_lanes),
     .p_iq_depth        (p_iq_depth),
     .p_seq_num_bits    (p_seq_num_bits),
     .p_num_iter        (p_num_fe_lanes),
-    .p_num_be_lanes    (p_num_be_lanes)
+    .p_num_be_lanes    (p_num_be_lanes),
+    .p_pipe_subsets    (p_pipe_subsets)
   ) inst_router (
     .clk            (clk),
     .rst            (rst),
@@ -692,9 +700,9 @@ module DecodeIssueUnitL8 #(
 
   function string trace_json_lane( int lane );
     if( !fifo_empty )
-      trace_json_lane = $sformatf("{\"seq\":\"%x\",\"inst\":\"%0s\",\"xfer\":\"%b\",\"dispatched\":\"%b\",\"inst_valid\":\"%b\"}",
+      trace_json_lane = $sformatf("{\"seq\":\"%x\",\"inst\":\"%0s\",\"xfer\":\"%b\",\"inst_status\":\"%b\"}",
         F_curr[lane].seq_num, disassemble(F_curr[lane].inst, F_curr[lane].pc),
-        dispatch_go[lane], F_curr[lane].dispatched, F_curr[lane].inst_valid);
+        dispatch_go[lane], F_curr[lane].inst_status);
     else
       trace_json_lane = "null";
   endfunction

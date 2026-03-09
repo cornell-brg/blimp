@@ -12,7 +12,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insts();
   logic               [31:0] send_pc         [p_num_fe_lanes];
   string                     send_assembly   [p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] send_seq_num    [p_num_fe_lanes];
-  logic                      send_inst_valid [p_num_fe_lanes];
+  logic                [1:0] send_inst_status [p_num_fe_lanes];
   logic                      send_valid      [p_num_fe_lanes];
 
   localparam p_num_recv_msgs = p_num_fe_lanes;
@@ -34,7 +34,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insts();
     send_pc[i]         = 'h200 + i*4;
     send_assembly[i]   = $sformatf("addi x%0d, x0, %0d", i+1, (i+1)*10);
     send_seq_num[i]    = p_seq_num_bits'(i);
-    send_inst_valid[i] = 1'b1;
+    send_inst_status[i] = INST_STATUS_READY;
     send_valid[i]      = 1'b1;
   end
 
@@ -57,7 +57,7 @@ task automatic test_case_1_fetch_block_no_ctrl_insts();
         send_pc,
         send_assembly,
         send_seq_num,
-        send_inst_valid,
+        send_inst_status,
         send_valid
       );
     end

@@ -54,12 +54,11 @@ class StageCard(tk.LabelFrame):
     def _pick_bg(self, data: dict) -> str:
         """Pick background color based on card state.
 
-        - Red tint for DIU lanes when dispatched=1 or inst_valid=0
+        - Red tint for DIU lanes when inst_status is not READY (01)
         """
         if self.section_def.key.startswith("diu_"):
-            dispatched = data.get("dispatched")
-            inst_valid = data.get("inst_valid")
-            if dispatched == "1" or inst_valid == "0":
+            inst_status = data.get("inst_status")
+            if inst_status is not None and inst_status != "01":
                 return COLORS["card_diu_alert"]
 
         return COLORS["card_active"]

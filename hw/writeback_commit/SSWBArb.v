@@ -120,7 +120,7 @@ module SSWBArb #(
     .p_num_outputs  (p_num_be_lanes),
     .p_seq_num_bits (p_seq_num_bits),
     .p_num_iter     (p_num_iter),
-    .p_accept_lsb   (1),
+    .p_accept_mode  (1),             // Lowest-index accept
     .p_slot_bits    (1)
   ) u_islip (
     .compat           (compat),

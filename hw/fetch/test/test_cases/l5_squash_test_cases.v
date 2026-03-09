@@ -15,7 +15,7 @@ task automatic test_case_1_squash_fetch_base_before();
   logic [31:0]               insts      [num_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [num_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [num_blocks][p_num_fe_lanes];
-  logic                      inst_valid [num_blocks][p_num_fe_lanes];
+  logic                [1:0] inst_status [num_blocks][p_num_fe_lanes];
   logic                      valid      [num_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -35,7 +35,7 @@ task automatic test_case_1_squash_fetch_base_before();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      inst_valid[block][i] = 1;
+      inst_status[block][i] = INST_STATUS_READY;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -50,7 +50,7 @@ task automatic test_case_1_squash_fetch_base_before();
       insts[block],
       pcs[block],
       seq_num[block],
-      inst_valid[block],
+      inst_status[block],
       valid[block]
     );
 
@@ -87,7 +87,7 @@ task automatic test_case_1_squash_fetch_base_before();
     insts[0],
     pcs[0],
     seq_num[0],
-    inst_valid[0],
+    inst_status[0],
     valid[0]
   );
 
@@ -106,7 +106,7 @@ task automatic test_case_2_squash_fetch_base_after();
   logic [31:0]               insts      [num_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [num_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [num_blocks][p_num_fe_lanes];
-  logic                      inst_valid [num_blocks][p_num_fe_lanes];
+  logic                [1:0] inst_status [num_blocks][p_num_fe_lanes];
   logic                      valid      [num_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -126,7 +126,7 @@ task automatic test_case_2_squash_fetch_base_after();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      inst_valid[block][i] = 1;
+      inst_status[block][i] = INST_STATUS_READY;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -140,7 +140,7 @@ task automatic test_case_2_squash_fetch_base_after();
     insts[0],
     pcs[0],
     seq_num[0],
-    inst_valid[0],
+    inst_status[0],
     valid[0]
   );
 
@@ -176,7 +176,7 @@ task automatic test_case_2_squash_fetch_base_after();
     insts[4],
     pcs[4],
     seq_num[4],
-    inst_valid[4],
+    inst_status[4],
     valid[4]
   );
 
@@ -195,7 +195,7 @@ task automatic test_case_3_squash_fetch_middle_before();
   logic [31:0]               insts      [num_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [num_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [num_blocks][p_num_fe_lanes];
-  logic                      inst_valid [num_blocks][p_num_fe_lanes];
+  logic                [1:0] inst_status [num_blocks][p_num_fe_lanes];
   logic                      valid      [num_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -215,7 +215,7 @@ task automatic test_case_3_squash_fetch_middle_before();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      inst_valid[block][i] = 1;
+      inst_status[block][i] = INST_STATUS_READY;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -229,7 +229,7 @@ task automatic test_case_3_squash_fetch_middle_before();
       insts[block],
       pcs[block],
       seq_num[block],
-      inst_valid[block],
+      inst_status[block],
       valid[block]
     );
 
@@ -257,7 +257,7 @@ task automatic test_case_3_squash_fetch_middle_before();
   // Squash to middle of first fetch block
   if (p_num_fe_lanes > 1) begin
     squash( 1, 'h204 );
-    inst_valid[0][0] = 0;
+    inst_status[0][0] = INST_STATUS_INVALID;
     for( int i = 1; i < p_num_fe_lanes; i = i + 1 ) begin
       seq_num[0][i] = p_seq_num_bits'(i + 1);
     end
@@ -272,7 +272,7 @@ task automatic test_case_3_squash_fetch_middle_before();
     insts[0],
     pcs[0],
     seq_num[0],
-    inst_valid[0],
+    inst_status[0],
     valid[0]
   );
 
@@ -291,7 +291,7 @@ task automatic test_case_4_squash_fetch_middle_after();
   logic [31:0]               insts      [num_blocks][p_num_fe_lanes];
   logic [31:0]               pcs        [num_blocks][p_num_fe_lanes];
   logic [p_seq_num_bits-1:0] seq_num    [num_blocks][p_num_fe_lanes];
-  logic                      inst_valid [num_blocks][p_num_fe_lanes];
+  logic                [1:0] inst_status [num_blocks][p_num_fe_lanes];
   logic                      valid      [num_blocks][p_num_fe_lanes];
 
   logic [p_seq_num_bits-1:0] seq_nums_to_free [p_num_be_lanes];
@@ -311,7 +311,7 @@ task automatic test_case_4_squash_fetch_middle_after();
       insts[block][i]      = 32'($urandom());
       pcs[block][i]        = 'h200 + (i << 2) + (block * p_num_fe_lanes * 4);
       seq_num[block][i]    = curr_sn;
-      inst_valid[block][i] = 1;
+      inst_status[block][i] = INST_STATUS_READY;
       valid[block][i]      = 1;
       fl_mem.init_mem( pcs[block][i], insts[block][i] );
 
@@ -325,7 +325,7 @@ task automatic test_case_4_squash_fetch_middle_after();
     insts[0],
     pcs[0],
     seq_num[0],
-    inst_valid[0],
+    inst_status[0],
     valid[0]
   );
 
@@ -352,7 +352,7 @@ task automatic test_case_4_squash_fetch_middle_after();
   // Squash to middle of fifth fetch block (ahead of current)
   if (p_num_fe_lanes > 1) begin
     squash( 1, 'h200 + (4 * p_num_fe_lanes * 4) + 4 );
-    inst_valid[4][0] = 0;
+    inst_status[4][0] = INST_STATUS_INVALID;
     seq_num[4][0]    = 0;
     for( int i = 1; i < p_num_fe_lanes; i = i + 1 ) begin
       seq_num[4][i] = p_seq_num_bits'(i + 1);
@@ -362,12 +362,12 @@ task automatic test_case_4_squash_fetch_middle_after();
     seq_num[4][0] = 1;
   end
 
-  // Check we fetch the fifth block with correct inst_valid and seq nums
+  // Check we fetch the fifth block with correct inst_status and seq nums
   recv_f__d_xfer(
     insts[4],
     pcs[4],
     seq_num[4],
-    inst_valid[4],
+    inst_status[4],
     valid[4]
   );
 
