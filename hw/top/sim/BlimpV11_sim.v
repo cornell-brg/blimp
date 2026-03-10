@@ -24,6 +24,14 @@ module BlimpV11_sim;
   localparam p_f_intf_fifo_bypass     = 0;
   localparam p_x_intf_fifo_bypass     = 0;
   localparam p_mem_d_intf_fifo_bypass = 0;
+  localparam p_num_pipes              = 8; // change manually - for delays
+
+  // Simulation-only backpressure: 8 bits per lane/pipe (stall 1/N; 0 = off)
+  //                                        lane3  lane2  lane1  lane0
+  localparam [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = {8'd0,  8'd0,  8'd0,  8'd0};
+  //                                        ctrl   mem    mul1   mul0   alu3   alu2   alu1   alu0
+  localparam [p_num_pipes*8-1:0]    p_sim_d2x_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
+  localparam [p_num_pipes*8-1:0]    p_sim_x2w_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
   
   //----------------------------------------------------------------------
   // Setup
@@ -58,15 +66,19 @@ module BlimpV11_sim;
   ) inst_trace_notif [p_num_be_lanes]();
 
   BlimpV11 #(
-    .p_opaq_bits     (p_opaq_bits),
-    .p_seq_num_bits  (p_seq_num_bits),
-    .p_num_phys_regs (p_num_phys_regs),
-    .p_num_fe_lanes  (p_num_fe_lanes),
-    .p_num_be_lanes  (p_num_be_lanes),
-    .p_iq_depth      (p_iq_depth),
-    .p_f_intf_fifo_bypass  (p_f_intf_fifo_bypass),
-    .p_x_intf_fifo_bypass  (p_x_intf_fifo_bypass),
-    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
+    .p_opaq_bits              (p_opaq_bits),
+    .p_seq_num_bits           (p_seq_num_bits),
+    .p_num_phys_regs          (p_num_phys_regs),
+    .p_num_fe_lanes           (p_num_fe_lanes),
+    .p_num_be_lanes           (p_num_be_lanes),
+    .p_iq_depth               (p_iq_depth),
+    .p_f_intf_fifo_bypass     (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_bypass     (p_x_intf_fifo_bypass),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass),
+    .p_sim_f2d_bp             (p_sim_f2d_bp),
+    .p_sim_d2x_bp             (p_sim_d2x_bp),
+    .p_sim_x2w_bp             (p_sim_x2w_bp),
+    .p_num_pipes              (p_num_pipes)
   ) dut (
     .inst_mem   (imem_intf),
     .data_mem   (dmem_intf),

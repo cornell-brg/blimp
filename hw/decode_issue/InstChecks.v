@@ -41,7 +41,9 @@ module InstCheckS1 #(
   InstChkIntf.out out_inter_chk,
 
   input logic entry_val,
-  input logic decoder_val
+  input logic decoder_val,
+
+  output logic alloc_try
 );
 
   localparam [1:0] INST_STATUS_INVALID    = 2'b00,
@@ -61,6 +63,10 @@ module InstCheckS1 #(
   assign out_inter_chk.pass        = 1'b1;
   assign out_inter_chk.invalidate  = 1'b0;
   assign out_inter_chk.inst_status = in_intra_chk.inst_status;
+
+  // Alloc try: instruction passed S1+S2 and has not already been dispatched
+  assign alloc_try = out_intra_chk.pass &&
+    out_intra_chk.inst_status != INST_STATUS_DISPATCHED;
 
 endmodule
 
@@ -90,9 +96,7 @@ module InstCheckS2 #(
   input logic                          oldest_ctrl_inst_srcs_ready,
   input logic                          oldest_ctrl_inst_dispatch_en,
 
-  input logic                          squash_sub_val,
-
-  output logic                         alloc_try
+  input logic                          squash_sub_val
 );
 
   localparam [1:0] INST_STATUS_INVALID    = 2'b00,
@@ -119,10 +123,6 @@ module InstCheckS2 #(
   assign out_inter_chk.pass        = 1'b1;
   assign out_inter_chk.invalidate  = 1'b0;
   assign out_inter_chk.inst_status = in_intra_chk.inst_status;
-
-  // Alloc try
-  assign alloc_try = in_intra_chk.pass && 
-    in_intra_chk.inst_status != INST_STATUS_DISPATCHED;
 
 endmodule
 

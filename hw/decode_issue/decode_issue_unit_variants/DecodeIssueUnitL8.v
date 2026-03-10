@@ -20,6 +20,7 @@
 `include "hw/decode_issue/SSDIURouter.v"
 `include "hw/decode_issue/SSRegfileL2.v"
 `include "hw/decode_issue/SSRenameTableL3.v"
+`include "hw/decode_issue/IssueQueueInOrder.v"
 `include "hw/decode_issue/IssueQueueOOO.v"
 `include "hw/util/SSSeqAge.v"
 `include "hw/decode_issue/DIUBypassFifo.v"
@@ -57,7 +58,14 @@ module DecodeIssueUnitL8 #(
 
   // Bitmask of which pipes use bypass IQs.  Default ('0) auto-computes
   // to bypass only for the control-subset pipe.
-  parameter logic [p_num_pipes-1:0] p_pipe_bypass = '0
+  parameter logic [p_num_pipes-1:0] p_pipe_bypass = '0,
+
+  // Memory subset — used to auto-detect which pipes are memory pipes
+  // and force them to use in-order issue queues.
+  parameter rv_op_vec p_mem_subset = '0,
+
+  // When set, all issue queues use in-order issue (no OOO selection).
+  parameter p_all_iq_in_order = 0
 ) (
   input logic clk,
   input logic rst,
@@ -92,6 +100,19 @@ module DecodeIssueUnitL8 #(
 
   localparam logic [p_num_pipes-1:0] c_pipe_bypass =
     (p_pipe_bypass != '0) ? p_pipe_bypass : ctrl_only_bypass();
+
+  // Compute which pipes are memory pipes (subset intersects p_mem_subset).
+  function automatic logic [p_num_pipes-1:0] compute_mem_pipes();
+    for (int i = 0; i < p_num_pipes; i++)
+      compute_mem_pipes[i] = |(p_pipe_subsets[i] & p_mem_subset);
+  endfunction
+
+  localparam logic [p_num_pipes-1:0] c_mem_pipes = compute_mem_pipes();
+
+  // Effective in-order mask: memory pipes always in-order, or all pipes
+  // when p_all_iq_in_order is set.
+  localparam logic [p_num_pipes-1:0] c_iq_in_order =
+    p_all_iq_in_order ? {p_num_pipes{1'b1}} : c_mem_pipes;
 
   //----------------------------------------------------------------------
   // Decode-issue message struct (accumulated through the pipeline)
@@ -308,7 +329,8 @@ module DecodeIssueUnitL8 #(
         .out_intra_chk (intra_chk_s1[i]),
         .out_inter_chk (inter_chk_s1[i+1]),
         .entry_val     (F_curr[i].val),
-        .decoder_val   (decoder_val[i])
+        .decoder_val   (decoder_val[i]),
+        .alloc_try     (alloc_try[i])
       );
 
       assign inst_chk_s1_pass[i] = intra_chk_s1[i].pass;
@@ -327,8 +349,7 @@ module DecodeIssueUnitL8 #(
         .oldest_ctrl_inst_idx         (oldest_ctrl_inst.idx),
         .oldest_ctrl_inst_srcs_ready  (oldest_ctrl_inst.srcs_ready),
         .oldest_ctrl_inst_dispatch_en (inst_chk_s4_pass[oldest_ctrl_inst.idx]),
-        .squash_sub_val               (squash_sub.val),
-        .alloc_try                    (alloc_try[i])
+        .squash_sub_val               (squash_sub.val)
       );
 
       // S3 -- Physical register allocation
@@ -571,41 +592,61 @@ module DecodeIssueUnitL8 #(
   //----------------------------------------------------------------------
   // Issue queues
   //----------------------------------------------------------------------
-  // One per pipe.  The control-subset pipe uses a bypass queue.
+  // One per pipe.  The control-subset pipe uses a bypass queue. Memory  pipes
+  // must use in-order queues since there is no load-store queue in the
+  // memory execute unit
 
   generate
     for( i = 0; i < p_num_pipes; i++ ) begin: IQ_GEN
-      IssueQueueOOO #(
-        .t_msg          (t_dio_inst_window),
-        .p_depth        (p_iq_depth),
-        .p_num_regs     (p_num_phys_regs),
-        .p_seq_num_bits (p_seq_num_bits),
-        .p_num_be_lanes (p_num_be_lanes),
-        .p_bypass       (c_pipe_bypass[i])
-      ) issue_queue (
-        .clk             (clk),
-        .rst             (rst),
 
-        // Insert (data from router)
-        .ins_msg         (iq_msg[i]),
-        .ins_try         (iq_ins_try[i]),
-        .ins_rdy         (iq_rdy[i]),
-        .ins_ack         (),
-        .avail_slots     (iq_avail_slots[i]),
+      if( c_iq_in_order[i] || c_pipe_bypass[i] ) begin: IQ_INORDER
 
-        // Dequeue
-        .Ex              (Ex[i]),
+        IssueQueueInOrder #(
+          .t_msg          (t_dio_inst_window),
+          .p_depth        (p_iq_depth),
+          .p_num_regs     (p_num_phys_regs),
+          .p_seq_num_bits (p_seq_num_bits),
+          .p_num_be_lanes (p_num_be_lanes),
+          .p_bypass       (c_pipe_bypass[i])
+        ) issue_queue (
+          .clk             (clk),
+          .rst             (rst),
+          .ins_msg         (iq_msg[i]),
+          .ins_try         (iq_ins_try[i]),
+          .ins_rdy         (iq_rdy[i]),
+          .ins_ack         (),
+          .avail_slots     (iq_avail_slots[i]),
+          .Ex              (Ex[i]),
+          .rf_raddr        (raddr[i]),
+          .rf_rdata        (rdata[i]),
+          .complete        (complete)
+        );
 
-        // Age comparison
-        .oldest_seq_num  (oldest_seq_num),
+      end else begin: IQ_OOO
 
-        // Register file access
-        .rf_raddr        (raddr[i]),
-        .rf_rdata        (rdata[i]),
+        IssueQueueOOO #(
+          .t_msg          (t_dio_inst_window),
+          .p_depth        (p_iq_depth),
+          .p_num_regs     (p_num_phys_regs),
+          .p_seq_num_bits (p_seq_num_bits),
+          .p_num_be_lanes (p_num_be_lanes),
+          .p_bypass       (0)
+        ) issue_queue (
+          .clk             (clk),
+          .rst             (rst),
+          .ins_msg         (iq_msg[i]),
+          .ins_try         (iq_ins_try[i]),
+          .ins_rdy         (iq_rdy[i]),
+          .ins_ack         (),
+          .avail_slots     (iq_avail_slots[i]),
+          .Ex              (Ex[i]),
+          .oldest_seq_num  (oldest_seq_num),
+          .rf_raddr        (raddr[i]),
+          .rf_rdata        (rdata[i]),
+          .complete        (complete)
+        );
 
-        // Completion interface
-        .complete        (complete)
-      );
+      end
 
       // JALR base register read -- assumes exactly one control pipe
       if( c_pipe_bypass[i] ) begin

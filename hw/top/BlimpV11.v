@@ -16,6 +16,9 @@
 `include "hw/execute/execute_units_l6/ControlFlowUnitL6.v"
 `include "hw/squash/SquashUnitL2.v"
 `include "hw/writeback_commit/writeback_commit_unit_variants/WritebackCommitUnitL4.v"
+`include "hw/util/F__DDelay.v"
+`include "hw/util/D__XDelay.v"
+`include "hw/util/X__WDelay.v"
 `include "intf/MemIntf.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
@@ -45,7 +48,15 @@ module BlimpV11 #(
   parameter p_mem_d_intf_fifo_depth   = 4,
   parameter p_mem_d_intf_fifo_bypass  = 0,
   parameter p_ctrl_d_intf_fifo_depth  = 1, // must be 1 - 1-cycle brx resolution
-  parameter p_ctrl_d_intf_fifo_bypass = 0  // must be 0 - 1-cycle brx resolution
+  parameter p_ctrl_d_intf_fifo_bypass = 0, // must be 0 - 1-cycle brx resolution
+  parameter p_num_pipes               = 8, // change manually - for delays
+  parameter p_all_iq_in_order         = 0,
+
+  // Simulation-only backpressure parameters (ignored in synthesis)
+  // Packed arrays: 8 bits per lane/pipe. Stall 1 cycle every N; 0 = off.
+  parameter [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = '0,
+  parameter [p_num_pipes*8-1:0]    p_sim_d2x_bp = '0,
+  parameter [p_num_pipes*8-1:0]    p_sim_x2w_bp = '0 
 ) (
   input logic clk,
   input logic rst,
@@ -69,7 +80,6 @@ module BlimpV11 #(
   InstTraceNotif.pub inst_trace [p_num_be_lanes]
 );
 
-  localparam p_num_pipes = 8;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
 
   //----------------------------------------------------------------------
@@ -112,6 +122,26 @@ module BlimpV11 #(
     .p_phys_addr_bits (p_phys_addr_bits)
   ) commit_notif [p_num_be_lanes]();
 
+  //----------------------------------------------------------------------
+  // Delayed Interfaces
+  //----------------------------------------------------------------------
+  // Intermediate interfaces for simulation-only delay injection between
+  // major pipeline stages. Downstream modules connect to these.
+
+  F__DIntf #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) f__d_del[p_num_fe_lanes]();
+
+  D__XIntf #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) d__x_del[p_num_pipes]();
+
+  X__WIntf #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) x__w_del[p_num_pipes]();
+
   logic [4:0] unused_complete_waddr [p_num_be_lanes];
 
   genvar i;
@@ -126,6 +156,101 @@ module BlimpV11 #(
       assign unused_complete_waddr[i] = complete_notif[i].waddr;
     end
   endgenerate
+
+  //----------------------------------------------------------------------
+  // Delay / Pass-through
+  //----------------------------------------------------------------------
+
+`ifndef SYNTHESIS
+
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: F2D_DELAY
+      F__DDelay #(
+        .p_seq_num_bits (p_seq_num_bits),
+        .p_bp_interval  (p_sim_f2d_bp[i*8 +: 8])
+      ) f2d_delay (
+        .clk (clk),
+        .rst (rst),
+        .up  (f__d_intfs[i]),
+        .dn  (f__d_del[i])
+      );
+    end
+  endgenerate
+
+  generate
+    for( i = 0; i < p_num_pipes; i++ ) begin: D2X_DELAY
+      D__XDelay #(
+        .p_seq_num_bits   (p_seq_num_bits),
+        .p_phys_addr_bits (p_phys_addr_bits),
+        .p_bp_interval    (p_sim_d2x_bp[i*8 +: 8])
+      ) d2x_delay (
+        .clk (clk),
+        .rst (rst),
+        .up  (d__x_intfs[i]),
+        .dn  (d__x_del[i])
+      );
+    end
+  endgenerate
+
+  generate
+    for( i = 0; i < p_num_pipes; i++ ) begin: X2W_DELAY
+      X__WDelay #(
+        .p_seq_num_bits   (p_seq_num_bits),
+        .p_phys_addr_bits (p_phys_addr_bits),
+        .p_bp_interval    (p_sim_x2w_bp[i*8 +: 8])
+      ) x2w_delay (
+        .clk (clk),
+        .rst (rst),
+        .up  (x__w_intfs[i]),
+        .dn  (x__w_del[i])
+      );
+    end
+  endgenerate
+
+`else
+
+  generate
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: F2D_PASSTHRU
+      assign f__d_del[i].inst        = f__d_intfs[i].inst;
+      assign f__d_del[i].pc          = f__d_intfs[i].pc;
+      assign f__d_del[i].val         = f__d_intfs[i].val;
+      assign f__d_del[i].seq_num     = f__d_intfs[i].seq_num;
+      assign f__d_del[i].inst_status = f__d_intfs[i].inst_status;
+      assign f__d_intfs[i].rdy       = f__d_del[i].rdy;
+    end
+  endgenerate
+
+  generate
+    for( i = 0; i < p_num_pipes; i++ ) begin: D2X_PASSTHRU
+      assign d__x_del[i].pc      = d__x_intfs[i].pc;
+      assign d__x_del[i].op1     = d__x_intfs[i].op1;
+      assign d__x_del[i].op2     = d__x_intfs[i].op2;
+      assign d__x_del[i].waddr   = d__x_intfs[i].waddr;
+      assign d__x_del[i].uop     = d__x_intfs[i].uop;
+      assign d__x_del[i].val     = d__x_intfs[i].val;
+      assign d__x_del[i].seq_num = d__x_intfs[i].seq_num;
+      assign d__x_del[i].preg    = d__x_intfs[i].preg;
+      assign d__x_del[i].ppreg   = d__x_intfs[i].ppreg;
+      assign d__x_del[i].op3     = d__x_intfs[i].op3;
+      assign d__x_intfs[i].rdy   = d__x_del[i].rdy;
+    end
+  endgenerate
+
+  generate
+    for( i = 0; i < p_num_pipes; i++ ) begin: X2W_PASSTHRU
+      assign x__w_del[i].pc      = x__w_intfs[i].pc;
+      assign x__w_del[i].waddr   = x__w_intfs[i].waddr;
+      assign x__w_del[i].wdata   = x__w_intfs[i].wdata;
+      assign x__w_del[i].wen     = x__w_intfs[i].wen;
+      assign x__w_del[i].val     = x__w_intfs[i].val;
+      assign x__w_del[i].seq_num = x__w_intfs[i].seq_num;
+      assign x__w_del[i].preg    = x__w_intfs[i].preg;
+      assign x__w_del[i].ppreg   = x__w_intfs[i].ppreg;
+      assign x__w_intfs[i].rdy   = x__w_del[i].rdy;
+    end
+  endgenerate
+
+`endif
 
   //----------------------------------------------------------------------
   // Units
@@ -201,10 +326,12 @@ module BlimpV11 #(
       p_alu_subset   // ALU0
     }),
     .p_ctrl_subset        (p_ctrl_subset),
+    .p_mem_subset         (p_mem_subset),
+    .p_all_iq_in_order    (p_all_iq_in_order),
     .p_f_intf_fifo_depth  (p_f_intf_fifo_depth),
     .p_f_intf_fifo_bypass (p_f_intf_fifo_bypass)
   ) DIU (
-    .F          (f__d_intfs),
+    .F          (f__d_del),
     .Ex         (d__x_intfs),
     .complete   (complete_notif),
     .squash_pub (squash_arb_notif[0]),
@@ -217,7 +344,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
   ) ALU0_XU (
-    .D (d__x_intfs[0]),
+    .D (d__x_del[0]),
     .W (x__w_intfs[0]),
     .*
   );
@@ -226,7 +353,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
   ) ALU1_XU (
-    .D (d__x_intfs[1]),
+    .D (d__x_del[1]),
     .W (x__w_intfs[1]),
     .*
   );
@@ -235,7 +362,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
   ) ALU2_XU (
-    .D (d__x_intfs[2]),
+    .D (d__x_del[2]),
     .W (x__w_intfs[2]),
     .*
   );
@@ -244,7 +371,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_alu_d_intf_fifo_bypass)
   ) ALU3_XU (
-    .D (d__x_intfs[3]),
+    .D (d__x_del[3]),
     .W (x__w_intfs[3]),
     .*
   );
@@ -253,7 +380,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_mul_d_intf_fifo_bypass)
   ) MUL_DIV_REM0_XU (
-    .D (d__x_intfs[4]),
+    .D (d__x_del[4]),
     .W (x__w_intfs[4]),
     .*
   );
@@ -262,7 +389,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_mul_d_intf_fifo_bypass)
   ) MUL_DIV_REM1_XU (
-    .D (d__x_intfs[5]),
+    .D (d__x_del[5]),
     .W (x__w_intfs[5]),
     .*
   );
@@ -272,7 +399,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_mem_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
   ) MEM_XU (
-    .D   (d__x_intfs[6]),
+    .D   (d__x_del[6]),
     .W   (x__w_intfs[6]),
     .mem (data_mem),
     .*
@@ -282,7 +409,7 @@ module BlimpV11 #(
     .p_d_intf_fifo_depth  (p_ctrl_d_intf_fifo_depth),
     .p_d_intf_fifo_bypass (p_ctrl_d_intf_fifo_bypass)
   ) CTRL_XU (
-    .D      (d__x_intfs[7]),
+    .D      (d__x_del[7]),
     .W      (x__w_intfs[7]),
     .squash (squash_arb_notif[1]),
     .*
@@ -294,7 +421,7 @@ module BlimpV11 #(
     .p_x_intf_fifo_depth  (p_x_intf_fifo_depth),
     .p_x_intf_fifo_bypass (p_x_intf_fifo_bypass)
   ) WCU (
-    .Ex       (x__w_intfs),
+    .Ex       (x__w_del),
     .complete (complete_notif),
     .commit   (commit_notif),
     .*

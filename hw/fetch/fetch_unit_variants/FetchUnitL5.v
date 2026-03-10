@@ -183,6 +183,7 @@ module FetchUnitL5
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes];
+  logic                      alloc_try     [p_num_fe_lanes];
   logic                      alloc_rdy     [p_num_fe_lanes];
   logic                      alloc_val     [p_num_fe_lanes];
 
@@ -192,7 +193,14 @@ module FetchUnitL5
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
   ) seq_num_gen (
-    .*
+    .clk           (clk),
+    .rst           (rst),
+    .alloc_seq_num (alloc_seq_num),
+    .alloc_try     (alloc_try),
+    .alloc_rdy     (alloc_rdy),
+    .alloc_val     (alloc_val),
+    .commit        (commit),
+    .squash        (squash)
   );
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -238,8 +246,9 @@ module FetchUnitL5
   // Per-lane response signals
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: RESP_LANE
-      assign alloc_rdy[i]     = mem.resp_val & D_rdy[i] & lane_active[i];
-      assign alloc_ok[i]      = alloc_rdy[i] & alloc_val[i];
+      assign alloc_try[i]     = mem.resp_val & D_rdy_all & lane_active[i];
+      assign alloc_val[i]     = alloc_try[i] & alloc_rdy[i];
+      assign alloc_ok[i]      = alloc_val[i];
       assign D_val[i]         = lane_active[i]       ? (mem.resp_val & alloc_ok[i]) :
                                 lane_send_invalid[i] ? mem.resp_val : 1'b0;
       assign D_inst[i]        = mem.resp_msg.data[i*32 +: 32];

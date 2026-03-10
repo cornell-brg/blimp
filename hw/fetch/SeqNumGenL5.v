@@ -25,11 +25,12 @@ module SeqNumGenL5 #(
   // Allocation Interface
   //----------------------------------------------------------------------
 
-  // allocate seq num for each ready lane, alloc_val is set for lanes that are
-  // ready and successfully allocated
+  // allocate seq num for each trying lane, alloc_rdy is set for lanes that
+  // can allocate, alloc_val is set by consumer to confirm allocation
   output logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes],
-  output logic                      alloc_val     [p_num_fe_lanes],
-  input  logic                      alloc_rdy     [p_num_fe_lanes],
+  input  logic                      alloc_try     [p_num_fe_lanes],
+  input  logic                      alloc_val     [p_num_fe_lanes],
+  output logic                      alloc_rdy     [p_num_fe_lanes],
 
   //----------------------------------------------------------------------
   // Commit Interface to free sequence numbers
@@ -127,15 +128,15 @@ module SeqNumGenL5 #(
   //----------------------------------------------------------------------
 
   // Track how many entries we need to allocate in this cycle
-  logic [p_num_fe_lanes_bits:0] alloc_rdy_cntr;
+  logic [p_num_fe_lanes_bits:0] alloc_try_cntr;
 
   // Count how many lanes are requesting allocation (separate block to break
   // combinational loop with can_alloc)
   always_comb begin
-    alloc_rdy_cntr = '0;
+    alloc_try_cntr = '0;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
-      if( alloc_rdy[j] )
-        alloc_rdy_cntr = alloc_rdy_cntr + 1;
+      if( alloc_try[j] )
+        alloc_try_cntr = alloc_try_cntr + 1;
     end
   end
 
@@ -148,7 +149,7 @@ module SeqNumGenL5 #(
     alloc_entries_free = 1'b1;
     if( !squash.val ) begin
       for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-        if( k < alloc_rdy_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
+        if( k < alloc_try_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
           alloc_entries_free = 1'b0;
       end
     end
@@ -186,27 +187,36 @@ module SeqNumGenL5 #(
     else
       eff_entries_allocated = entries_allocated;
 
-    space_needed    = eff_entries_allocated + (p_seq_num_bits+1)'(alloc_rdy_cntr);
+    space_needed    = eff_entries_allocated + (p_seq_num_bits+1)'(alloc_try_cntr);
     space_available = p_num_entries;
     can_alloc       = (space_needed <= space_available) & alloc_entries_free;
   end
 
   // Allocate consecutive sequence numbers starting from head pointer for each
-  // ready lane
+  // trying lane
   logic [p_num_fe_lanes_bits:0] alloc_lane_cntr;
   always_comb begin
     alloc_lane_cntr = '0;
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin: ALLOC_SEQ_NUM_ASSIGN
       alloc_seq_num[j] = '0;
-      if( alloc_rdy[j] ) begin
+      if( alloc_try[j] ) begin
         alloc_seq_num[j] = ( squash.val ) ? squash.seq_num + p_seq_num_bits'(1 + alloc_lane_cntr)
                                           : p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + alloc_lane_cntr);
         alloc_lane_cntr = alloc_lane_cntr + 1;
       end
 
-      // Valid allocation for this lane if we can allocate and this lane is
-      // requesting allocation
-      alloc_val[j] = can_alloc & alloc_rdy[j];
+      // Ready for this lane if we can allocate and this lane is trying
+      alloc_rdy[j] = can_alloc & alloc_try[j];
+    end
+  end
+
+  // Count validated allocations for head pointer advancement
+  logic [p_num_fe_lanes_bits:0] alloc_val_cntr;
+  always_comb begin
+    alloc_val_cntr = '0;
+    for( int j = 0; j < p_num_fe_lanes; j++ ) begin
+      if( alloc_val[j] )
+        alloc_val_cntr = alloc_val_cntr + 1;
     end
   end
 
@@ -228,9 +238,9 @@ module SeqNumGenL5 #(
     if( squash.val ) curr_head_ptr_next = squash_head_ptr;
 
     // If allocating (possibly also during a squash), head pointer moves forward
-    // by number of entries allocated (starting from new squash head pointer if
-    // squash happens)
-    if( can_alloc  ) curr_head_ptr_next = curr_head_ptr_next + p_seq_num_bits'(alloc_rdy_cntr);
+    // by number of validated allocations (starting from new squash head pointer
+    // if squash happens)
+    if( |alloc_val_cntr ) curr_head_ptr_next = curr_head_ptr_next + (p_seq_num_bits+1)'(alloc_val_cntr);
   end
 
   //----------------------------------------------------------------------

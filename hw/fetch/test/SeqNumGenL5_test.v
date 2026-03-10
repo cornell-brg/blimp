@@ -50,8 +50,9 @@ module SeqNumGenL5TestSuite #(
   localparam p_num_seq_nums = 2 ** p_seq_num_bits;
 
   logic [p_seq_num_bits-1:0] alloc_seq_num [p_num_fe_lanes];
-  logic                      alloc_val     [p_num_fe_lanes];
+  logic                      alloc_try     [p_num_fe_lanes];
   logic                      alloc_rdy     [p_num_fe_lanes];
+  logic                      alloc_val     [p_num_fe_lanes];
 
   CommitNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -96,10 +97,12 @@ module SeqNumGenL5TestSuite #(
         p_alloc_intv_delay
       ) alloc_Ostream (
         .msg (alloc_msg[i]),
-        .val (alloc_val[i]),
-        .rdy (alloc_rdy[i]),
+        .val (alloc_rdy[i]),
+        .rdy (alloc_try[i]),
         .*
       );
+
+      assign alloc_val[i] = alloc_try[i] & alloc_rdy[i];
     end
   endgenerate
 

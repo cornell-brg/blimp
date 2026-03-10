@@ -23,11 +23,25 @@ module BlimpV11TestHarness #(
   parameter p_num_fe_lanes           = 2,
   parameter p_num_be_lanes           = 2,
   parameter p_iq_depth               = 4,
+  parameter p_reclaim_width          = p_num_be_lanes,
+  parameter p_max_in_flight          = 8,
   parameter p_mem_send_intv_delay    = 1,
   parameter p_mem_recv_intv_delay    = 1,
+  parameter p_f_intf_fifo_depth      = 4,
   parameter p_f_intf_fifo_bypass     = 0,
+  parameter p_x_intf_fifo_depth      = 4,
   parameter p_x_intf_fifo_bypass     = 0,
-  parameter p_mem_d_intf_fifo_bypass = 0
+  parameter p_alu_d_intf_fifo_depth  = 4,
+  parameter p_mul_d_intf_fifo_depth  = 4,
+  parameter p_mem_d_intf_fifo_depth  = 4,
+  parameter p_mem_d_intf_fifo_bypass = 0,
+  parameter p_num_pipes              = 8,
+  parameter p_all_iq_in_order        = 0,
+
+  // Simulation-only backpressure parameters (packed: 8 bits per lane/pipe)
+  parameter [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = '0,
+  parameter [p_num_pipes*8-1:0]    p_sim_d2x_bp = '0,
+  parameter [p_num_pipes*8-1:0]    p_sim_x2w_bp = '0
 );
 
   //----------------------------------------------------------------------
@@ -69,9 +83,21 @@ module BlimpV11TestHarness #(
     .p_num_be_lanes           (p_num_be_lanes),
     .p_num_fe_lanes           (p_num_fe_lanes),
     .p_iq_depth               (p_iq_depth),
+    .p_reclaim_width          (p_reclaim_width),
+    .p_max_in_flight          (p_max_in_flight),
+    .p_num_pipes              (p_num_pipes),
+    .p_f_intf_fifo_depth      (p_f_intf_fifo_depth),
     .p_f_intf_fifo_bypass     (p_f_intf_fifo_bypass),
+    .p_x_intf_fifo_depth      (p_x_intf_fifo_depth),
     .p_x_intf_fifo_bypass     (p_x_intf_fifo_bypass),
-    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass)
+    .p_alu_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_mul_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
+    .p_mem_d_intf_fifo_depth  (p_mem_d_intf_fifo_depth),
+    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass),
+    .p_all_iq_in_order        (p_all_iq_in_order),
+    .p_sim_f2d_bp             (p_sim_f2d_bp),
+    .p_sim_d2x_bp             (p_sim_d2x_bp),
+    .p_sim_x2w_bp             (p_sim_x2w_bp)
   ) dut (
     .inst_mem   (imem_intf),
     .data_mem   (dmem_intf),
