@@ -5,8 +5,13 @@
 // order. Supports bypassing from the input to the output if possible, as well
 // as wake-up logic to mark instructions as ready.
 //
+// Source operand pending status is provided at insert time and tracked
+// internally.  The queue monitors completion notifications to clear
+// pending bits, removing the need for rename-table lookups at dequeue.
+//
 // The message struct (t_msg) must contain .pc, .seq_num, .uop, .src_preg0,
-// .src_preg1, .waddr, .imm, .op2_sel, .op3_sel, .alloc_preg, .alloc_ppreg.
+// .src_preg1, .src_pending0, .src_pending1, .waddr, .imm, .op2_sel,
+// .op3_sel, .alloc_preg, .alloc_ppreg.
 
 `ifndef HW_DECODE_ISSUEQUEUEINORDER_V
 `define HW_DECODE_ISSUEQUEUEINORDER_V
@@ -33,8 +38,9 @@ module IssueQueueInOrder #(
   //----------------------------------------------------------------------
 
   input  t_msg                     ins_msg,
-  input  logic                     ins_val,
+  input  logic                     ins_try,
   output logic                     ins_rdy,
+  output logic                     ins_ack,
   output logic [p_entry_bits:0]    avail_slots,
 
   //----------------------------------------------------------------------
@@ -42,14 +48,6 @@ module IssueQueueInOrder #(
   //----------------------------------------------------------------------
 
   D__XIntf.D_intf Ex,
-
-  //----------------------------------------------------------------------
-  // Rename Table Access
-  //----------------------------------------------------------------------
-
-  output logic [p_addr_bits-1:0] rt_lookup_preg    [2],
-  input  logic                   rt_lookup_pending [2],
-  output logic                   rt_lookup_en      [2],
 
   //----------------------------------------------------------------------
   // Register File Access
@@ -65,6 +63,18 @@ module IssueQueueInOrder #(
   CompleteNotif.sub complete [p_num_be_lanes]
 );
 
+  // Extract interface signals for runtime indexing (Verilator limitation).
+  logic                   complete_val  [p_num_be_lanes];
+  logic [p_addr_bits-1:0] complete_preg [p_num_be_lanes];
+
+  genvar g;
+  generate
+    for( g = 0; g < p_num_be_lanes; g++ ) begin: COMPLETE_EXTRACT
+      assign complete_val[g]  = complete[g].val;
+      assign complete_preg[g] = complete[g].preg;
+    end
+  endgenerate
+
   generate
     if( !p_bypass ) begin
 
@@ -79,6 +89,7 @@ module IssueQueueInOrder #(
       //----------------------------------------------------------------------
 
       t_msg entries [p_depth];
+      logic src_pending [p_depth][2];
 
       logic [p_entry_bits:0] deq_ptr;
       logic [p_entry_bits:0] ins_ptr;
@@ -93,14 +104,43 @@ module IssueQueueInOrder #(
       assign empty       = ( ins_ptr == deq_ptr );
       assign avail_slots = p_depth - ( ins_ptr - deq_ptr );
       assign ins_rdy     = ( avail_slots != '0 );
+      assign ins_ack     = ins_try & ins_rdy;
 
       // Insert entry
       always_ff @( posedge clk ) begin
         if( rst ) begin
           entries <= '{default: 'x};
         end else begin
-          if( ins_val & (!bypass | !both_src_ready) ) begin
+          if( ins_try & (!bypass | !both_src_ready) ) begin
             entries[ins_ptr[p_entry_bits-1:0]] <= ins_msg;
+          end
+        end
+      end
+
+      // Insert and wake-up pending bits
+      always_ff @( posedge clk ) begin
+        if( rst ) begin
+          for( int j = 0; j < p_depth; j++ ) begin
+            src_pending[j][0] <= 1'b0;
+            src_pending[j][1] <= 1'b0;
+          end
+        end else begin
+          // Wake up: clear pending on completion match
+          for( int j = 0; j < p_depth; j++ ) begin
+            for( int k = 0; k < p_num_be_lanes; k++ ) begin
+              if( complete_val[k] ) begin
+                if( complete_preg[k] == entries[j].src_preg0 )
+                  src_pending[j][0] <= 1'b0;
+                if( complete_preg[k] == entries[j].src_preg1 )
+                  src_pending[j][1] <= 1'b0;
+              end
+            end
+          end
+
+          // Insert: set pending from message (overwrites wake-up for this slot)
+          if( ins_try & (!bypass | !both_src_ready) ) begin
+            src_pending[ins_ptr[p_entry_bits-1:0]][0] <= ins_msg.src_pending0;
+            src_pending[ins_ptr[p_entry_bits-1:0]][1] <= ins_msg.src_pending1;
           end
         end
       end
@@ -109,7 +149,7 @@ module IssueQueueInOrder #(
       always_ff @( posedge clk ) begin
         if( rst )
           ins_ptr <= '0;
-        else if( ins_val & (!bypass | !both_src_ready) )
+        else if( ins_try & (!bypass | !both_src_ready) )
           ins_ptr <= ins_ptr + 1;
       end
 
@@ -117,7 +157,7 @@ module IssueQueueInOrder #(
       // Bypass
       //----------------------------------------------------------------------
 
-      assign bypass = ins_val & deq_val & empty;
+      assign bypass = ins_try & deq_val & empty;
 
       //----------------------------------------------------------------------
       // Dequeue
@@ -127,20 +167,37 @@ module IssueQueueInOrder #(
       t_msg deq_msg;
       assign deq_msg = empty ? ins_msg : entries[deq_ptr[p_entry_bits-1:0]];
 
-      // Lookup entry in rename table to see if src operands ready, set register
-      // file read addresses to get the data
-      assign rt_lookup_en[0]   = 1'b1;
-      assign rt_lookup_en[1]   = 1'b1;
-      assign rt_lookup_preg[0] = deq_msg.src_preg0;
-      assign rt_lookup_preg[1] = deq_msg.src_preg1;
-      assign rf_raddr[0]       = rt_lookup_preg[0];
-      assign rf_raddr[1]       = rt_lookup_preg[1];
+      // Set register file read addresses from dequeuing entry's source pregs
+      assign rf_raddr[0] = deq_msg.src_preg0;
+      assign rf_raddr[1] = deq_msg.src_preg1;
 
-      // Can deq if not empty or can bypass, and both src regs are ready (either
-      // ready as indicated in rename table or just completed on this cycle)
+      // Source readiness: check stored pending bits (or insert-time pending
+      // for bypass), with same-cycle completion bypass.
+      logic deq_pending [2];
+      always_comb begin
+        if( empty ) begin
+          // Bypass path: use insert-time pending from message
+          deq_pending[0] = ins_msg.src_pending0;
+          deq_pending[1] = ins_msg.src_pending1;
+        end else begin
+          deq_pending[0] = src_pending[deq_ptr[p_entry_bits-1:0]][0];
+          deq_pending[1] = src_pending[deq_ptr[p_entry_bits-1:0]][1];
+        end
+
+        // Same-cycle completion bypass
+        for( int k = 0; k < p_num_be_lanes; k++ ) begin
+          if( complete_val[k] ) begin
+            if( complete_preg[k] == deq_msg.src_preg0 )
+              deq_pending[0] = 1'b0;
+            if( complete_preg[k] == deq_msg.src_preg1 )
+              deq_pending[1] = 1'b0;
+          end
+        end
+      end
+
       logic both_src_ready;
-      assign both_src_ready = !rt_lookup_pending[0] & !rt_lookup_pending[1];
-      assign deq_rdy = ( !empty | ins_val ) & both_src_ready;
+      assign both_src_ready = !deq_pending[0] & !deq_pending[1];
+      assign deq_rdy = ( !empty | ins_try ) & both_src_ready;
 
       // Output deq fields
       always_comb begin
@@ -170,6 +227,10 @@ module IssueQueueInOrder #(
       // Insert outputs
       assign avail_slots = '1;
 
+      // Set register file read addresses
+      assign rf_raddr[0] = ins_msg.src_preg0;
+      assign rf_raddr[1] = ins_msg.src_preg1;
+
       // Dequeue outputs
       assign Ex.pc               = ins_msg.pc;
       assign Ex.op1              = rf_rdata[0];
@@ -187,17 +248,28 @@ module IssueQueueInOrder #(
           Ex.op3.mem_data   = rf_rdata[1];
       end
 
-      // Lookup entry in rename table to see if src operands ready, set register
-      // file read addresses to get the data
-      assign rt_lookup_en[0]   = ins_val;
-      assign rt_lookup_en[1]   = ins_val;
-      assign rt_lookup_preg[0] = ins_msg.src_preg0;
-      assign rt_lookup_preg[1] = ins_msg.src_preg1;
-      assign rf_raddr[0]       = rt_lookup_preg[0];
-      assign rf_raddr[1]       = rt_lookup_preg[1];
+      // Source readiness with same-cycle completion bypass
+      logic deq_pending [2];
+      always_comb begin
+        deq_pending[0] = ins_msg.src_pending0;
+        deq_pending[1] = ins_msg.src_pending1;
 
-      assign Ex.val  = ins_val;
+        for( int k = 0; k < p_num_be_lanes; k++ ) begin
+          if( complete_val[k] ) begin
+            if( complete_preg[k] == ins_msg.src_preg0 )
+              deq_pending[0] = 1'b0;
+            if( complete_preg[k] == ins_msg.src_preg1 )
+              deq_pending[1] = 1'b0;
+          end
+        end
+      end
+
+      logic both_src_ready;
+      assign both_src_ready = !deq_pending[0] & !deq_pending[1];
+
+      assign Ex.val  = ins_try & both_src_ready;
       assign ins_rdy = Ex.rdy;
+      assign ins_ack = Ex.val & Ex.rdy;
     end
   endgenerate
 

@@ -73,6 +73,7 @@ module BlimpV8_sim;
         inst_trace_wdata,
         inst_trace_wen
       );
+      t.commit_notify( 1 );
     end
   end
 

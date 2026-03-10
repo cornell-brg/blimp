@@ -11,10 +11,17 @@
 `include "intf/CommitNotif.v"
 
 module SSSeqAge #(
-  parameter p_num_be_lanes = 2
+  parameter p_num_be_lanes  = 2,
+  parameter p_seq_num_bits  = 5
 ) (
   input  logic clk,
   input  logic rst,
+
+  //----------------------------------------------------------------------
+  // Oldest sequence number
+  //----------------------------------------------------------------------
+
+  output logic [p_seq_num_bits-1:0] oldest_seq_num,
 
   //----------------------------------------------------------------------
   // Commit Interface
@@ -23,7 +30,6 @@ module SSSeqAge #(
   CommitNotif.sub commit [p_num_be_lanes]
 );
 
-  localparam p_seq_num_bits   = commit[0].p_seq_num_bits;
   localparam p_phys_addr_bits = commit[0].p_phys_addr_bits;
 
   logic                 [31:0] commit_pc      [p_num_be_lanes-1:0];
@@ -48,7 +54,6 @@ module SSSeqAge #(
   end
 
   // Keep track of the oldest in-flight sequence number
-  logic [p_seq_num_bits-1:0] oldest_seq_num;
   logic [p_seq_num_bits-1:0] youngest_commit_seq_num;
   logic                      any_commit;
   assign any_commit = |commit_val_packed;

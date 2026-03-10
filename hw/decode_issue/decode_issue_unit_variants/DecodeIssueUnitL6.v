@@ -232,8 +232,11 @@ module DecodeIssueUnitL6 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
   ) seq_age (
     .*
   );

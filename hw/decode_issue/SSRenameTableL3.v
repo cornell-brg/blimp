@@ -13,11 +13,10 @@
 `include "intf/CommitNotif.v"
 
 module SSRenameTableL3 #(
-  parameter p_num_phys_regs    = 36,
-  parameter p_phys_addr_bits   = $clog2(p_num_phys_regs),
-  parameter p_num_lookup_ports = 2,
-  parameter p_num_fe_lanes     = 2,
-  parameter p_num_be_lanes     = 2
+  parameter p_num_phys_regs  = 36,
+  parameter p_phys_addr_bits = $clog2(p_num_phys_regs),
+  parameter p_num_fe_lanes   = 2,
+  parameter p_num_be_lanes   = 2
 ) (
   input  logic clk,
   input  logic rst,
@@ -41,13 +40,9 @@ module SSRenameTableL3 #(
   // Lookup
   // ---------------------------------------------------------------------
 
-  input  logic                  [4:0] lookup_new_inst_areg [p_num_fe_lanes][2],
-  input  logic                        lookup_new_inst_en   [p_num_fe_lanes][2],
-  output logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2],
-
-  input  logic [p_phys_addr_bits-1:0] lookup_preg    [p_num_lookup_ports][2],
-  input  logic                        lookup_preg_en [p_num_lookup_ports][2],
-  output logic                        lookup_pending [p_num_lookup_ports][2],
+  input  logic                  [4:0] lookup_new_inst_areg    [p_num_fe_lanes][2],
+  output logic [p_phys_addr_bits-1:0] lookup_new_inst_preg    [p_num_fe_lanes][2],
+  output logic                        lookup_new_inst_pending [p_num_fe_lanes][2],
 
   // ---------------------------------------------------------------------
   // Complete (clear pending)
@@ -92,16 +87,6 @@ module SSRenameTableL3 #(
 
   logic got_complete_pend [31:1];
   logic got_free          [p_num_phys_regs-1:1];
-
-  logic unused_lookup_new_inst_en [p_num_fe_lanes][2];
-
-  always_comb begin
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin: UNUSED_LOOKUP_NEW_INST_EN
-      for( int l = 0; l < 2; l++ ) begin
-        unused_lookup_new_inst_en[k][l] = lookup_new_inst_en[k][l];
-      end
-    end
-  end
 
   genvar i;
   generate
@@ -273,85 +258,36 @@ module SSRenameTableL3 #(
   endgenerate
 
   // ---------------------------------------------------------------------
-  // Lookup
+  // Lookup: areg → preg + pending for new instructions
   // ---------------------------------------------------------------------
+  // For each source of each new instruction, determine the physical
+  // register and whether it is still pending.  Same-cycle forwarding:
+  //   - Completion bypass: if the areg's preg just completed, not pending
+  //   - Alloc forwarding: if an earlier lane allocated this areg, use the
+  //     new preg (always pending since the instruction hasn't executed)
 
-  logic got_complete_lookup [p_num_lookup_ports][2];
-  logic unused_iq_lookup_preg_en [p_num_lookup_ports][2];
-
-  always_comb begin
-    for( int j = 0; j < p_num_lookup_ports; j++ ) begin: UNUSED_IQ_lookup_preg_en_OUTER
-      for( int k = 0; k < 2; k++ ) begin: UNUSED_IQ_lookup_preg_en_INNER
-        unused_iq_lookup_preg_en[j][k] = lookup_preg_en[j][k];
-      end
-    end
-  end
-
-  always_comb begin
-    for( int k = 0; k < p_num_lookup_ports; k++ ) begin
-      for( int l = 0; l < 2; l++ ) begin
-        got_complete_lookup[k][l] = '0;
-      end
-    end
-    for( int j = 0; j < p_num_be_lanes; j++ ) begin: GOT_COMPLETE_OUTER
-      for( int k = 0; k < p_num_lookup_ports; k++ ) begin: GOT_COMPLETE_MIDDLE
-        for( int l = 0; l < 2; l++ ) begin: GOT_COMPLETE_INNER
-          if( complete_preg[j] == lookup_preg[k][l] ) 
-            got_complete_lookup[k][l] = 1'b1;
-        end
-      end
-    end
-  end
-  
-  logic found_alloc;
-  always_comb begin
-    for( int k = 0; k < p_num_lookup_ports; k++ ) begin: LOOKUP_SET_PENDING_OUTER
-      for( int l = 0; l < 2; l++ ) begin: LOOKUP_SET_PENDING_INNER
-        if( lookup_preg[k][l] == '0 ) begin
-          lookup_pending[k][l] = 0;
-          found_alloc = 1'b0;
-        end else if( got_complete_lookup[k][l] ) begin
-          lookup_pending[k][l] = 1'b0; // Bypass
-          found_alloc = 1'b0;
-        end else begin
-          // Check if preg was just allocated this cycle
-          // (uses alloc_try, not alloc_val, to break comb loop through dispatch_go)
-          found_alloc = 1'b0;
-          for ( int m = 0; m < p_num_fe_lanes; m++ ) begin: LOOKUP_ALLOC_FWD
-            if( alloc_try[m] && alloc_areg[m] != 0 &&
-                lookup_preg[k][l] == alloc_preg[m] )
-              found_alloc = 1'b1;
-          end
-
-          if( found_alloc )
-            lookup_pending[k][l] = 1'b1;
-          else begin
-            lookup_pending[k][l] = '0;
-            for ( int m = 1; m < 32; m++ ) begin: LOOKUP_PENDING_SEARCH
-              if( lookup_preg[k][l] == rename_table[m].preg )
-                lookup_pending[k][l] = rename_table[m].pending;
-            end
-          end
-        end
-      end
-    end
-  end
-  
   always_comb begin
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      for( int l = 0; l < 2; l++ ) begin: LOOKUP_PREG_FOR_AREG
+      for( int l = 0; l < 2; l++ ) begin
         if( lookup_new_inst_areg[k][l] == '0 ) begin
-          lookup_new_inst_preg[k][l] = '0;
-
-        // Check if previous lanes have renamed this areg, use that for the preg
-        // if so, use lane closest to this lane
+          lookup_new_inst_preg[k][l]    = '0;
+          lookup_new_inst_pending[k][l] = 1'b0;
         end else begin
-          lookup_new_inst_preg[k][l] = 
+          lookup_new_inst_preg[k][l]    =
             rename_table[lookup_new_inst_areg[k][l]].preg;
+          lookup_new_inst_pending[k][l] =
+            rename_table[lookup_new_inst_areg[k][l]].pending;
+
+          // Completion bypass
+          if( got_complete_pend[lookup_new_inst_areg[k][l]] )
+            lookup_new_inst_pending[k][l] = 1'b0;
+
+          // Alloc forwarding from earlier lanes (last writer wins)
           for( int m = 0; m < k; m++ ) begin
-            if( alloc_try[m] && 
-                alloc_areg[m] == lookup_new_inst_areg[k][l]) begin
-              lookup_new_inst_preg[k][l] = alloc_preg[m];
+            if( alloc_try[m] &&
+                alloc_areg[m] == lookup_new_inst_areg[k][l] ) begin
+              lookup_new_inst_preg[k][l]    = alloc_preg[m];
+              lookup_new_inst_pending[k][l] = 1'b1;
             end
           end
         end
@@ -432,18 +368,10 @@ module SSRenameTableL3 #(
       for( int k = 0; k < 2; k++ ) begin
         if( j != 0 || k != 0 )
           trace = {trace, ", "};
-        if( lookup_new_inst_en[j][k] ) begin
-          if( trace_level > 0 )
-            trace = {trace, $sformatf("%x > %x", lookup_new_inst_areg[j][k], lookup_new_inst_preg[j][k])};
-          else
-            trace = {trace, $sformatf("%x", lookup_new_inst_areg[j][k])};
-        end
-        else begin
-          if( trace_level > 0 )
-            trace = {trace, {(lookup_len){" "}}};
-          else
-            trace = {trace, {(2){" "}}};
-        end
+        if( trace_level > 0 )
+          trace = {trace, $sformatf("%x > %x", lookup_new_inst_areg[j][k], lookup_new_inst_preg[j][k])};
+        else
+          trace = {trace, $sformatf("%x", lookup_new_inst_areg[j][k])};
       end
     end
 

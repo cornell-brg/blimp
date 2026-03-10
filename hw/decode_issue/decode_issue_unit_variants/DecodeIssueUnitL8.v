@@ -15,12 +15,12 @@
 `endif
 
 `include "defs/ISA.v"
-`include "hw/decode_issue/InstDecoder.v"
-`include "hw/decode_issue/ImmGen.v"
+`include "hw/decode_issue/SSDecoder.v"
+`include "hw/decode_issue/SSInstMapper.v"
 `include "hw/decode_issue/SSDIURouter.v"
 `include "hw/decode_issue/SSRegfileL2.v"
 `include "hw/decode_issue/SSRenameTableL3.v"
-`include "hw/decode_issue/IssueQueueInOrder.v"
+`include "hw/decode_issue/IssueQueueOOO.v"
 `include "hw/util/SSSeqAge.v"
 `include "hw/decode_issue/DIUBypassFifo.v"
 `include "intf/F__DIntf.v"
@@ -29,6 +29,7 @@
 `include "intf/SquashNotif.v"
 `include "intf/InstCheckIntf.v"
 `include "hw/decode_issue/InstChecks.v"
+`include "hw/decode_issue/DIUSquashPub.v"
 
 import ISA::*;
 
@@ -52,7 +53,11 @@ module DecodeIssueUnitL8 #(
 
   parameter p_f_intf_fifo_depth  = 4,
   parameter p_f_intf_fifo_bypass = 0,
-  parameter p_iq_entries_bits    = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1
+  parameter p_iq_entries_bits    = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
+
+  // Bitmask of which pipes use bypass IQs.  Default ('0) auto-computes
+  // to bypass only for the control-subset pipe.
+  parameter logic [p_num_pipes-1:0] p_pipe_bypass = '0
 ) (
   input logic clk,
   input logic rst,
@@ -78,6 +83,16 @@ module DecodeIssueUnitL8 #(
   localparam p_phys_addr_bits   = $clog2(p_num_phys_regs);
   localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
 
+  // Compute effective bypass mask: when p_pipe_bypass == '0, default to
+  // bypass only for the control-subset pipe.
+  function automatic logic [p_num_pipes-1:0] ctrl_only_bypass();
+    for (int i = 0; i < p_num_pipes; i++)
+      ctrl_only_bypass[i] = (p_pipe_subsets[i] == p_ctrl_subset);
+  endfunction
+
+  localparam logic [p_num_pipes-1:0] c_pipe_bypass =
+    (p_pipe_bypass != '0) ? p_pipe_bypass : ctrl_only_bypass();
+
   //----------------------------------------------------------------------
   // Decode-issue message struct (accumulated through the pipeline)
   //----------------------------------------------------------------------
@@ -95,29 +110,60 @@ module DecodeIssueUnitL8 #(
     rv_uop                       uop;
     logic [p_phys_addr_bits-1:0] src_preg0;
     logic [p_phys_addr_bits-1:0] src_preg1;
+    logic                        src_pending0;
+    logic                        src_pending1;
     logic                  [4:0] waddr;
     logic                 [31:0] imm;
     logic                        op2_sel;
     logic                        op3_sel;
     logic [p_phys_addr_bits-1:0] alloc_preg;
     logic [p_phys_addr_bits-1:0] alloc_ppreg;
-  } t_diu_msg;
+  } t_dio_inst_window;
+
+  //----------------------------------------------------------------------
+  // Oldest control instruction info struct
+  //----------------------------------------------------------------------
+
+  typedef struct packed {
+    logic                          found;
+    logic                          is_brx;
+    logic                          srcs_ready;
+    logic [p_fe_lane_idx_bits-1:0] idx;
+    logic                    [1:0] jal;
+    logic                   [31:0] pc;
+    logic                   [31:0] imm;
+    logic   [p_seq_num_bits-1:0]   seq_num;
+  } t_oldest_ctrl_inst;
 
   //----------------------------------------------------------------------
   // Forward declarations
   //----------------------------------------------------------------------
   // Signals referenced before they are driven (cross-stage dependencies).
 
-  logic dispatch_go                  [p_num_fe_lanes];
-  logic alloc_rdy                    [p_num_fe_lanes];
-  logic oldest_ctrl_inst_srcs_ready;
-  logic invalidate_inst              [p_num_fe_lanes];
+  logic dispatch_go      [p_num_fe_lanes];
+  logic alloc_rdy        [p_num_fe_lanes];
+  logic invalidate_inst  [p_num_fe_lanes];
 
-  // Instruction check interfaces -- one per stage per lane.
-  InstCheckIntf inst_chk_s1 [p_num_fe_lanes] ();
-  InstCheckIntf inst_chk_s2 [p_num_fe_lanes] ();
-  InstCheckIntf inst_chk_s3 [p_num_fe_lanes] ();
-  InstCheckIntf inst_chk_s4 [p_num_fe_lanes] ();
+  // Instruction check interface chains.
+  //
+  // Intra chains (same lane, across stages):
+  //   intra_chk_s0 = sentinel → S1 input
+  //   intra_chk_sN = stage N output → stage N+1 input
+  //
+  // Inter chains (same stage, across lanes):
+  //   inter_chk_sN[0] = sentinel for lane 0
+  //   inter_chk_sN[i+1] = stage N, lane i output → lane i+1 input
+
+  InstChkIntf intra_chk_s0 [p_num_fe_lanes] ();
+  InstChkIntf intra_chk_s1 [p_num_fe_lanes] ();
+  InstChkIntf intra_chk_s2 [p_num_fe_lanes] ();
+  InstChkIntf intra_chk_s3 [p_num_fe_lanes] ();
+  InstChkIntf intra_chk_s4 [p_num_fe_lanes] ();
+
+  InstChkIntf inter_chk_s1 [p_num_fe_lanes + 1] ();
+  InstChkIntf inter_chk_s2 [p_num_fe_lanes + 1] ();
+  InstChkIntf inter_chk_s3 [p_num_fe_lanes + 1] ();
+  InstChkIntf inter_chk_s4 [p_num_fe_lanes + 1] ();
 
   // Helper arrays for variable-indexed access (SV interfaces cannot be
   // indexed with runtime variables in Verilator).
@@ -130,36 +176,36 @@ module DecodeIssueUnitL8 #(
 
   logic                      fifo_pop;
   logic                      fifo_empty;
-  logic [1:0]                fifo_edit_inst_state [p_num_fe_lanes];
+  logic [1:0]                fifo_update_head [p_num_fe_lanes];
 
-  t_diu_msg F_curr [p_num_fe_lanes];
+  t_dio_inst_window F_curr [p_num_fe_lanes];
 
   DIUBypassFifo #(
-    .t_msg          (t_diu_msg),
+    .t_msg          (t_dio_inst_window),
     .p_seq_num_bits (p_seq_num_bits),
     .p_depth        (p_f_intf_fifo_depth),
     .p_bypass       (p_f_intf_fifo_bypass),
     .p_num_lanes    (p_num_fe_lanes)
   ) f_fifo (
-    .clk                 (clk),
-    .rst                 (rst | squash_sub.val),
-    .clear               (squash_pub_val_comb),
-    .F                   (F),
-    .pop                 (fifo_pop),
-    .empty               (fifo_empty),
-    .o_msg               (F_curr),
-    .edit_inst_state     (fifo_edit_inst_state)
+    .clk             (clk),
+    .rst             (rst | squash_sub.val),
+    .clear           (squash_pub_val_comb),
+    .F               (F),
+    .pop             (fifo_pop),
+    .empty           (fifo_empty),
+    .o_msg           (F_curr),
+    .edit_inst_state (fifo_update_head)
   );
 
   // Wire invalidation / dispatch decisions back to the FIFO.
   always_comb begin
     for( int j = 0; j < p_num_fe_lanes; j++ ) begin
       if( invalidate_inst[j] )
-        fifo_edit_inst_state[j] = INST_STATUS_INVALID;
+        fifo_update_head[j] = INST_STATUS_INVALID;
       else if( dispatch_go[j] )
-        fifo_edit_inst_state[j] = INST_STATUS_DISPATCHED;
+        fifo_update_head[j] = INST_STATUS_DISPATCHED;
       else
-        fifo_edit_inst_state[j] = INST_STATUS_READY;
+        fifo_update_head[j] = INST_STATUS_READY;
     end
   end
 
@@ -181,212 +227,136 @@ module DecodeIssueUnitL8 #(
   assign fifo_pop = F_rdy_all & !fifo_empty;
 
   //----------------------------------------------------------------------
-  // Decode
+  // Decode and oldest control instruction search
   //----------------------------------------------------------------------
 
-  logic       decoder_val     [p_num_fe_lanes];
-  rv_uop      decoder_uop     [p_num_fe_lanes];
-  logic [4:0] decoder_raddr0  [p_num_fe_lanes];
-  logic [4:0] decoder_raddr1  [p_num_fe_lanes];
-  logic [4:0] decoder_waddr   [p_num_fe_lanes];
-  logic       decoder_wen     [p_num_fe_lanes];
-  rv_imm_type decoder_imm_sel [p_num_fe_lanes];
-  logic       decoder_op2_sel [p_num_fe_lanes];
-  logic [1:0] decoder_jal     [p_num_fe_lanes];
-  logic       decoder_op3_sel [p_num_fe_lanes];
+  logic       decoder_val [p_num_fe_lanes];
+  logic [4:0] decoder_raddr0 [p_num_fe_lanes];
+  logic [4:0] decoder_raddr1 [p_num_fe_lanes];
+  logic       decoder_wen [p_num_fe_lanes];
+
+  t_dio_inst_window  decoded_msg [p_num_fe_lanes];
+  t_oldest_ctrl_inst oldest_ctrl_inst;
+
+  logic lookup_new_inst_pending [p_num_fe_lanes][2];
 
   genvar i;
 
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: DECODER_GEN
-      InstDecoder decoder (
-        .val     (decoder_val[i]),
-        .inst    (F_curr[i].inst),
-        .uop     (decoder_uop[i]),
-        .raddr0  (decoder_raddr0[i]),
-        .raddr1  (decoder_raddr1[i]),
-        .waddr   (decoder_waddr[i]),
-        .wen     (decoder_wen[i]),
-        .imm_sel (decoder_imm_sel[i]),
-        .op2_sel (decoder_op2_sel[i]),
-        .jal     (decoder_jal[i]),
-        .op3_sel (decoder_op3_sel[i])
-      );
-    end
-  endgenerate
-
-  //----------------------------------------------------------------------
-  // Oldest control instruction search
-  //----------------------------------------------------------------------
-  // Scan the current window for the oldest branch / jump instruction
-  // that has not yet dispatched.  Its index drives S2 ordering checks
-  // and the squash logic below.
-
-  logic [p_fe_lane_idx_bits-1:0] oldest_ctrl_inst_idx;
-  logic [p_seq_num_bits-1:0]     oldest_ctrl_inst_seq_num;
-  logic                          oldest_ctrl_inst_found;
-  logic                          oldest_ctrl_inst_is_brx;
-
-  logic [p_phys_addr_bits-1:0] lookup_preg          [p_num_pipes+1][2];
-  logic                        lookup_preg_en       [p_num_pipes+1][2];
-  logic                        lookup_pending       [p_num_pipes+1][2];
-  logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
-
-  SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
-  ) seq_age (
-    .clk    (clk),
-    .rst    (rst),
-    .commit (commit)
+  SSDecoder #(
+    .t_msg          (t_dio_inst_window),
+    .t_ctrl_info    (t_oldest_ctrl_inst),
+    .p_num_fe_lanes (p_num_fe_lanes),
+    .p_brx_subset   (p_brx_subset)
+  ) ss_decoder (
+    .in_msg                  (F_curr),
+    .out_msg                 (decoded_msg),
+    .decoder_val             (decoder_val),
+    .raddr0                  (decoder_raddr0),
+    .raddr1                  (decoder_raddr1),
+    .wen                     (decoder_wen),
+    .oldest_ctrl_inst        (oldest_ctrl_inst),
+    .lookup_new_inst_pending (lookup_new_inst_pending)
   );
 
-  always_comb begin
-    oldest_ctrl_inst_idx     = '0;
-    oldest_ctrl_inst_seq_num = F_curr[p_num_fe_lanes-1].seq_num;
-    oldest_ctrl_inst_found   = 1'b0;
-    oldest_ctrl_inst_is_brx  = 1'b0;
+  //----------------------------------------------------------------------
+  // Instruction check sentinels
+  //----------------------------------------------------------------------
+  // Intra sentinel (before S1): pass=1, inst_status from FIFO.
+  // Inter sentinels (lane 0):   pass=1, S4 uses DISPATCHED status so
+  //                              lane 0 sees prev-lane as dispatched.
 
-    for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-      logic is_brx, is_jal, is_valid;
-      is_brx   = in_subset(p_brx_subset, num_ops'(1 << decoder_uop[k]));
-      is_jal   = (decoder_jal[k] != 2'd0);
-      is_valid = inst_chk_s1_pass[k] && 
-        (F_curr[k].inst_status != INST_STATUS_DISPATCHED);
+  // Inter-lane sentinels (index 0 of each inter chain).
+  assign inter_chk_s1[0].pass        = 1'b1;
+  assign inter_chk_s1[0].invalidate  = 1'b0;
+  assign inter_chk_s1[0].inst_status = INST_STATUS_READY;
 
-      if( (is_brx || is_jal) && is_valid &&
-          (!oldest_ctrl_inst_found ||
-           seq_age.is_older(
-            F_curr[k].seq_num,
-             oldest_ctrl_inst_seq_num
-           )
-          )
-        )
-      begin
-        oldest_ctrl_inst_idx     = p_fe_lane_idx_bits'(k);
-        oldest_ctrl_inst_seq_num = F_curr[k].seq_num;
-        oldest_ctrl_inst_found   = 1'b1;
-        oldest_ctrl_inst_is_brx  = is_brx;
-      end
-    end
-  end
+  assign inter_chk_s2[0].pass        = 1'b1;
+  assign inter_chk_s2[0].invalidate  = 1'b0;
+  assign inter_chk_s2[0].inst_status = INST_STATUS_READY;
 
-  // Check whether the oldest control instruction's sources are ready
-  // via the rename-table lookup port reserved for this purpose.
-  always_comb begin
-    oldest_ctrl_inst_srcs_ready    = 1'b1;
-    lookup_preg_en[p_num_pipes][0] = 1'b0;
-    lookup_preg_en[p_num_pipes][1] = 1'b0;
-    lookup_preg[p_num_pipes][0]    = '0;
-    lookup_preg[p_num_pipes][1]    = '0;
+  assign inter_chk_s3[0].pass        = 1'b1;
+  assign inter_chk_s3[0].invalidate  = 1'b0;
+  assign inter_chk_s3[0].inst_status = INST_STATUS_READY;
 
-    if( oldest_ctrl_inst_found ) begin
-      lookup_preg_en[p_num_pipes][0] = 1'b1;
-      lookup_preg[p_num_pipes][0]    =
-        lookup_new_inst_preg[oldest_ctrl_inst_idx][0];
-
-      if( oldest_ctrl_inst_is_brx ) begin
-        lookup_preg_en[p_num_pipes][1] = 1'b1;
-        lookup_preg[p_num_pipes][1]    =
-          lookup_new_inst_preg[oldest_ctrl_inst_idx][1];
-      end
-
-      oldest_ctrl_inst_srcs_ready =
-        !lookup_pending[p_num_pipes][0] &
-        (!oldest_ctrl_inst_is_brx | !lookup_pending[p_num_pipes][1]);
-    end
-  end
+  assign inter_chk_s4[0].pass        = 1'b1;
+  assign inter_chk_s4[0].invalidate  = 1'b0;
+  assign inter_chk_s4[0].inst_status = INST_STATUS_DISPATCHED;
 
   //----------------------------------------------------------------------
-  // Instruction check stage 1 -- Validity
+  // Instruction check stages
   //----------------------------------------------------------------------
+
+  logic lane_val  [p_num_fe_lanes];
+  logic iq_val    [p_num_pipes];
+  logic alloc_try [p_num_fe_lanes];
 
   generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S1_GEN
-      assign inst_chk_s1[i].prev_stage_pass = 1'b1;
-      assign inst_chk_s1[i].prev_inst_pass  = 1'b1;
-      assign inst_chk_s1[i].inst_valid      = 
-        (F_curr[i].inst_status != INST_STATUS_INVALID);
+    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_GEN
 
-      InstCheckS1 check_s1 (
-        .chk_intf       (inst_chk_s1[i]),
-        .entry_val      (F_curr[i].val),
-        .entry_inst_val (F_curr[i].inst_status != INST_STATUS_INVALID),
-        .decoder_val    (decoder_val[i])
+      // Intra sentinel (before S1): pass through from FIFO.
+      assign intra_chk_s0[i].pass        = 1'b1;
+      assign intra_chk_s0[i].invalidate  = 1'b0;
+      assign intra_chk_s0[i].inst_status = F_curr[i].inst_status;
+
+      // S1 -- Validity
+      InstCheckS1 #(
+        .inst_idx       (i),
+        .p_num_fe_lanes (p_num_fe_lanes)
+      ) check_s1 (
+        .in_intra_chk  (intra_chk_s0[i]),
+        .in_inter_chk  (inter_chk_s1[i]),
+        .out_intra_chk (intra_chk_s1[i]),
+        .out_inter_chk (inter_chk_s1[i+1]),
+        .entry_val     (F_curr[i].val),
+        .decoder_val   (decoder_val[i])
       );
 
-      assign inst_chk_s1_pass[i] = inst_chk_s1[i].pass;
-    end
-  endgenerate
+      assign inst_chk_s1_pass[i] = intra_chk_s1[i].pass;
 
-  //----------------------------------------------------------------------
-  // Instruction check stage 2 -- Control instruction ordering
-  //----------------------------------------------------------------------
-
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S2_GEN
-      assign inst_chk_s2[i].prev_stage_pass = inst_chk_s1[i].pass;
-      assign inst_chk_s2[i].prev_inst_pass  = 1'b1;
-      assign inst_chk_s2[i].inst_valid      = 
-        (F_curr[i].inst_status != INST_STATUS_INVALID);
-
+      // S2 -- Control instruction ordering
       InstCheckS2 #(
         .inst_idx       (i),
         .p_num_fe_lanes (p_num_fe_lanes)
       ) check_s2 (
-        .chk_intf                     (inst_chk_s2[i]),
-        .oldest_ctrl_inst_found       (oldest_ctrl_inst_found),
-        .oldest_ctrl_inst_is_brx      (oldest_ctrl_inst_is_brx),
-        .oldest_ctrl_inst_idx         (oldest_ctrl_inst_idx),
-        .oldest_ctrl_inst_srcs_ready  (oldest_ctrl_inst_srcs_ready),
-        .oldest_ctrl_inst_dispatch_en (inst_chk_s4_pass[oldest_ctrl_inst_idx]),
-        .squash_sub_val               (squash_sub.val)
-      );
-    end
-  endgenerate
-
-  //----------------------------------------------------------------------
-  // Instruction check stage 3 -- Physical register allocation
-  //----------------------------------------------------------------------
-
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S3_GEN
-      assign inst_chk_s3[i].prev_stage_pass = inst_chk_s2[i].pass;
-      assign inst_chk_s3[i].prev_inst_pass  = (i == 0) ? 1'b1 :
-                                               inst_chk_s3[i-1].prev_inst_pass_out;
-      assign inst_chk_s3[i].inst_valid      = (F_curr[i].inst_status != INST_STATUS_INVALID);
-
-      InstCheckS3 check_s3 (
-        .chk_intf    (inst_chk_s3[i]),
-        .decoder_wen (decoder_wen[i]),
-        .alloc_rdy   (alloc_rdy[i]),
-        .dispatched  (F_curr[i].inst_status == INST_STATUS_DISPATCHED)
-      );
-    end
-  endgenerate
-
-  //----------------------------------------------------------------------
-  // Instruction check stage 4 -- Structural hazard (crossbar routing)
-  //----------------------------------------------------------------------
-
-  logic lane_val [p_num_fe_lanes];
-  logic iq_val   [p_num_pipes];
-
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: INST_CHECK_S4_GEN
-      assign inst_chk_s4[i].prev_stage_pass = inst_chk_s3[i].pass;
-      assign inst_chk_s4[i].prev_inst_pass  = (i == 0) ? 1'b1 :
-                                               inst_chk_s4[i-1].prev_inst_pass_out;
-      assign inst_chk_s4[i].inst_valid      = (F_curr[i].inst_status != INST_STATUS_INVALID);
-
-      InstCheckS4 check_s4 (
-        .chk_intf             (inst_chk_s4[i]),
-        .dispatched           (F_curr[i].inst_status == INST_STATUS_DISPATCHED),
-        .prev_inst_dispatched (i == 0 ? 1'b1 :
-                               (F_curr[i-1].inst_status == INST_STATUS_DISPATCHED)),
-        .lane_val             (lane_val[i])
+        .in_intra_chk                 (intra_chk_s1[i]),
+        .in_inter_chk                 (inter_chk_s2[i]),
+        .out_intra_chk                (intra_chk_s2[i]),
+        .out_inter_chk                (inter_chk_s2[i+1]),
+        .oldest_ctrl_inst_found       (oldest_ctrl_inst.found),
+        .oldest_ctrl_inst_is_brx      (oldest_ctrl_inst.is_brx),
+        .oldest_ctrl_inst_idx         (oldest_ctrl_inst.idx),
+        .oldest_ctrl_inst_srcs_ready  (oldest_ctrl_inst.srcs_ready),
+        .oldest_ctrl_inst_dispatch_en (inst_chk_s4_pass[oldest_ctrl_inst.idx]),
+        .squash_sub_val               (squash_sub.val),
+        .alloc_try                    (alloc_try[i])
       );
 
-      assign inst_chk_s4_pass[i] = inst_chk_s4[i].pass;
+      // S3 -- Physical register allocation
+      InstCheckS3 #(
+        .inst_idx       (i),
+        .p_num_fe_lanes (p_num_fe_lanes)
+      ) check_s3 (
+        .in_intra_chk  (intra_chk_s2[i]),
+        .in_inter_chk  (inter_chk_s3[i]),
+        .out_intra_chk (intra_chk_s3[i]),
+        .out_inter_chk (inter_chk_s3[i+1]),
+        .decoder_wen   (decoder_wen[i]),
+        .alloc_rdy     (alloc_rdy[i])
+      );
+
+      // S4 -- Structural hazard (crossbar routing)
+      InstCheckS4 #(
+        .inst_idx       (i),
+        .p_num_fe_lanes (p_num_fe_lanes)
+      ) check_s4 (
+        .in_intra_chk  (intra_chk_s3[i]),
+        .in_inter_chk  (inter_chk_s4[i]),
+        .out_intra_chk (intra_chk_s4[i]),
+        .out_inter_chk (inter_chk_s4[i+1]),
+        .lane_val      (lane_val[i])
+      );
+
+      assign inst_chk_s4_pass[i] = intra_chk_s4[i].pass;
     end
   endgenerate
 
@@ -398,10 +368,10 @@ module DecodeIssueUnitL8 #(
   generate
     for( i = 0; i < p_num_fe_lanes; i++ ) begin: INVALIDATE_GEN
       assign invalidate_inst[i] =
-        inst_chk_s1[i].invalidate |
-        inst_chk_s2[i].invalidate |
-        inst_chk_s3[i].invalidate |
-        inst_chk_s4[i].invalidate;
+        intra_chk_s1[i].invalidate |
+        intra_chk_s2[i].invalidate |
+        intra_chk_s3[i].invalidate |
+        intra_chk_s4[i].invalidate;
     end
   endgenerate
 
@@ -409,58 +379,49 @@ module DecodeIssueUnitL8 #(
   // Rename table and register file
   //----------------------------------------------------------------------
 
-  logic [p_phys_addr_bits-1:0] alloc_preg  [p_num_fe_lanes];
-  logic [p_phys_addr_bits-1:0] alloc_ppreg [p_num_fe_lanes];
 
   logic [4:0] lookup_new_inst_areg [p_num_fe_lanes][2];
-  logic       lookup_new_inst_en   [p_num_fe_lanes][2];
-
-  logic alloc_try [p_num_fe_lanes];
-  logic alloc_val [p_num_fe_lanes];
-
+  logic [4:0] alloc_areg          [p_num_fe_lanes];
   always_comb begin
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
       lookup_new_inst_areg[k][0] = decoder_raddr0[k];
       lookup_new_inst_areg[k][1] = decoder_raddr1[k];
-      lookup_new_inst_en[k][0]   = 1'b1;
-      lookup_new_inst_en[k][1]   = 1'b1;
-      alloc_try[k] = inst_chk_s1_pass[k] & 
-        (F_curr[k].inst_status != INST_STATUS_DISPATCHED);
+      alloc_areg[k]              = decoded_msg[k].waddr;
     end
   end
 
+  logic alloc_val [p_num_fe_lanes];
   always_comb begin
     for( int k = 0; k < p_num_fe_lanes; k++ ) begin
       alloc_val[k] = alloc_try[k] && dispatch_go[k];
     end
   end
 
+  logic [p_phys_addr_bits-1:0] alloc_preg           [p_num_fe_lanes];
+  logic [p_phys_addr_bits-1:0] alloc_ppreg          [p_num_fe_lanes];
+  logic [p_phys_addr_bits-1:0] lookup_new_inst_preg [p_num_fe_lanes][2];
+
   SSRenameTableL3 #(
-    .p_num_phys_regs    (p_num_phys_regs),
-    .p_num_lookup_ports (p_num_pipes + 1),
-    .p_num_fe_lanes     (p_num_fe_lanes),
-    .p_num_be_lanes     (p_num_be_lanes)
+    .p_num_phys_regs (p_num_phys_regs),
+    .p_num_fe_lanes  (p_num_fe_lanes),
+    .p_num_be_lanes  (p_num_be_lanes)
   ) rename_table (
-    .clk                  (clk),
-    .rst                  (rst),
+    .clk                     (clk),
+    .rst                     (rst),
 
-    .alloc_areg           (decoder_waddr),
-    .alloc_preg           (alloc_preg),
-    .alloc_ppreg          (alloc_ppreg),
-    .alloc_try            (alloc_try),
-    .alloc_val            (alloc_val),
-    .alloc_rdy            (alloc_rdy),
+    .alloc_areg              (alloc_areg),
+    .alloc_preg              (alloc_preg),
+    .alloc_ppreg             (alloc_ppreg),
+    .alloc_try               (alloc_try),
+    .alloc_val               (alloc_val),
+    .alloc_rdy               (alloc_rdy),
 
-    .lookup_new_inst_areg (lookup_new_inst_areg),
-    .lookup_new_inst_en   (lookup_new_inst_en),
-    .lookup_new_inst_preg (lookup_new_inst_preg),
+    .lookup_new_inst_areg    (lookup_new_inst_areg),
+    .lookup_new_inst_preg    (lookup_new_inst_preg),
+    .lookup_new_inst_pending (lookup_new_inst_pending),
 
-    .lookup_preg          (lookup_preg),
-    .lookup_preg_en       (lookup_preg_en),
-    .lookup_pending       (lookup_pending),
-
-    .complete             (complete),
-    .commit               (commit)
+    .complete                (complete),
+    .commit                  (commit)
   );
 
   // Extract completion signals for the register file write port.
@@ -494,131 +455,117 @@ module DecodeIssueUnitL8 #(
     .wen   (complete_wen_and_val)
   );
 
-  // Immediate generation -- one per FE lane.
-  logic [31:0] imm [p_num_fe_lanes];
-
-  generate
-    for( i = 0; i < p_num_fe_lanes; i++ ) begin: IMM_GEN
-      ImmGen imm_gen (
-        .inst    (F_curr[i].inst),
-        .imm_sel (decoder_imm_sel[i]),
-        .imm     (imm[i])
-      );
-    end
-  endgenerate
 
   //----------------------------------------------------------------------
   // Squashing
   //----------------------------------------------------------------------
-  // When the oldest control instruction is a JAL/JALR (not a branch),
-  // compute its jump target and publish a squash notification.
 
-  logic [31:0] jump_target;
+  logic        squash_pub_val_comb;
   logic [31:0] jump_base;
 
-  always_comb begin
-    if( !oldest_ctrl_inst_is_brx ) begin
-      case( decoder_jal[oldest_ctrl_inst_idx] )
-        2'd1:    jump_target = F_curr[oldest_ctrl_inst_idx].pc
-                              + imm[oldest_ctrl_inst_idx];
-        2'd2:    jump_target = (jump_base + imm[oldest_ctrl_inst_idx])
-                              & 32'hFFFFFFFE;
-        default: jump_target = '0;
-      endcase
-    end else begin
-      jump_target = '0;
-    end
-  end
-
-  // Combinational squash signal for internal use (FIFO reset, squash_sent).
-  logic squash_pub_val_comb;
-  assign squash_pub_val_comb = oldest_ctrl_inst_found  &&
-                               !oldest_ctrl_inst_is_brx &&
-                               dispatch_go[oldest_ctrl_inst_idx];
-
-  logic squash_sent;
-
-  always_ff @( posedge clk ) begin
-    if( rst )
-      squash_sent <= 1'b0;
-    else if( fifo_pop )
-      squash_sent <= 1'b0;
-    else if( squash_pub_val_comb )
-      squash_sent <= 1'b1;
-  end
-
-  // Register squash_pub outputs to break the combinational loop through
-  // SU -> FU -> bypass FIFO -> DIU.
-  always_ff @( posedge clk ) begin
-    if( rst ) begin
-      squash_pub.val     <= 1'b0;
-      squash_pub.target  <= '0;
-      squash_pub.seq_num <= '0;
-    end else begin
-      squash_pub.val     <= squash_pub_val_comb;
-      squash_pub.target  <= jump_target;
-      squash_pub.seq_num <= F_curr[oldest_ctrl_inst_idx].seq_num;
-    end
-  end
+  DIUSquashPub #(
+    .t_ctrl_info    (t_oldest_ctrl_inst),
+    .p_seq_num_bits (p_seq_num_bits)
+  ) squash_publisher (
+    .clk                          (clk),
+    .rst                          (rst),
+    .oldest_ctrl_inst             (oldest_ctrl_inst),
+    .oldest_ctrl_inst_jump_base   (jump_base),
+    .oldest_ctrl_inst_dispatch_go (dispatch_go[oldest_ctrl_inst.idx]),
+    .squash_pub                   (squash_pub),
+    .squash_pub_val_comb          (squash_pub_val_comb)
+  );
 
   //----------------------------------------------------------------------
-  // Crossbar routing
+  // Crossbar mapping and routing
   //----------------------------------------------------------------------
-  // Route each valid, undispatched instruction to an issue queue based
-  // on its micro-op.  The router also muxes per-lane data to per-pipe
-  // outputs and computes lane_val / dispatch_go internally.
+  // SSInstMapper computes the lane-to-pipe mapping via iSLIP.
+  // SSDIURouter muxes instruction data according to the mapping.
 
   logic                       iq_rdy         [p_num_pipes];
   logic [p_iq_entries_bits:0] iq_avail_slots [p_num_pipes];
 
-  // Pack router input data
-  t_diu_msg router_in_msg [p_num_fe_lanes];
-  logic     router_val    [p_num_fe_lanes];
+  // Pack mapper input data
+  t_dio_inst_window router_in_msg [p_num_fe_lanes];
 
   always_comb begin
     for( int i = 0; i < p_num_fe_lanes; i++ ) begin
-      router_val[i]                = inst_chk_s1_pass[i] && 
-        (F_curr[i].inst_status != INST_STATUS_DISPATCHED);
-      router_in_msg[i]             = F_curr[i];
-      router_in_msg[i].uop         = decoder_uop[i];
-      router_in_msg[i].src_preg0   = lookup_new_inst_preg[i][0];
-      router_in_msg[i].src_preg1   = lookup_new_inst_preg[i][1];
-      router_in_msg[i].waddr       = decoder_waddr[i];
-      router_in_msg[i].imm         = imm[i];
-      router_in_msg[i].op2_sel     = decoder_op2_sel[i];
-      router_in_msg[i].op3_sel     = decoder_op3_sel[i];
-      router_in_msg[i].alloc_preg  = alloc_preg[i];
-      router_in_msg[i].alloc_ppreg = alloc_ppreg[i];
+      router_in_msg[i]              = decoded_msg[i];
+      router_in_msg[i].src_preg0    = lookup_new_inst_preg[i][0];
+      router_in_msg[i].src_preg1    = lookup_new_inst_preg[i][1];
+      router_in_msg[i].src_pending0 = lookup_new_inst_pending[i][0];
+      router_in_msg[i].src_pending1 = lookup_new_inst_pending[i][1];
+      router_in_msg[i].alloc_preg   = alloc_preg[i];
+      router_in_msg[i].alloc_ppreg  = alloc_ppreg[i];
     end
   end
 
   // Per-pipe routed instruction data from the router
-  t_diu_msg iq_msg    [p_num_pipes];
-  logic     iq_ins_val [p_num_pipes];
+  t_dio_inst_window iq_msg     [p_num_pipes];
+  logic             iq_ins_try [p_num_pipes];
 
-  SSDIURouter #(
-    .t_msg             (t_diu_msg),
+  //----------------------------------------------------------------------
+  // Sequence age tracker
+  //----------------------------------------------------------------------
+  // Shared oldest_seq_num used by both the mapper (age-based grant)
+  // and the out-of-order issue queues (oldest-ready selection).
+
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+
+  SSSeqAge #(
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
+    .clk            (clk),
+    .rst            (rst),
+    .oldest_seq_num (oldest_seq_num),
+    .commit         (commit)
+  );
+
+  // Mapper outputs consumed by both the router and the inst-check S4
+  // stage (lane_val feeds into the structural-hazard check).
+
+  localparam p_pipe_bits        = p_num_pipes > 1 ? $clog2(p_num_pipes) : 1;
+  localparam p_input_lanes_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
+
+  logic [p_input_lanes_bits-1:0] mapper_route_idx        [p_num_pipes];
+  logic [p_pipe_bits-1:0]        mapper_lane_to_pipe_map [p_num_fe_lanes];
+
+  SSInstMapper #(
+    .t_msg             (t_dio_inst_window),
     .p_num_pipes       (p_num_pipes),
     .p_num_input_lanes (p_num_fe_lanes),
     .p_iq_depth        (p_iq_depth),
     .p_seq_num_bits    (p_seq_num_bits),
     .p_num_iter        (p_num_fe_lanes),
-    .p_num_be_lanes    (p_num_be_lanes),
-    .p_pipe_subsets    (p_pipe_subsets)
+    .p_pipe_subsets    (p_pipe_subsets),
+    .p_pipe_bypass     (c_pipe_bypass)
+  ) inst_mapper (
+    .in_msg           (router_in_msg),
+    .val              (inst_chk_s1_pass),
+    .iq_rdy           (iq_rdy),
+    .iq_avail_slots   (iq_avail_slots),
+    .oldest_seq_num   (oldest_seq_num),
+    .route_idx        (mapper_route_idx),
+    .iq_val           (iq_val),
+    .lane_val         (lane_val),
+    .lane_to_pipe_map (mapper_lane_to_pipe_map)
+  );
+
+  SSDIURouter #(
+    .t_msg             (t_dio_inst_window),
+    .p_num_pipes       (p_num_pipes),
+    .p_num_input_lanes (p_num_fe_lanes)
   ) inst_router (
-    .clk            (clk),
-    .rst            (rst),
-    .val            (router_val),
-    .in_msg         (router_in_msg),
-    .chk_pass       (inst_chk_s4_pass),
-    .iq_rdy         (iq_rdy),
-    .iq_avail_slots (iq_avail_slots),
-    .iq_msg         (iq_msg),
-    .iq_ins_val     (iq_ins_val),
-    .iq_val         (iq_val),
-    .lane_val       (lane_val),
-    .dispatch_go    (dispatch_go),
-    .commit         (commit)
+    .in_msg           (router_in_msg),
+    .chk_pass         (inst_chk_s4_pass),
+    .iq_rdy           (iq_rdy),
+    .route_idx        (mapper_route_idx),
+    .iq_val           (iq_val),
+    .lane_to_pipe_map (mapper_lane_to_pipe_map),
+    .iq_msg           (iq_msg),
+    .iq_ins_try       (iq_ins_try),
+    .dispatch_go      (dispatch_go)
   );
 
   //----------------------------------------------------------------------
@@ -628,41 +575,40 @@ module DecodeIssueUnitL8 #(
 
   generate
     for( i = 0; i < p_num_pipes; i++ ) begin: IQ_GEN
-      IssueQueueInOrder #(
-        .t_msg          (t_diu_msg),
+      IssueQueueOOO #(
+        .t_msg          (t_dio_inst_window),
         .p_depth        (p_iq_depth),
         .p_num_regs     (p_num_phys_regs),
         .p_seq_num_bits (p_seq_num_bits),
         .p_num_be_lanes (p_num_be_lanes),
-        .p_bypass       (p_pipe_subsets[i] == p_ctrl_subset)
+        .p_bypass       (c_pipe_bypass[i])
       ) issue_queue (
-        .clk               (clk),
-        .rst               (rst),
+        .clk             (clk),
+        .rst             (rst),
 
         // Insert (data from router)
-        .ins_msg           (iq_msg[i]),
-        .ins_val           (iq_ins_val[i]),
-        .ins_rdy           (iq_rdy[i]),
-        .avail_slots       (iq_avail_slots[i]),
+        .ins_msg         (iq_msg[i]),
+        .ins_try         (iq_ins_try[i]),
+        .ins_rdy         (iq_rdy[i]),
+        .ins_ack         (),
+        .avail_slots     (iq_avail_slots[i]),
 
         // Dequeue
-        .Ex                (Ex[i]),
+        .Ex              (Ex[i]),
 
-        // Rename table access
-        .rt_lookup_preg    (lookup_preg[i]),
-        .rt_lookup_pending (lookup_pending[i]),
-        .rt_lookup_en      (lookup_preg_en[i]),
+        // Age comparison
+        .oldest_seq_num  (oldest_seq_num),
 
         // Register file access
-        .rf_raddr          (raddr[i]),
-        .rf_rdata          (rdata[i]),
+        .rf_raddr        (raddr[i]),
+        .rf_rdata        (rdata[i]),
 
         // Completion interface
-        .complete          (complete)
+        .complete        (complete)
       );
 
-      // JALR base register read -- assumes exactly one control pipe.
-      if( p_pipe_subsets[i] == p_ctrl_subset ) begin
+      // JALR base register read -- assumes exactly one control pipe
+      if( c_pipe_bypass[i] ) begin
         assign jump_base = rdata[i][0];
       end
     end

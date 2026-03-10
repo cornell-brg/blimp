@@ -187,6 +187,24 @@ module SimUtils
     end
   endtask
 
+  //----------------------------------------------------------------------
+  // CPI Calculator
+  //----------------------------------------------------------------------
+
+  int num_committed = 0;
+
+  task commit_notify( input int num_insts );
+    num_committed = num_committed + num_insts;
+  endtask
+
+  final begin
+    if( num_committed > 0 ) begin
+      $display( "" );
+      $display( "CPI = %0d / %0d = %f",
+        cycles, num_committed, real'(cycles) / real'(num_committed) );
+    end
+  end
+
 endmodule
 
 `endif // HW_TOP_SIM_SIM_UTILS_V

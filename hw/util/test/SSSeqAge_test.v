@@ -40,8 +40,11 @@ module SSSeqAgeTestSuite #(
     .p_seq_num_bits (p_seq_num_bits)
   ) commit_notif [p_num_be_lanes] ();
 
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
   ) dut(
     .commit (commit_notif),
     .*

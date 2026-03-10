@@ -7,44 +7,37 @@
 `define INTF_INST_CHECK_INTF_V
 
 //------------------------------------------------------------------------
-// InstCheckIntf
+// InstChkIntf
 //------------------------------------------------------------------------
 
-interface InstCheckIntf;
+interface InstChkIntf;
+
+  localparam [1:0] INST_STATUS_INVALID    = 2'b00,
+                   INST_STATUS_READY      = 2'b01,
+                   INST_STATUS_DISPATCHED = 2'b10; 
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Signals
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  logic prev_stage_pass;
-  logic prev_inst_pass;
-  logic inst_valid;
-  logic pass;
-  logic invalidate;
-  logic prev_inst_pass_out;
+  logic       pass;
+  logic       invalidate;
+  logic [1:0] inst_status;
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Module-facing Ports
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  // Check module
-  modport check (
-    input  prev_stage_pass,
-    input  prev_inst_pass,
-    input  inst_valid,
+  modport out (
     output pass,
     output invalidate,
-    output prev_inst_pass_out
+    output inst_status
   );
 
-  // Controller (DIU)
-  modport ctl (
-    output prev_stage_pass,
-    output prev_inst_pass,
-    output inst_valid,
-    input  pass,
-    input  invalidate,
-    input  prev_inst_pass_out
+  modport in (
+    input pass,
+    input invalidate,
+    input inst_status
   );
 
 endinterface

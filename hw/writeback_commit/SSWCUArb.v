@@ -56,14 +56,17 @@ module SSWCUArb #(
   // Age tracking
   //----------------------------------------------------------------------
 
-  SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
-  ) seq_age (
-    .*
-  );
-
   logic [p_seq_num_bits-1:0] oldest_seq_num;
-  assign oldest_seq_num = seq_age.oldest_seq_num;
+
+  SSSeqAge #(
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
+    .clk              (clk),
+    .rst              (rst),
+    .oldest_seq_num   (oldest_seq_num),
+    .commit           (commit)
+  );
 
   //----------------------------------------------------------------------
   // Build request and compatibility matrix

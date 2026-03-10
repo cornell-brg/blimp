@@ -95,15 +95,22 @@ module BlimpV11_sim;
 
   always @( posedge clk ) begin
     #2;
-    for( int j = 0; j < p_num_be_lanes; j++ ) begin
-      if( inst_trace_val[j] ) begin
-        t.inst_trace(
-          inst_trace_pc[j],
-          inst_trace_waddr[j],
-          inst_trace_wdata[j],
-          inst_trace_wen[j]
-        );
+    begin
+      int num_committed;
+      num_committed = 0;
+      for( int j = 0; j < p_num_be_lanes; j++ ) begin
+        if( inst_trace_val[j] ) begin
+          num_committed = num_committed + 1;
+          t.inst_trace(
+            inst_trace_pc[j],
+            inst_trace_waddr[j],
+            inst_trace_wdata[j],
+            inst_trace_wen[j]
+          );
+        end
       end
+      if( num_committed > 0 )
+        t.commit_notify( num_committed );
     end
   end
 

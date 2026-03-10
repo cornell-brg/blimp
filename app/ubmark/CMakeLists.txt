@@ -5,7 +5,10 @@
 
 set(APP_FILES
   bsearch.cpp
+  depchain.cpp
+  ptrchase.cpp
   vvadd.cpp
+  vvadd-long.cpp
   PARENT_SCOPE
 )
 
