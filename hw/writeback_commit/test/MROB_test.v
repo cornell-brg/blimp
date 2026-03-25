@@ -418,8 +418,6 @@ module MROBTestSuite #(
   task test_case_random();
     t.test_case_begin( "test_case_random" );
 
-    model.deq_ptr = $urandom( 32'hDEADBEEF );
-
     // Initialize MROB model to empty
     model.deq_ptr = '0;
     for( int i = 0; i < p_depth; i++ ) begin
@@ -480,32 +478,32 @@ module MROBTestSuite #(
         end
       end
       
-      // // Insert to MROB
-      // send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
-      // // Dequeue from MROB if ready to dequeue
-      // if ( test_rand.deq_rdy ) begin
-      //   recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
-      //   model.deq_ptr = deq_ptr_next;
-      // end
-      // else
-      //   #10;
+      // Insert to MROB
+      send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      // Dequeue from MROB if ready to dequeue
+      if ( test_rand.deq_rdy ) begin
+        recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+        model.deq_ptr = deq_ptr_next;
+      end
+      else
+        #10;
 
-      fork
-        begin
-          // Insert to MROB
-          send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
-        end
+      // fork
+      //   begin
+      //     // Insert to MROB
+      //     send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      //   end
 
-        begin
-          // Dequeue from MROB if ready to dequeue
-          if ( test_rand.deq_rdy ) begin
-            recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
-            model.deq_ptr = deq_ptr_next;
-          end
-          else
-            #10;
-        end
-      join
+      //   begin
+      //     // Dequeue from MROB if ready to dequeue
+      //     if ( test_rand.deq_rdy ) begin
+      //       recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+      //       model.deq_ptr = deq_ptr_next;
+      //     end
+      //     else
+      //       #10;
+      //   end
+      // join
     end
 
     t.test_case_end();
@@ -591,32 +589,32 @@ module MROBTestSuite #(
         end
       end
 
-      // // Insert to MROB
-      // send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
-      // // Dequeue from MROB if ready to dequeue
-      // if ( test_rand.deq_rdy ) begin
-      //   recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
-      //   model.deq_ptr = deq_ptr_next;
-      // end
-      // else
-      //   #10;
+      // Insert to MROB
+      send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      // Dequeue from MROB if ready to dequeue
+      if ( test_rand.deq_rdy ) begin
+        recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+        model.deq_ptr = deq_ptr_next;
+      end
+      else
+        #10;
 
-      fork
-        begin
-          // Insert to MROB
-          send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
-        end
+      // fork
+      //   begin
+      //     // Insert to MROB
+      //     send( test_rand.ins_msg, test_rand.ins_idx, test_rand.ins_msg_val );
+      //   end
 
-        begin
-          // Dequeue from MROB if ready to dequeue
-          if ( test_rand.deq_rdy ) begin
-            recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
-            model.deq_ptr = deq_ptr_next;
-          end
-          else
-            #10;
-        end
-      join
+      //   begin
+      //     // Dequeue from MROB if ready to dequeue
+      //     if ( test_rand.deq_rdy ) begin
+      //       recv( test_rand.deq_msg, test_rand.deq_idx, test_rand.deq_msg_val );
+      //       model.deq_ptr = deq_ptr_next;
+      //     end
+      //     else
+      //       #10;
+      //   end
+      // join
     end
 
     t.test_case_end();
