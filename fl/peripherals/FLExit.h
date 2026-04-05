@@ -27,6 +27,14 @@ class FLExit : public FLPeripheral {
   {
     return address_ranges;
   }
+
+public:
+  //----------------------------------------------------------------------
+  // Exit status (for non-Verilator builds)
+  //----------------------------------------------------------------------
+
+  static bool     s_exit_requested;
+  static uint32_t s_exit_code;
 };
 
 #endif  // FL_TERMINAL_H

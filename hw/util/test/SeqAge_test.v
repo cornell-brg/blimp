@@ -39,7 +39,9 @@ module SeqAgeTestSuite #(
     .p_seq_num_bits (p_seq_num_bits)
   ) commit_notif();
 
-  SeqAge dut(
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) dut(
     .commit (commit_notif),
     .*
   );

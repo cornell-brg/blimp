@@ -45,7 +45,9 @@ module SeqArbHelper #(
   CommitNotif.sub commit
 );
 
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
 
@@ -131,7 +133,7 @@ module SeqArb #(
           assign intermediate_seq_num[i] = seq_num[i];
           assign intermediate_val[i]     = val[i];
         end else begin
-          assign intermediate_seq_num[i] = 'x;
+          assign intermediate_seq_num[i] = '0;
           assign intermediate_val[i]     = 1'b0;
         end
       end

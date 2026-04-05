@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 02-synopsys-vcs-rtlsim/run
+#=========================================================================
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Colors
+
+RED="\e[31m"
+GREEN="\e[32m"
+RESET="\e[0m"
+
+# Determine TOPDIR and RUNDIR
+
+TOPDIR="$(git rev-parse --show-toplevel)"
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+#-------------------------------------------------------------------------
+# Generate dependencies and compile libraries
+#-------------------------------------------------------------------------
+
+# Set VCS +define+ flags from YAML defines
+YAML_DEFINES="
+{% for d in defines | default([]) -%}
+{% if d is mapping -%}
+{% for k, v in d.items() -%}
+  +define+{{ k }}={{ v }}
+{% endfor -%}
+{% else -%}
+  +define+{{ d }}
+{% endif -%}
+{% endfor -%}
+"
+
+cmake ${TOPDIR} -DCMAKE_Verilog_COMPILER_ID=VCS | tee run.log
+make vcs-deps -j | tee -a run.log
+
+#-------------------------------------------------------------------------
+# Function for running one test
+#-------------------------------------------------------------------------
+# $1 = name of test
+
+function run_test
+{
+  trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+  rm -rf $1 $1.daidir $1.log
+
+  # Compile testbench
+  vcs \
+    -sverilog -q -xprop=tmerge -override_timescale=1ns/1ps \
+    -top $1 \
+    -CFLAGS -I${TOPDIR} \
+    -LDFLAGS -z\ noexecstack \
+    +incdir+${TOPDIR} \
+    +define+BLIMP_VCS \
+    +define+VCS_ASIC \
+    +define+PICKLE_RTLSIM \
+    ${YAML_DEFINES} \
+    +define+NTC \
+    {{ "+vcs+dumpvars+$1.vcd" if dump_vcd | default(false) }} \
+    libFL_PROC.a libASM.a \
+    ../01-verilator-pickle/{{ design_name }}_pickled.v \
+    ../01-verilator-pickle/$1.v \
+    -o $1 | tee -a $1.log
+
+  # Run test
+  ./$1 | tee -a $1.log
+
+  if ! grep -iP "error" $1.log | grep -ivP "Total errors:\s*0" > /dev/null 2>&1 && { grep "\[ passed \]" $1.log > /dev/null 2>&1 || ! grep $'\033\[31mF\033\[0m' $1.log > /dev/null 2>&1; }; then
+    echo -e ">>>> [ ${GREEN}passed${RESET} ] $1" >> $1.log
+  else
+    echo -e ">>>> [ ${RED}FAILED${RESET} ] $1" >> $1.log
+  fi
+}
+
+#-------------------------------------------------------------------------
+# Function for running one eval
+#-------------------------------------------------------------------------
+# $1 = sim name   (e.g., BlimpV11_sim)
+# $2 = elf target (e.g., vvadd)
+
+function run_eval
+{
+  trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+  local sim_name=$1
+  local elf_target=$2
+  local eval_name="${sim_name}-${elf_target}"
+
+  rm -rf ${eval_name} ${eval_name}.daidir ${eval_name}.log
+
+  # Compile ELF eval target
+  make app-${elf_target} -j | tee ${eval_name}.log
+
+  # Compile simulation bench
+  vcs \
+    -sverilog -q -xprop=tmerge -override_timescale=1ns/1ps \
+    -top $1 \
+    -CFLAGS -I${TOPDIR} \
+    -LDFLAGS -z\ noexecstack \
+    +incdir+${TOPDIR} \
+    +define+BLIMP_VCS \
+    +define+VCS_ASIC \
+    +define+PICKLE_RTLSIM \
+    ${YAML_DEFINES} \
+    {{ "+vcs+dumpvars+${eval_name}.vcd" if dump_vcd | default(false) }} \
+    libFL_PROC.a libASM.a \
+    ${TOPDIR}/hw/top/sim/utils/load_elf.cpp \
+    ../01-verilator-pickle/{{ design_name }}_pickled.v \
+    ${TOPDIR}/hw/top/sim/${sim_name}.v \
+    -o ${eval_name} | tee -a ${eval_name}.log
+
+  # Run eval
+  ./${eval_name} +elf=app/${elf_target} | tee -a ${eval_name}.log
+
+  if ! grep -iP "error" ${eval_name}.log | grep -ivP "Total errors:\s*0" > /dev/null 2>&1 && grep "exit code 0" ${eval_name}.log > /dev/null 2>&1; then
+    echo -e ">>>> [ ${GREEN}passed${RESET} ] ${eval_name}" >> ${eval_name}.log
+  else
+    echo -e ">>>> [ ${RED}FAILED${RESET} ] ${eval_name}" >> ${eval_name}.log
+  fi
+}
+
+#-------------------------------------------------------------------------
+# Run tests
+#-------------------------------------------------------------------------
+
+{% for item in tests | default([]) -%}
+run_test {{item}}
+{% endfor %}
+
+#-------------------------------------------------------------------------
+# Run evals
+#-------------------------------------------------------------------------
+
+{% for item in evals | default([]) -%}
+{% if item is mapping -%}
+{% for sim_name, config in item.items() -%}
+run_eval {{ sim_name }} {{ config.elf }}
+{% endfor -%}
+{% endif -%}
+{% endfor %}
+
+#-------------------------------------------------------------------------
+# Print results
+#-------------------------------------------------------------------------
+
+echo "" >> run.log
+
+{% for item in tests | default([]) -%}
+grep -h ">>>" {{item}}.log | sed -e 's/>>>>//' >> run.log
+{% endfor -%}
+
+{% for item in evals | default([]) -%}
+{% if item is mapping -%}
+{% for sim_name, config in item.items() -%}
+grep -h ">>>" {{ sim_name }}-{{ config.elf | replace("/", "-") }}.log | sed -e 's/>>>>//' >> run.log
+{% endfor -%}
+{% endif -%}
+{% endfor %}
+
+echo "" >> run.log
+
+cat run.log

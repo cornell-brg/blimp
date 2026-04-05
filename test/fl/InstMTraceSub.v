@@ -12,7 +12,8 @@
 `include "test/FLTestUtils.v"
 
 module InstMTraceSub #(
-  parameter p_num_lanes = 2
+  parameter p_num_lanes    = 2,
+  parameter p_sample_delay = 0
 ) (
   input logic        clk,
   
@@ -34,11 +35,32 @@ module InstMTraceSub #(
 
   t_trace_struct trace_q [$];
 
+  // Delayed copies of input signals, sampled after signals settle
+  logic [31:0] pc_d    [p_num_lanes];
+  logic  [4:0] waddr_d [p_num_lanes];
+  logic [31:0] wdata_d [p_num_lanes];
+  logic        wen_d   [p_num_lanes];
+  logic        val_d   [p_num_lanes];
+
+  // Sample delayed copies at +1ns (after clock-to-Q, before linetrace's #2)
+  // verilator lint_off BLKSEQ
+  always @( posedge clk ) begin
+    #1;
+    for (int i = 0; i < p_num_lanes; i++) begin
+      pc_d[i]    = pc[i];
+      waddr_d[i] = waddr[i];
+      wdata_d[i] = wdata[i];
+      wen_d[i]   = wen[i];
+      val_d[i]   = val[i];
+    end
+  end
+  // verilator lint_on BLKSEQ
+
   // push all valid input traces onto the queue on the posedge
   initial begin
     while (1) begin
       @( posedge clk );
-      #1; // prevent data ambiguity at posedge
+      #((p_sample_delay)*1ns); // prevent data ambiguity at posedge
       for (int i = 0; i < p_num_lanes; i++) begin
         if (val[i]) begin
           if (wen[i])
@@ -99,7 +121,7 @@ module InstMTraceSub #(
     do begin
       #2;
       @( posedge clk );
-      #1;
+      #((p_sample_delay)*1ns);
     end while( !in_trace_q( trace_to_chk ) );
     
     `CHECK_DEL_EQ_Q( trace_q, trace_to_chk );
@@ -133,16 +155,16 @@ module InstMTraceSub #(
 
     trace = "";
     for( int i = 0; i < p_num_lanes; i++ ) begin
-      if( val[i] & waiting ) begin
-        if( wen[i] )
-          trace = {trace, $sformatf("%h:%b:%h:%h%s", pc[i], wen[i], waddr[i], wdata[i], 
+      if( val_d[i] & waiting ) begin
+        if( wen_d[i] )
+          trace = {trace, $sformatf("%h:%b:%h:%h%s", pc_d[i], wen_d[i], waddr_d[i], wdata_d[i],
                             (i == p_num_lanes-1) ? "" : "  ")};
         else
-          trace = {trace, $sformatf("%h:%b:%s:%s%s", pc[i], wen[i], 
+          trace = {trace, $sformatf("%h:%b:%s:%s%s", pc_d[i], wen_d[i],
                             {2{"x"}},
                             {8{"x"}}, (i == p_num_lanes-1) ? "" : "  ")};
       end
-      else if( val[i] )
+      else if( val_d[i] )
         trace = {trace, {(str_len-1){" "}}, "X", (i == p_num_lanes-1) ? "" : "  "};
       else if( waiting )
         trace = {trace, {(str_len){" "}}, (i == p_num_lanes-1) ? "" : "  "};
@@ -161,11 +183,11 @@ module InstMTraceSub #(
       if( i != 0 )
         inst_trace = {inst_trace, "  "};
 
-      if( val[i] ) begin
-        if( wen[i] )
-          inst_trace = $sformatf("0x%08x: 0x%08x -> R[%02d]", pc[i], wdata[i], waddr[i]);
+      if( val_d[i] ) begin
+        if( wen_d[i] )
+          inst_trace = $sformatf("0x%08x: 0x%08x -> R[%02d]", pc_d[i], wdata_d[i], waddr_d[i]);
         else
-          inst_trace = $sformatf("0x%08x                     ", pc[i]);
+          inst_trace = $sformatf("0x%08x                     ", pc_d[i]);
       end
     end
   endfunction

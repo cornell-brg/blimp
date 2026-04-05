@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 00-openram-memgen/run
+#=========================================================================
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR and SRCDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+#-------------------------------------------------------------------------
+# Function for generating one SRAM
+#-------------------------------------------------------------------------
+# $1 = name of sram
+
+function memgen
+{
+  trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+  rm -rf $1*
+
+  # Run openram
+
+  openram -v -v {{sram_dir}}/$1_cfg.py | tee $1.log
+
+  cp $1/*_TT_1p1V_25C.lib $1.lib
+  cp $1/*.lef .
+  cp $1/*.gds .
+  cp $1/*.v   .
+
+  # Run library compiler
+
+  lc_shell -x \
+    "read_lib $1.lib; \
+     write_lib $1_TT_1p1V_25C_lib -format db -output $1.db; \
+     exit" | tee -a $1.log
+
+}
+
+#-------------------------------------------------------------------------
+# List of SRAMs
+#-------------------------------------------------------------------------
+
+{% for sram in srams | default([]) -%}
+memgen {{sram}}
+{% endfor %}
+

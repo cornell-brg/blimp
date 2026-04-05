@@ -20,11 +20,13 @@
 // Implement parametrized typed through macro functions
 //------------------------------------------------------------------------
 
+`ifndef PICKLE_RTLSIM
 typedef enum logic {
   MEM_MSG_READ  = 1'b0,
   MEM_MSG_WRITE = 1'b1,
   MEM_MSG_X     = 1'bx
 } t_op;
+`endif
 
 `define MEM_REQ( OPAQ_BITS ) \
   t_mem_req_msg_``OPAQ_BITS``
@@ -78,7 +80,9 @@ typedef enum logic {
 // Define commonly-used parametrizations
 //------------------------------------------------------------------------
 
+`ifndef PICKLE_RTLSIM
 `MEM_REQ_DEFINE ( 8 );
 `MEM_RESP_DEFINE( 8 );
+`endif
 
 `endif // TYPES_MEMMSG_V

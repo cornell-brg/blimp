@@ -40,7 +40,6 @@ module IssueQueueInOrder #(
   input  t_msg                     ins_msg,
   input  logic                     ins_try,
   output logic                     ins_rdy,
-  output logic                     ins_ack,
   output logic [p_entry_bits:0]    avail_slots,
 
   //----------------------------------------------------------------------
@@ -76,7 +75,7 @@ module IssueQueueInOrder #(
   endgenerate
 
   generate
-    if( !p_bypass ) begin
+    if( !p_bypass ) begin : NO_BYPASS
 
       // Adapter signals for Ex interface
       logic deq_val;
@@ -99,17 +98,17 @@ module IssueQueueInOrder #(
       //----------------------------------------------------------------------
       logic empty;
       logic bypass;
+      logic both_src_ready;
 
       // Set status signals
       assign empty       = ( ins_ptr == deq_ptr );
       assign avail_slots = p_depth - ( ins_ptr - deq_ptr );
       assign ins_rdy     = ( avail_slots != '0 );
-      assign ins_ack     = ins_try & ins_rdy;
 
       // Insert entry
       always_ff @( posedge clk ) begin
         if( rst ) begin
-          entries <= '{default: 'x};
+          entries <= '{default: '0};
         end else begin
           if( ins_try & (!bypass | !both_src_ready) ) begin
             entries[ins_ptr[p_entry_bits-1:0]] <= ins_msg;
@@ -195,7 +194,6 @@ module IssueQueueInOrder #(
         end
       end
 
-      logic both_src_ready;
       assign both_src_ready = !deq_pending[0] & !deq_pending[1];
       assign deq_rdy = ( !empty | ins_try ) & both_src_ready;
 
@@ -222,7 +220,7 @@ module IssueQueueInOrder #(
         else if( deq_val & deq_rdy & !bypass )
           deq_ptr <= deq_ptr + 1;
       end
-    end else begin
+    end else begin : BYPASS
 
       // Insert outputs
       assign avail_slots = '1;
@@ -269,7 +267,6 @@ module IssueQueueInOrder #(
 
       assign Ex.val  = ins_try & both_src_ready;
       assign ins_rdy = Ex.rdy;
-      assign ins_ack = Ex.val & Ex.rdy;
     end
   endgenerate
 

@@ -20,6 +20,8 @@
 module FetchUnitL5
 #(
   parameter p_reclaim_width = 2,
+  parameter p_seq_num_bits  = 5,
+  parameter p_num_phys_regs = 36,
   parameter p_max_in_flight = 16,
   parameter p_num_fe_lanes  = 2,
   parameter p_num_be_lanes  = 2
@@ -62,9 +64,9 @@ module FetchUnitL5
   localparam [1:0] INST_STATUS_INVALID = 2'b00,
                    INST_STATUS_READY   = 2'b01;
 
-  localparam       p_seq_num_bits      = D[0].p_seq_num_bits;
-
-  localparam       p_flight_bits       = $clog2(p_max_in_flight) + 1;
+  localparam       p_flight_bits       = $clog2(p_max_in_flight) + 1 > $clog2(p_num_fe_lanes) + 1
+                                         ? $clog2(p_max_in_flight) + 1
+                                         : $clog2(p_num_fe_lanes) + 1;
   localparam       p_lane_idx_bits     = p_num_fe_lanes > 1 ?
                                           $clog2(p_num_fe_lanes) : 1;
 
@@ -189,6 +191,7 @@ module FetchUnitL5
 
   SeqNumGenL5 #(
     .p_seq_num_bits  (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs),
     .p_reclaim_width (p_reclaim_width),
     .p_num_fe_lanes  (p_num_fe_lanes),
     .p_num_be_lanes  (p_num_be_lanes)
@@ -217,10 +220,10 @@ module FetchUnitL5
       /* verilator lint_off CMPCONST */
       assign lane_active[i]       = !should_drop &
                                     (!needs_squash_restart |
-                                     (p_lane_idx_bits'(i) >= squash_restart_offset));
+                                     (p_lane_idx_bits'(unsigned'(i)) >= squash_restart_offset));
       assign lane_send_invalid[i] = !should_drop &
                                     needs_squash_restart &
-                                    (p_lane_idx_bits'(i) < squash_restart_offset);
+                                    (p_lane_idx_bits'(unsigned'(i)) < squash_restart_offset);
       /* verilator lint_on CMPCONST */
     end
   endgenerate
@@ -251,8 +254,8 @@ module FetchUnitL5
       assign alloc_ok[i]      = alloc_val[i];
       assign D_val[i]         = lane_active[i]       ? (mem.resp_val & alloc_ok[i]) :
                                 lane_send_invalid[i] ? mem.resp_val : 1'b0;
-      assign D_inst[i]        = mem.resp_msg.data[i*32 +: 32];
-      assign D_pc[i]          = mem.resp_msg.addr + 32'(i << 2);
+      assign D_inst[i]        = mem.resp_msg.data[unsigned'(i)*32 +: 32];
+      assign D_pc[i]          = mem.resp_msg.addr + 32'(unsigned'(i) << 2);
       assign D_seq_num[i]     = alloc_seq_num[i];
       assign D_inst_status[i] = (mem.resp_val & lane_active[i])
                                  ? INST_STATUS_READY : INST_STATUS_INVALID;

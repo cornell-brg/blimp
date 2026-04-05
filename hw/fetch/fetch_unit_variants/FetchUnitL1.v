@@ -76,7 +76,7 @@ module FetchUnitL1 (
     mem.req_msg.op     = MEM_MSG_READ;
     mem.req_msg.opaque = '0;
     mem.req_msg.strb   = '0;
-    mem.req_msg.data   = 'x;
+    mem.req_msg.data   = '0;
   end
 
   //----------------------------------------------------------------------
@@ -99,6 +99,7 @@ module FetchUnitL1 (
   ) resp_fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (resp_push),
     .pop   (resp_pop),
     .empty (resp_empty),
@@ -120,7 +121,7 @@ module FetchUnitL1 (
   always_comb begin
     D.inst       = fifo_rdata.data;
     D.pc         = fifo_rdata.addr;
-    D.seq_num    = 'x;
+    D.seq_num    = '0;
   end
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

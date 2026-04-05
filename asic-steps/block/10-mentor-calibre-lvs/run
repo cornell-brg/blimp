@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 10-mentor-calibre-lvs/run
+#=========================================================================
+
+# Colors
+
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+RESET=$'\e[0m'
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+echo "Running in $RUNDIR"
+
+rm -rf lvs_results
+mkdir -p lvs_results
+
+# Convert post-pnr.v to post-pnr.sp
+
+v2lvs \
+  -v ../05-cadence-innovus-pnr/post-pnr.v \
+  -o post-pnr.sp \
+  -lsr ${TSMC_180NM}/stdcells.sp \
+  -s ${TSMC_180NM}/stdcells.sp \
+  -log run.log
+
+# Run using run.rs script
+
+calibre -lvs -hier -64 -turbo -hyper run.rule | tee -a run.log
+
+# Print LVS summary
+
+./print-summary lvs.report run.log | tee -a run.log
+

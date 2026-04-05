@@ -60,7 +60,7 @@ module MROB #(
   always_ff @( posedge clk ) begin
     if( rst ) begin
       for( int i = 0; i < p_depth; i++ ) begin
-        entries[i] <= '{msg: 'x, val: 1'b0};
+        entries[i] <= '{msg: '0, val: 1'b0};
       end
     end else begin
 
@@ -77,7 +77,7 @@ module MROB #(
       // If, however, we are also dequeuing this index, clear the entry
       for( int i = 0; i < p_num_lanes; i++ ) begin
         if( deq_en & deq_rdy & deq_msg_val[i] ) begin
-          entries[deq_idx[i]] <= '{msg: 'x, val: 1'b0};
+          entries[deq_idx[i]] <= '{msg: '0, val: 1'b0};
         end
       end
     end

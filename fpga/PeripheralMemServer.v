@@ -100,6 +100,7 @@ module PeripheralMemServer #(
   ) key_buf (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (key_buf_push),
     .pop   (key_buf_pop),
     .empty (key_buf_empty),

@@ -47,3 +47,14 @@ bool try_fl_write( uint32_t* addr, uint32_t* data )
   }
   return false;
 }
+
+//------------------------------------------------------------------------
+// fl_exit_requested
+//------------------------------------------------------------------------
+// Returns true if FLExit::write was called, so the SV side can call
+// $finish instead of the C++ side calling exit().
+
+bool fl_exit_requested()
+{
+  return FLExit::s_exit_requested;
+}

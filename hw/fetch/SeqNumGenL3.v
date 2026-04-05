@@ -45,7 +45,9 @@ module SeqNumGenL3 #(
   //----------------------------------------------------------------------
   // Need to keep track to know which to free on a squash
 
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
   
@@ -145,7 +147,9 @@ module SeqNumGenL3 #(
   logic [p_seq_num_bits-1:0] entries_allocated;
   assign entries_allocated = curr_head_ptr - curr_tail_ptr;
 
+  // verilator lint_off SPLITVAR
   logic [p_reclaim_width-1:0] reclaim_valid /* verilator split_var */;
+  // verilator lint_on SPLITVAR
   logic [p_reclaim_width-1:0] reclaim_select;
 
   generate
@@ -161,27 +165,29 @@ module SeqNumGenL3 #(
   endgenerate
 
   // Identify the maximum amount to reclaim
-  assign reclaim_select = reclaim_valid & (
-    ((~reclaim_valid) >> 1) | 
-    {1'b1, (p_reclaim_width-1)'(1'b0)}
-  );
-
-  // Find the maximum amount to reclaim
-  logic [p_seq_num_bits-1:0] curr_tail_incr;
-  logic [p_seq_num_bits-1:0] curr_tail_incr_arr [p_reclaim_width];
-
   generate
-    for( i = 0; i < p_reclaim_width; i = i + 1 ) begin: RECLAIM_INCR
-      always_comb begin
-        if( reclaim_select[i] )
-          curr_tail_incr_arr[i] = p_seq_num_bits'(i + 1);
-        else
-          curr_tail_incr_arr[i] = '0;
-      end
+    if (p_reclaim_width > 1) begin
+      assign reclaim_select = reclaim_valid & (
+        ((~reclaim_valid) >> 1) |
+        {1'b1, (p_reclaim_width-1)'(1'b0)}
+      );
+    end else begin
+      assign reclaim_select = reclaim_valid & (
+        ((~reclaim_valid) >> 1) |
+        {1'b1}
+      );
     end
   endgenerate
 
-  assign curr_tail_incr = curr_tail_incr_arr.or();
+  // Find the maximum amount to reclaim
+  logic [p_seq_num_bits-1:0] curr_tail_incr;
+
+  always_comb begin
+    curr_tail_incr = '0;
+    for( int j = 0; j < p_reclaim_width; j++ )
+      if( reclaim_select[j] )
+        curr_tail_incr = p_seq_num_bits'(j + 1);
+  end
 
   always_ff @( posedge clk ) begin
     if( rst ) begin

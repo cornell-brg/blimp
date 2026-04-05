@@ -15,7 +15,9 @@ module FetchAddrGen
   parameter p_rst_addr      = 32'h200,
 
   // Derived parameters (do not override)
-  parameter p_flight_bits   = $clog2(p_max_in_flight) + 1
+  parameter p_flight_bits   = $clog2(p_max_in_flight) + 1 > $clog2(p_num_fe_lanes) + 1
+                               ? $clog2(p_max_in_flight) + 1
+                               : $clog2(p_num_fe_lanes) + 1
 )
 (
   input  logic clk,
@@ -76,10 +78,11 @@ module FetchAddrGen
       mem_req_addr = curr_fetch_block_base;
   end
 
-  localparam logic [p_flight_bits-1:0] c_max_in_flight = p_max_in_flight;
+  localparam logic [p_flight_bits-1:0] c_max_in_flight = p_max_in_flight[p_flight_bits-1:0];
 
   assign mem_req_val  = squash_val |
-                        (num_in_flight + num_to_squash < c_max_in_flight);
+                        (num_in_flight + num_to_squash < c_max_in_flight)
+                        && !rst;
   assign memreq_xfer = mem_req_val & memreq_rdy;
 
 endmodule

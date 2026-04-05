@@ -23,7 +23,7 @@ default), the age-based ``SSWCUArb`` is used; when cleared, the round-robin
 ``MRRArb`` is used instead. Both arbiters receive a budget
 (``avail_slots_arb``) computed as the minimum of the MROB's available slots and
 the number of backend lanes, capped further when the bypass FIFO is full. A
-``WCUBypassFifo`` sits between the arbiter output and the MROB, decoupling
+``WCUFifo`` sits between the arbiter output and the MROB, decoupling
 the arbitration stage from the reorder buffer.
 
 .. image:: img/WritebackCommitUnitL4.png
@@ -100,10 +100,10 @@ When MRRArb is used, an additional selection mux packs the granted pipe data
 into sequential output lanes, and ready signals are driven directly from the
 grant vector.
 
-Bypass FIFO: WCUBypassFifo
+Bypass FIFO: WCUFifo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``WCUBypassFifo`` is a multi-lane FIFO that sits between the arbiter output
+The ``WCUFifo`` is a multi-lane FIFO that sits between the arbiter output
 and the MROB. It wraps a ``FifoBypass`` and packs all ``p_num_be_lanes`` lanes
 into a single FIFO entry. The FIFO is pushed whenever any selected instruction
 is valid and there is space, and popped whenever it is not empty. Completion

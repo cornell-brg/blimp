@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+#=========================================================================
+# 09-mentor-calibre-drc/print-summary
+#=========================================================================
+# Parse DRC summary reports and print violations.
+
+import sys
+from pathlib import Path
+
+RED   = "\033[31m"
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
+def print_drc( drc_reports ):
+
+  for drc_report in drc_reports:
+    print(f"")
+    print(f" {drc_report}")
+
+    if not Path(drc_report).exists():
+      print(f" {RED}{drc_report} not found{RESET}")
+      continue
+
+    in_section = False
+    found = False
+    with open( drc_report, "r" ) as file:
+      for line in file:
+        if "RULECHECK RESULTS STATISTICS (BY CELL)" in line:
+          next(file)  # skip "---" line
+          in_section = True
+          continue
+        if in_section:
+          if "------------" in line:
+            break
+          if line.startswith("CELL"):
+            total = line.split("TOTAL Result Count = ")[1].split()[0]
+            print(f" {RED}{total} DRC violations{RESET}")
+            found = True
+          elif "RULECHECK" in line:
+            rule  = line.split("RULECHECK")[1].split()[0]
+            count = line.split("TOTAL Result Count = ")[1].split()[0]
+            print(f"  - {rule:<20} = {count}")
+
+    if not found:
+      print(f" {GREEN}No violations found{RESET}")
+
+if __name__ == "__main__":
+  print_drc( sys.argv[1:] )

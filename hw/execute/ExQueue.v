@@ -71,6 +71,7 @@ module ExQueue #(
   ) buffer (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (buffer_push),
     .pop   (buffer_pop),
     .empty (buffer_empty),

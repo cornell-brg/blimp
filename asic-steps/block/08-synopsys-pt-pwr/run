@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 08-synopsys-pt-pwr/run
+#=========================================================================
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+# Function for running one power analysis
+#  $1 = name of eval
+#  $2 = sim name (for SAIF strip path)
+
+function run_pwr
+{
+  trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+  rm -rf $1*.rpt
+
+  export EVALNAME=$1
+  export SIMNAME=$2
+
+  pt_shell -f run.tcl | tee $1.log
+}
+
+# List of evals
+
+{% for item in evals | default([]) -%}
+{% if item is mapping -%}
+{% for sim_name, config in item.items() -%}
+run_pwr {{ sim_name }}-{{ config.elf | replace("/", "-") }} {{ sim_name }}
+{% endfor -%}
+{% endif -%}
+{% endfor %}
+

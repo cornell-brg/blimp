@@ -171,8 +171,9 @@ module MemIntfTestServer_2Port #(
             _temp_write_data[0][31:24] = curr_req[0].data[31:24];
 
           if( curr_req[0].strb == 4'b1111 ) begin
-            if( try_fl_write(curr_req[0].addr, _temp_write_data[0]) );
-            else
+            if( try_fl_write(curr_req[0].addr, _temp_write_data[0]) ) begin
+              if( fl_exit_requested() ) $finish;
+            end else
               mem[curr_req[0].addr] = _temp_write_data[0];
           end else begin
             mem[curr_req[0].addr] = _temp_write_data[0];
@@ -219,8 +220,9 @@ module MemIntfTestServer_2Port #(
             _temp_write_data[1][31:24] = curr_req[1].data[31:24];
 
           if( curr_req[1].strb == 4'b1111 ) begin
-            if( try_fl_write(curr_req[1].addr, _temp_write_data[1]) );
-            else
+            if( try_fl_write(curr_req[1].addr, _temp_write_data[1]) ) begin
+              if( fl_exit_requested() ) $finish;
+            end else
               mem[curr_req[1].addr] = _temp_write_data[1];
           end else begin
             mem[curr_req[1].addr] = _temp_write_data[1];

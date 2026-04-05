@@ -1,12 +1,12 @@
 //========================================================================
 // DIUSquashPub.v
 //========================================================================
-// Squash publisher for the decode-issue unit.
+// Combinational squash publisher for the decode-issue unit.
 //
 // When the oldest control instruction is a JAL/JALR (not a branch),
-// computes its jump target and publishes a registered squash
-// notification.  Also exposes a combinational squash-valid signal for
-// use as a same-cycle FIFO reset.
+// computes its jump target and publishes a combinational squash
+// notification.  This is safe because SquashUnitL3 decouples the DIU's
+// grant from its own request, breaking the combinational loop.
 
 `ifndef HW_DECODEISSUE_DIUSQUASHPUB_V
 `define HW_DECODEISSUE_DIUSQUASHPUB_V
@@ -17,9 +17,6 @@ module DIUSquashPub #(
   parameter type t_ctrl_info    = logic,
   parameter      p_seq_num_bits = 5
 ) (
-  input logic clk,
-  input logic rst,
-
   // Oldest control instruction info (bundled struct)
   input t_ctrl_info oldest_ctrl_inst,
 
@@ -28,10 +25,7 @@ module DIUSquashPub #(
   input logic        oldest_ctrl_inst_dispatch_go,
 
   // Squash notification
-  SquashNotif.pub squash_pub,
-
-  // Combinational squash-valid for same-cycle use (e.g. FIFO reset)
-  output logic squash_pub_val_comb
+  SquashNotif.pub squash_pub
 );
 
   //----------------------------------------------------------------------
@@ -56,28 +50,18 @@ module DIUSquashPub #(
   end
 
   //----------------------------------------------------------------------
-  // Combinational squash valid
+  // Combinational squash notification
   //----------------------------------------------------------------------
 
-  assign squash_pub_val_comb = oldest_ctrl_inst.found  &&
-                               !oldest_ctrl_inst.is_brx &&
-                               oldest_ctrl_inst_dispatch_go;
+  logic squash_val;
 
-  //----------------------------------------------------------------------
-  // Registered squash notification
-  //----------------------------------------------------------------------
+  assign squash_val = oldest_ctrl_inst.found  &&
+                      !oldest_ctrl_inst.is_brx &&
+                      oldest_ctrl_inst_dispatch_go;
 
-  always_ff @( posedge clk ) begin
-    if( rst ) begin
-      squash_pub.val     <= 1'b0;
-      squash_pub.target  <= '0;
-      squash_pub.seq_num <= '0;
-    end else begin
-      squash_pub.val     <= squash_pub_val_comb;
-      squash_pub.target  <= jump_target;
-      squash_pub.seq_num <= oldest_ctrl_inst.seq_num;
-    end
-  end
+  assign squash_pub.val     = squash_val;
+  assign squash_pub.target  = jump_target;
+  assign squash_pub.seq_num = oldest_ctrl_inst.seq_num;
 
 endmodule
 

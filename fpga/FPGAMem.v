@@ -99,6 +99,7 @@ module FPGAMem #(
   ) req_fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (fifo_push),
     .pop   (fifo_pop),
     .empty (fifo_empty),

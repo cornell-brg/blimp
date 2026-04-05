@@ -208,8 +208,9 @@ module MemIntfTestServerMP #(
                 if( ( curr_req.strb[w*4 +: 4] & 4'b1000 ) > 0 )
                   _temp_write_data[31:24] = curr_req.data[w*32+24 +: 8];
                 if( curr_req.strb[w*4 +: 4] == 4'b1111 ) begin
-                  if( try_fl_write(curr_req.addr + (w << 2), _temp_write_data) );
-                  else
+                  if( try_fl_write(curr_req.addr + (w << 2), _temp_write_data) ) begin
+                    if( fl_exit_requested() ) $finish;
+                  end else
                     mem[curr_req.addr + (w << 2)] = _temp_write_data;
                 end else begin
                   mem[curr_req.addr + (w << 2)] = _temp_write_data;

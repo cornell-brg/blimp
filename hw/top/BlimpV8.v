@@ -10,7 +10,6 @@
 `include "defs/UArch.v"
 `include "hw/fetch/fetch_unit_variants/FetchUnitL3.v"
 `include "hw/decode_issue/decode_issue_unit_variants/DecodeIssueUnitL5.v"
-`include "hw/execute/ExQueue.v"
 `include "hw/execute/execute_units_l6/ALUL6.v"
 `include "hw/execute/execute_units_l7/IterativeMulDivRemL7.v"
 `include "hw/execute/execute_units_l7/LoadStoreUnitL7.v"
@@ -27,9 +26,20 @@
 `include "intf/InstTraceNotif.v"
 
 module BlimpV8 #(
-  parameter p_opaq_bits     = 8,
-  parameter p_seq_num_bits  = 5,
-  parameter p_num_phys_regs = 36
+  parameter p_opaq_bits              = 8,
+  parameter p_seq_num_bits           = 5,
+  parameter p_num_phys_regs          = 36,
+  parameter p_reclaim_width          = 2,
+  parameter p_max_in_flight          = 8,
+  parameter p_x_intf_fifo_depth      = 1,
+  parameter p_alu_d_intf_fifo_depth  = 1,
+  parameter p_mul_d_intf_fifo_depth  = 1,
+  parameter p_mem_d_intf_fifo_depth  = 1,
+  parameter p_ctrl_d_intf_fifo_depth = 1,
+  parameter p_num_alus               = 2,
+  parameter p_num_muls               = 2,
+  parameter p_num_ldstrs             = 1,
+  parameter p_num_pipes              = p_num_alus + p_num_muls + p_num_ldstrs + 1
 ) (
   input logic clk,
   input logic rst,
@@ -44,7 +54,7 @@ module BlimpV8 #(
   // Data Memory
   //----------------------------------------------------------------------
 
-  MemIntf.client data_mem,
+  MemIntf.client data_mem [p_num_ldstrs],
 
   //----------------------------------------------------------------------
   // Instruction Trace
@@ -53,8 +63,11 @@ module BlimpV8 #(
   InstTraceNotif.pub inst_trace
 );
 
-  localparam p_num_pipes = 6;
   localparam p_phys_addr_bits = $clog2( p_num_phys_regs );
+
+  // Pipe index offsets for MEM and CTRL units
+  localparam p_mem_pipe_idx  = p_num_alus + p_num_muls;
+  localparam p_ctrl_pipe_idx = p_num_alus + p_num_muls + p_num_ldstrs;
 
   //----------------------------------------------------------------------
   // Interfaces
@@ -67,17 +80,17 @@ module BlimpV8 #(
   D__XIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) d__x_intfs[p_num_pipes]();
+  ) d__x_intfs[p_num_pipes-1:0]();
 
   X__WIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) x__w_intfs[p_num_pipes]();
+  ) x__w_intfs[p_num_pipes-1:0]();
 
   X__WIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) buffer_intf [2]();
+  ) buffer_intf [p_num_alus]();
 
   SquashNotif #(
     .p_seq_num_bits (p_seq_num_bits)
@@ -150,8 +163,22 @@ module BlimpV8 #(
                             OP_BLTU_VEC |
                             OP_BGEU_VEC;
 
+  // Build pipe subsets array from parameterized counts
+  function automatic rv_op_vec [p_num_pipes-1:0] gen_pipe_subsets;
+    for ( int i = 0; i < p_num_alus; i++ )
+      gen_pipe_subsets[i] = p_alu_subset;
+    for ( int i = 0; i < p_num_muls; i++ )
+      gen_pipe_subsets[p_num_alus + i] = p_m_subset;
+    for ( int i = 0; i < p_num_ldstrs; i++ )
+      gen_pipe_subsets[p_mem_pipe_idx + i] = p_mem_subset;
+    gen_pipe_subsets[p_ctrl_pipe_idx] = p_ctrl_subset;
+  endfunction
+
+  localparam rv_op_vec [p_num_pipes-1:0] c_pipe_subsets = gen_pipe_subsets();
+
   FetchUnitL3 #(
-    .p_max_in_flight (8)
+    .p_reclaim_width (p_reclaim_width),
+    .p_max_in_flight (p_max_in_flight)
   ) FU (
     .mem    (inst_mem),
     .D      (f__d_intf),
@@ -163,14 +190,7 @@ module BlimpV8 #(
   DecodeIssueUnitL5 #(
     .p_num_pipes     (p_num_pipes),
     .p_num_phys_regs (p_num_phys_regs),
-    .p_pipe_subsets ({
-      p_alu_subset, // ALU0
-      p_alu_subset, // ALU1
-      p_m_subset,   // M-Extension for MUL0
-      p_m_subset,   // M-Extension for MUL1
-      p_mem_subset, // Memory
-      p_ctrl_subset // Control Flow
-    })
+    .p_pipe_subsets  (c_pipe_subsets)
   ) DIU (
     .F          (f__d_intf),
     .Ex         (d__x_intfs),
@@ -181,54 +201,52 @@ module BlimpV8 #(
     .*
   );
 
-  ALUL6 ALU0_XU (
-    .D (d__x_intfs[0]),
-    .W (buffer_intf[0]),
-    .*
-  );
+  genvar j;
 
-  ALUL6 ALU1_XU (
-    .D (d__x_intfs[1]),
-    .W (buffer_intf[1]),
-    .*
-  );
+  generate
+    for( j = 0; j < p_num_alus; j++ ) begin: ALU_XU_GEN
+      ALUL6 #(
+        .p_d_intf_fifo_depth (p_alu_d_intf_fifo_depth)
+      ) ALU_XU (
+        .D (d__x_intfs[j]),
+        .W (x__w_intfs[j]),
+        .*
+      );
+    end
+  endgenerate
 
-  ExQueue #(1) alu0_buf (
-    .in  (buffer_intf[0]),
-    .out (x__w_intfs[0]),
-    .*
-  );
+  generate
+    for( j = 0; j < p_num_muls; j++ ) begin: MUL_XU_GEN
+      IterativeMulDivRemL7 #(
+        .p_d_intf_fifo_depth (p_mul_d_intf_fifo_depth)
+      ) MUL_DIV_REM_XU (
+        .D (d__x_intfs[p_num_alus + j]),
+        .W (x__w_intfs[p_num_alus + j]),
+        .*
+      );
+    end
+  endgenerate
 
-  ExQueue #(1) alu1_buf (
-    .in  (buffer_intf[1]),
-    .out (x__w_intfs[1]),
-    .*
-  );
+  generate
+    for( j = 0; j < p_num_ldstrs; j++ ) begin: MEM_XU_GEN
+      LoadStoreUnitL7 #(
+        .p_opaq_bits         (p_opaq_bits),
+        .p_num_in_flight     (p_max_in_flight),
+        .p_d_intf_fifo_depth (p_mem_d_intf_fifo_depth)
+      ) MEM_XU (
+        .D   (d__x_intfs[p_mem_pipe_idx + j]),
+        .W   (x__w_intfs[p_mem_pipe_idx + j]),
+        .mem (data_mem[j]),
+        .*
+      );
+    end
+  endgenerate
 
-  IterativeMulDivRemL7 MUL_DIV_REM0_XU (
-    .D (d__x_intfs[2]),
-    .W (x__w_intfs[2]),
-    .*
-  );
-
-  IterativeMulDivRemL7 MUL_DIV_REM1_XU (
-    .D (d__x_intfs[3]),
-    .W (x__w_intfs[3]),
-    .*
-  );
-
-  LoadStoreUnitL7 #(
-    .p_opaq_bits (p_opaq_bits)
-  ) MEM_XU (
-    .D   (d__x_intfs[4]),
-    .W   (x__w_intfs[4]),
-    .mem (data_mem),
-    .*
-  );
-
-  ControlFlowUnitL6 CTRL_XU (
-    .D      (d__x_intfs[5]),
-    .W      (x__w_intfs[5]),
+  ControlFlowUnitL6 #(
+    .p_d_intf_fifo_depth (p_ctrl_d_intf_fifo_depth)
+  ) CTRL_XU (
+    .D      (d__x_intfs[p_ctrl_pipe_idx]),
+    .W      (x__w_intfs[p_ctrl_pipe_idx]),
     .squash (squash_arb_notif[1]),
     .*
   );
@@ -256,21 +274,39 @@ module BlimpV8 #(
   //----------------------------------------------------------------------
 
 `ifndef SYNTHESIS
+  string alu_trace   [p_num_alus];
+  string mul_trace   [p_num_muls];
+  string ldstr_trace [p_num_ldstrs];
+
+  generate
+    for( j = 0; j < p_num_alus; j++ ) begin: ALU_TRACE_GEN
+      always_comb alu_trace[j] = ALU_XU_GEN[j].ALU_XU.trace( 0 );
+    end
+    for( j = 0; j < p_num_muls; j++ ) begin: MUL_TRACE_GEN
+      always_comb mul_trace[j] = MUL_XU_GEN[j].MUL_DIV_REM_XU.trace( 0 );
+    end
+    for( j = 0; j < p_num_ldstrs; j++ ) begin: MEM_TRACE_GEN
+      always_comb ldstr_trace[j] = MEM_XU_GEN[j].MEM_XU.trace( 0 );
+    end
+  endgenerate
+
   function string trace( int trace_level );
     trace = "";
     trace = {trace, FU.trace( trace_level )};
     trace = {trace, " | "};
     trace = {trace, DIU.trace( trace_level )};
-    trace = {trace, " | "};
-    trace = {trace, ALU0_XU.trace( trace_level )};
-    trace = {trace, " | "};
-    trace = {trace, ALU1_XU.trace( trace_level )};
-    trace = {trace, " | "};
-    trace = {trace, MUL_DIV_REM0_XU.trace( trace_level )};
-    trace = {trace, " | "};
-    trace = {trace, MUL_DIV_REM1_XU.trace( trace_level )};
-    trace = {trace, " | "};
-    trace = {trace, MEM_XU.trace( trace_level )};
+    for( int i = 0; i < p_num_alus; i++ ) begin
+      trace = {trace, " | "};
+      trace = {trace, alu_trace[i]};
+    end
+    for( int i = 0; i < p_num_muls; i++ ) begin
+      trace = {trace, " | "};
+      trace = {trace, mul_trace[i]};
+    end
+    for( int i = 0; i < p_num_ldstrs; i++ ) begin
+      trace = {trace, " | "};
+      trace = {trace, ldstr_trace[i]};
+    end
     trace = {trace, " | "};
     trace = {trace, CTRL_XU.trace( trace_level )};
     trace = {trace, " | "};

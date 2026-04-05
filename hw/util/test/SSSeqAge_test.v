@@ -18,7 +18,8 @@ import TestEnv::*;
 module SSSeqAgeTestSuite #(
   parameter p_suite_num    = 0,
   parameter p_seq_num_bits = 5,
-  parameter p_num_be_lanes = 2
+  parameter p_num_be_lanes = 2,
+  parameter p_num_phys_regs = 36
 );
 
   string suite_name = $sformatf("%0d: MSeqNumAgeIntfTestSuite_%0d",
@@ -43,8 +44,9 @@ module SSSeqAgeTestSuite #(
   logic [p_seq_num_bits-1:0] oldest_seq_num;
 
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes),
-    .p_seq_num_bits (p_seq_num_bits)
+    .p_num_be_lanes  (p_num_be_lanes),
+    .p_seq_num_bits  (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs)
   ) dut(
     .commit (commit_notif),
     .*

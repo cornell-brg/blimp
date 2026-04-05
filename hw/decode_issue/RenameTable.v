@@ -145,16 +145,16 @@ module RenameTable #(
     .out (preg_alloc_sel_out)
   );
 
-  logic [p_phys_addr_bits-1:0] preg_alloc_mask [p_num_phys_regs-1:1];
+  logic [p_phys_addr_bits-1:0] alloc_preg_sel;
 
-  generate
-    for( i = 1; i < p_num_phys_regs; i = i + 1 ) begin: SELECT_PHYS
-      assign preg_alloc_mask[i] = ( preg_alloc_sel_out[i] ) ? p_phys_addr_bits'(i)
-                                                            : '0;
-    end
-  endgenerate
+  always_comb begin
+    alloc_preg_sel = '0;
+    for( int j = 1; j < p_num_phys_regs; j++ )
+      if( preg_alloc_sel_out[j] )
+        alloc_preg_sel = p_phys_addr_bits'(j);
+  end
 
-  assign alloc_preg  = ( alloc_areg != 0 ) ? preg_alloc_mask.or()
+  assign alloc_preg  = ( alloc_areg != 0 ) ? alloc_preg_sel
                                            : 0;
   assign alloc_ppreg = ( alloc_areg != 0 ) ? rename_table[alloc_areg].preg
                                            : 0;

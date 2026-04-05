@@ -50,7 +50,6 @@ module IssueQueueOOO #(
   input  t_msg                     ins_msg,
   input  logic                     ins_try,
   output logic                     ins_rdy,
-  output logic                     ins_ack,
   output logic [p_entry_bits:0]    avail_slots,
 
   //----------------------------------------------------------------------
@@ -92,7 +91,7 @@ module IssueQueueOOO #(
   endgenerate
 
   generate
-    if( !p_bypass ) begin
+    if( !p_bypass ) begin : NO_BYPASS
 
       // Adapter signals for Ex interface
       logic deq_val;
@@ -135,7 +134,6 @@ module IssueQueueOOO #(
       assign empty       = ( num_valid == '0 );
       assign avail_slots = p_depth[p_entry_bits:0] - num_valid;
       assign ins_rdy     = ( num_valid != p_depth[p_entry_bits:0] );
-      assign ins_ack     = ins_try & ins_rdy;
 
       //------------------------------------------------------------------
       // Free slot selection (for insertion)
@@ -166,6 +164,8 @@ module IssueQueueOOO #(
       //------------------------------------------------------------------
       // Insert
       //------------------------------------------------------------------
+      logic [p_entry_bits-1:0]  sel_idx;
+      logic                     sel_found;
 
       logic ins_go;
       assign ins_go = ins_try & ins_rdy & ( !bypass | !both_src_ready );
@@ -173,7 +173,7 @@ module IssueQueueOOO #(
       // Store entry
       always_ff @( posedge clk ) begin
         if( rst )
-          entries <= '{default: 'x};
+          entries <= '{default: '0};
         else if( ins_go )
           entries[free_idx] <= ins_msg;
       end
@@ -250,8 +250,6 @@ module IssueQueueOOO #(
       //   older = (seq[j] < seq[i]) ^ (seq[j] < oldest) ^ (seq[i] < oldest)
       //
       // An entry is the oldest ready if no other ready entry is older.
-      logic [p_entry_bits-1:0]  sel_idx;
-      logic                     sel_found;
       logic [p_depth-1:0]       is_oldest;
 
       always_comb begin
@@ -335,7 +333,7 @@ module IssueQueueOOO #(
           Ex.op3.mem_data   = rf_rdata[1];
       end
 
-    end else begin
+    end else begin : BYPASS
 
       //------------------------------------------------------------------
       // Full bypass mode (p_bypass = 1)
@@ -386,7 +384,6 @@ module IssueQueueOOO #(
 
       assign Ex.val  = ins_try & both_src_ready;
       assign ins_rdy = Ex.rdy;
-      assign ins_ack = Ex.val & Ex.rdy;
     end
   endgenerate
 

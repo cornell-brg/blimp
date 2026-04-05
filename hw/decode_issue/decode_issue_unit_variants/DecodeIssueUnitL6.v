@@ -89,7 +89,7 @@ module DecodeIssueUnitL6 #(
 
   always_ff @( posedge clk ) begin
     if ( rst )
-      F_reg <= '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg <= '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg <= F_reg_next;
   end
@@ -100,7 +100,7 @@ module DecodeIssueUnitL6 #(
     if ( F_xfer )
       F_reg_next = '{ val: 1'b1, inst: F.inst, pc: F.pc, seq_num: F.seq_num };
     else if ( X_xfer | should_squash )
-      F_reg_next = '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg_next = '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg_next = F_reg;
   end
@@ -235,8 +235,9 @@ module DecodeIssueUnitL6 #(
   logic [p_seq_num_bits-1:0] oldest_seq_num;
 
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes),
-    .p_seq_num_bits (p_seq_num_bits)
+    .p_num_be_lanes  (p_num_be_lanes),
+    .p_seq_num_bits  (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs)
   ) seq_age (
     .*
   );

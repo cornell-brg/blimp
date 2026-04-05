@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 01-verilator-pickle/run
+#=========================================================================
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Colors
+
+RED="\e[31m"
+GREEN="\e[32m"
+RESET="\e[0m"
+
+# Determine TOPDIR and RUNDIR
+
+TOPDIR="$(git rev-parse --show-toplevel)"
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+# Create fresh run.log
+
+rm -rf run.log
+touch run.log
+
+#-------------------------------------------------------------------------
+# Run commands
+#-------------------------------------------------------------------------
+
+# Set define flags/parameter values
+{% set define_flags = ['-DSYNTHESIS'] -%}
+{% for d in defines | default([]) -%}
+{% if d is mapping -%}
+{% for k, v in d.items() -%}
+{% set _ = define_flags.append('-D' ~ k ~ '=' ~ v) -%}
+{% endfor -%}
+{% else -%}
+{% set _ = define_flags.append('-D' ~ d) -%}
+{% endif -%}
+{% endfor -%}
+
+# Generate testbenches
+{% if tests is defined -%}
+{% for test in tests -%}
+python generate_tests.py {{ test }} {{ define_flags | join(' ') }} 2>&1 | tee -a run.log
+{% endfor %}
+{% endif %}
+
+# Pickle Verilog
+set +e
+$(verilator \
+  -E -I${TOPDIR} \
+  {{ define_flags | join(' ') }} \
+  ${RUNDIR}/../../../{{ design_name }}.v > {{ design_name }}_pickled.v \
+) 2>&1 | tee -a run.log
+exit_status=${PIPESTATUS[0]}
+set -e
+if [ $exit_status -eq 0 ]; then
+  echo -e ">>>> [ ${GREEN}passed${RESET} ] verilator -E -I${TOPDIR} ${RUNDIR}/../../../{{ design_name }}" >> run.log
+else
+  echo -e ">>>> [ ${RED}FAILED${RESET} ] verilator -E -I${TOPDIR} ${RUNDIR}/../../../{{ design_name }}" >> run.log
+fi
+
+#-------------------------------------------------------------------------
+# Print resolved top-level parameters
+#-------------------------------------------------------------------------
+
+src_file="${RUNDIR}/../../../{{ design_name }}.v"
+pickled_file="{{ design_name }}_pickled.v"
+
+if [ -f "$pickled_file" ] && [ -f "$src_file" ]; then
+  echo "" >> run.log
+  echo "Resolved top-level parameters:" >> run.log
+  echo "-------------------------------" >> run.log
+  sed -n '/BEGIN TOP PARAMS/,/END TOP PARAMS/s/.*parameter[[:space:]]\{1,\}\([a-zA-Z_][a-zA-Z0-9_]*\).*/\1/p' \
+    "$src_file" | while read pname; do
+    sed -n "/^module {{ design_name }} /,/^) (/{/parameter ${pname}[[:space:]]/p}" \
+      "$pickled_file"
+  done >> run.log
+  echo "" >> run.log
+fi
+
+#-------------------------------------------------------------------------
+# Print results
+#-------------------------------------------------------------------------
+
+echo ""
+cat run.log
+echo ""
+

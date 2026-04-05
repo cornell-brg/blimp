@@ -8,7 +8,7 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L6_CONTROLFLOWUNITL6_V
 
 `include "defs/UArch.v"
-`include "hw/common/FifoBypass.v"
+`include "hw/common/Fifo.v"
 `include "intf/D__XIntf.v"
 `include "intf/SquashNotif.v"
 `include "intf/X__WIntf.v"
@@ -16,8 +16,7 @@
 import UArch::*;
 
 module ControlFlowUnitL6 #(
-  parameter p_d_intf_fifo_depth  = 4,
-  parameter p_d_intf_fifo_bypass = 0
+  parameter p_d_intf_fifo_depth = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -79,29 +78,27 @@ module ControlFlowUnitL6 #(
 
   // verilator lint_on ENUMVALUE
 
-  logic fifo_full, fifo_empty, fifo_bypassing;
+  logic fifo_full, fifo_empty;
   logic fifo_push, fifo_pop;
 
-  assign fifo_push = D.val & !fifo_full;
+  assign fifo_push = D.val & (!fifo_full | fifo_pop);
   assign fifo_pop  = !fifo_empty & W.rdy;
 
   D_input D_curr;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits ($bits(D_input)),
-    .p_depth      (p_d_intf_fifo_depth),
-    .p_bypass     (p_d_intf_fifo_bypass)
+    .p_depth      (p_d_intf_fifo_depth)
   ) d_fifo (
-    .clk       (clk),
-    .rst       (rst),
-    .clear     (1'b0),
-    .push      (fifo_push),
-    .pop       (fifo_pop),
-    .empty     (fifo_empty),
-    .full      (fifo_full),
-    .bypassing (fifo_bypassing),
-    .wdata     (fifo_in),
-    .rdata     (D_curr)
+    .clk   (clk),
+    .rst   (rst),
+    .clear (1'b0),
+    .push  (fifo_push),
+    .pop   (fifo_pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_in),
+    .rdata (D_curr)
   );
 
   //----------------------------------------------------------------------
@@ -168,7 +165,7 @@ module ControlFlowUnitL6 #(
   // Assign remaining signals
   //----------------------------------------------------------------------
 
-  assign D.rdy = !fifo_full;
+  assign D.rdy = !fifo_full | fifo_pop;
   assign W.val = !fifo_empty;
 
   //----------------------------------------------------------------------

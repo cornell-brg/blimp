@@ -87,7 +87,7 @@ module DecodeIssueUnitL5 #(
 
   always_ff @( posedge clk ) begin
     if ( rst )
-      F_reg <= '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg <= '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg <= F_reg_next;
   end
@@ -98,7 +98,7 @@ module DecodeIssueUnitL5 #(
     if ( F_xfer )
       F_reg_next = '{ val: 1'b1, inst: F.inst, pc: F.pc, seq_num: F.seq_num };
     else if ( X_xfer | should_squash )
-      F_reg_next = '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg_next = '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg_next = F_reg;
   end
@@ -215,7 +215,9 @@ module DecodeIssueUnitL5 #(
   // Determine whether we need to squash ourself
   //----------------------------------------------------------------------
   
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
 

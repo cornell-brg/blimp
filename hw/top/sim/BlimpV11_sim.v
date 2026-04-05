@@ -4,7 +4,9 @@
 // A module for simulating BlimpV11
 
 `include "asm/assemble.v"
+`ifndef VCS_ASIC
 `include "hw/top/BlimpV11.v"
+`endif
 `include "hw/top/sim/utils/SimUtils.v"
 `include "intf/MemIntf.v"
 `include "intf/InstTraceNotif.v"
@@ -12,26 +14,97 @@
 
 import "DPI-C" context function void load_elf ( string elf_file );
 
+`ifndef P_OPAQ_BITS
+  `define P_OPAQ_BITS               8
+`endif
+`ifndef P_SEQ_NUM_BITS
+  `define P_SEQ_NUM_BITS            5
+`endif
+`ifndef P_NUM_PHYS_REGS
+  `define P_NUM_PHYS_REGS           36
+`endif
+`ifndef P_NUM_FE_LANES
+  `define P_NUM_FE_LANES            2
+`endif
+`ifndef P_NUM_BE_LANES
+  `define P_NUM_BE_LANES            2
+`endif
+`ifndef P_IQ_DEPTH
+  `define P_IQ_DEPTH                4
+`endif
+`ifndef P_RECLAIM_WIDTH
+  `define P_RECLAIM_WIDTH           4
+`endif
+`ifndef P_MAX_IN_FLIGHT
+  `define P_MAX_IN_FLIGHT           4
+`endif
+`ifndef P_F_INTF_FIFO_DEPTH
+  `define P_F_INTF_FIFO_DEPTH       1
+`endif
+`ifndef P_X_INTF_FIFO_DEPTH
+  `define P_X_INTF_FIFO_DEPTH       1
+`endif
+`ifndef P_ALU_D_INTF_FIFO_DEPTH
+  `define P_ALU_D_INTF_FIFO_DEPTH   1
+`endif
+`ifndef P_MUL_D_INTF_FIFO_DEPTH
+  `define P_MUL_D_INTF_FIFO_DEPTH   1
+`endif
+`ifndef P_MEM_D_INTF_FIFO_DEPTH
+  `define P_MEM_D_INTF_FIFO_DEPTH   1
+`endif
+`ifndef P_CTRL_D_INTF_FIFO_DEPTH
+  `define P_CTRL_D_INTF_FIFO_DEPTH  1
+`endif
+`ifndef P_ALL_IQ_IN_ORDER
+  `define P_ALL_IQ_IN_ORDER         0
+`endif
+`ifndef P_NUM_ALUS
+  `define P_NUM_ALUS                2
+`endif
+`ifndef P_NUM_MULS
+  `define P_NUM_MULS                1
+`endif
+`ifndef P_NUM_LDSTRS
+  `define P_NUM_LDSTRS              1
+`endif
+`ifndef P_PIPE_BYPASS
+  `define P_PIPE_BYPASS             'b11111
+`endif
+
 module BlimpV11_sim;
 
   // Define default simulation parameters
-  localparam p_num_phys_regs          = 40;
-  localparam p_opaq_bits              = 8;
-  localparam p_seq_num_bits           = 5;
-  localparam p_num_be_lanes           = 4;
-  localparam p_num_fe_lanes           = 4;
-  localparam p_iq_depth               = 4;
-  localparam p_f_intf_fifo_bypass     = 0;
-  localparam p_x_intf_fifo_bypass     = 0;
-  localparam p_mem_d_intf_fifo_bypass = 0;
-  localparam p_num_pipes              = 8; // change manually - for delays
+  localparam p_opaq_bits               = `P_OPAQ_BITS;
+  localparam p_seq_num_bits            = `P_SEQ_NUM_BITS;
+  localparam p_num_phys_regs           = `P_NUM_PHYS_REGS;
+  localparam p_num_fe_lanes            = `P_NUM_FE_LANES;
+  localparam p_num_be_lanes            = `P_NUM_BE_LANES;
+  localparam p_iq_depth                = `P_IQ_DEPTH;
+  localparam p_reclaim_width           = `P_RECLAIM_WIDTH;
+  localparam p_max_in_flight           = `P_MAX_IN_FLIGHT;
+  localparam p_f_intf_fifo_depth       = `P_F_INTF_FIFO_DEPTH;
+  localparam p_x_intf_fifo_depth       = `P_X_INTF_FIFO_DEPTH;
+  localparam p_alu_d_intf_fifo_depth   = `P_ALU_D_INTF_FIFO_DEPTH;
+  localparam p_mul_d_intf_fifo_depth   = `P_MUL_D_INTF_FIFO_DEPTH;
+  localparam p_mem_d_intf_fifo_depth   = `P_MEM_D_INTF_FIFO_DEPTH;
+  localparam p_ctrl_d_intf_fifo_depth  = `P_CTRL_D_INTF_FIFO_DEPTH;
+  localparam p_num_alus                = `P_NUM_ALUS;
+  localparam p_num_muls                = `P_NUM_MULS;
+  localparam p_num_ldstrs              = `P_NUM_LDSTRS;
+  localparam p_all_iq_in_order         = `P_ALL_IQ_IN_ORDER;
+  localparam p_pipe_bypass             = `P_PIPE_BYPASS;
+  localparam p_num_pipes               = p_num_alus + p_num_muls + p_num_ldstrs + 1;
 
   // Simulation-only backpressure: 8 bits per lane/pipe (stall 1/N; 0 = off)
   //                                        lane3  lane2  lane1  lane0
-  localparam [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = {8'd0,  8'd0,  8'd0,  8'd0};
+  // localparam [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = {8'd0,  8'd0,  8'd0,  8'd0};
+  localparam [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = '0;
   //                                        ctrl   mem    mul1   mul0   alu3   alu2   alu1   alu0
-  localparam [p_num_pipes*8-1:0]    p_sim_d2x_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
-  localparam [p_num_pipes*8-1:0]    p_sim_x2w_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
+  // localparam [p_num_pipes*8-1:0]    p_sim_d2x_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
+  // localparam [p_num_pipes*8-1:0]    p_sim_x2w_bp = {8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0,  8'd0};
+  localparam [p_num_pipes*8-1:0]    p_sim_d2x_bp = '0;
+  localparam [p_num_pipes*8-1:0]    p_sim_x2w_bp = '0;
   
   //----------------------------------------------------------------------
   // Setup
@@ -59,11 +132,113 @@ module BlimpV11_sim;
 
   MemIntf #(
     .p_opaq_bits (p_opaq_bits)
-  ) dmem_intf();
+  ) dmem_intf [1]();
 
   InstTraceNotif #(
     .p_seq_num_bits (p_seq_num_bits)
   ) inst_trace_notif [p_num_be_lanes]();
+
+  logic [31:0]               inst_trace_pc      [p_num_be_lanes];
+  logic  [4:0]               inst_trace_waddr   [p_num_be_lanes];
+  logic [31:0]               inst_trace_wdata   [p_num_be_lanes];
+  logic                      inst_trace_wen     [p_num_be_lanes];
+  logic                      inst_trace_val     [p_num_be_lanes];
+  logic [p_seq_num_bits-1:0] inst_trace_seq_num [p_num_be_lanes];
+
+`ifdef VCS_ASIC
+
+  `ifndef INPUT_DELAY
+    `define INPUT_DELAY  0.1
+  `endif
+  `ifndef OUTPUT_DELAY
+    `define OUTPUT_DELAY 0.1
+  `endif
+
+  // Derived message bit widths (must match BlimpV11SynthWrap)
+
+  localparam p_imem_data_bits = p_num_fe_lanes * 32;
+  localparam p_imem_strb_bits = p_num_fe_lanes * 4;
+  localparam p_imem_msg_bits  = 1 + p_opaq_bits + 32
+                              + p_imem_strb_bits + p_imem_data_bits;
+  localparam p_dmem_data_bits = 32;
+  localparam p_dmem_strb_bits = 4;
+  localparam p_dmem_msg_bits  = 1 + p_opaq_bits + 32
+                              + p_dmem_strb_bits + p_dmem_data_bits;
+
+  //--------------------------------------------------------------------
+  // Intermediate wires for DUT port connections
+  //--------------------------------------------------------------------
+
+  // DUT inputs (testbench -> DUT, delayed by INPUT_DELAY)
+
+  logic                        dut_rst;
+  logic                        dut_imem_req_rdy;
+  logic                        dut_imem_resp_val;
+  logic [p_imem_msg_bits-1:0]  dut_imem_resp_msg;
+  logic                        dut_dmem_req_rdy;
+  logic                        dut_dmem_resp_val;
+  logic [p_dmem_msg_bits-1:0]  dut_dmem_resp_msg;
+
+  //--------------------------------------------------------------------
+  // Delayed input drives (testbench -> DUT)
+  //--------------------------------------------------------------------
+
+  assign #(`INPUT_DELAY) dut_rst           = rst;
+  assign #(`INPUT_DELAY) dut_imem_req_rdy  = imem_intf.req_rdy;
+  assign #(`INPUT_DELAY) dut_imem_resp_val = imem_intf.resp_val;
+  assign #(`INPUT_DELAY) dut_imem_resp_msg = imem_intf.resp_msg;
+  assign #(`INPUT_DELAY) dut_dmem_req_rdy  = dmem_intf[0].req_rdy;
+  assign #(`INPUT_DELAY) dut_dmem_resp_val = dmem_intf[0].resp_val;
+  assign #(`INPUT_DELAY) dut_dmem_resp_msg = dmem_intf[0].resp_msg;
+
+  //--------------------------------------------------------------------
+  // DUT instantiation
+  //--------------------------------------------------------------------
+
+  logic [p_num_be_lanes*32-1:0]             dut_trace_pc;
+  logic [p_num_be_lanes*5-1:0]              dut_trace_waddr;
+  logic [p_num_be_lanes*32-1:0]             dut_trace_wdata;
+  logic [p_num_be_lanes-1:0]                dut_trace_wen;
+  logic [p_num_be_lanes-1:0]                dut_trace_val;
+  logic [p_num_be_lanes*p_seq_num_bits-1:0] dut_trace_seq_num;
+
+  BlimpV11SynthWrap dut (
+    .clk            (clk),
+    .rst            (dut_rst),
+    .imem_req_val   (imem_intf.req_val),
+    .imem_req_rdy   (dut_imem_req_rdy),
+    .imem_req_msg   (imem_intf.req_msg),
+    .imem_resp_val  (dut_imem_resp_val),
+    .imem_resp_rdy  (imem_intf.resp_rdy),
+    .imem_resp_msg  (dut_imem_resp_msg),
+    .dmem_req_val   (dmem_intf[0].req_val),
+    .dmem_req_rdy   (dut_dmem_req_rdy),
+    .dmem_req_msg   (dmem_intf[0].req_msg),
+    .dmem_resp_val  (dut_dmem_resp_val),
+    .dmem_resp_rdy  (dmem_intf[0].resp_rdy),
+    .dmem_resp_msg  (dut_dmem_resp_msg),
+    .trace_pc       (dut_trace_pc),
+    .trace_waddr    (dut_trace_waddr),
+    .trace_wdata    (dut_trace_wdata),
+    .trace_wen      (dut_trace_wen),
+    .trace_val      (dut_trace_val),
+    .trace_seq_num  (dut_trace_seq_num)
+  );
+
+  // Unpack trace signals from packed DUT ports
+  genvar ti;
+  generate
+    for( ti = 0; ti < p_num_be_lanes; ti++ ) begin: TRACE_UNPACK
+      assign inst_trace_pc[ti]      = dut_trace_pc      [ti*32 +: 32];
+      assign inst_trace_waddr[ti]   = dut_trace_waddr   [ti*5 +: 5];
+      assign inst_trace_wdata[ti]   = dut_trace_wdata   [ti*32 +: 32];
+      assign inst_trace_wen[ti]     = dut_trace_wen      [ti];
+      assign inst_trace_val[ti]     = dut_trace_val      [ti];
+      assign inst_trace_seq_num[ti] = dut_trace_seq_num  [ti*p_seq_num_bits +: p_seq_num_bits];
+    end
+  endgenerate
+
+`else
 
   BlimpV11 #(
     .p_opaq_bits              (p_opaq_bits),
@@ -72,26 +247,28 @@ module BlimpV11_sim;
     .p_num_fe_lanes           (p_num_fe_lanes),
     .p_num_be_lanes           (p_num_be_lanes),
     .p_iq_depth               (p_iq_depth),
-    .p_f_intf_fifo_bypass     (p_f_intf_fifo_bypass),
-    .p_x_intf_fifo_bypass     (p_x_intf_fifo_bypass),
-    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass),
+    .p_reclaim_width          (p_reclaim_width),
+    .p_max_in_flight          (p_max_in_flight),
+    .p_f_intf_fifo_depth      (p_f_intf_fifo_depth),
+    .p_x_intf_fifo_depth      (p_x_intf_fifo_depth),
+    .p_alu_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth),
+    .p_mul_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth),
+    .p_mem_d_intf_fifo_depth  (p_mem_d_intf_fifo_depth),
+    .p_ctrl_d_intf_fifo_depth (p_ctrl_d_intf_fifo_depth),
+    .p_num_alus               (p_num_alus),
+    .p_num_muls               (p_num_muls),
+    .p_num_ldstrs             (p_num_ldstrs),
+    .p_all_iq_in_order        (p_all_iq_in_order),
+    .p_pipe_bypass            (p_pipe_bypass),
     .p_sim_f2d_bp             (p_sim_f2d_bp),
     .p_sim_d2x_bp             (p_sim_d2x_bp),
-    .p_sim_x2w_bp             (p_sim_x2w_bp),
-    .p_num_pipes              (p_num_pipes)
+    .p_sim_x2w_bp             (p_sim_x2w_bp)
   ) dut (
     .inst_mem   (imem_intf),
     .data_mem   (dmem_intf),
     .inst_trace (inst_trace_notif),
     .*
   );
-
-  logic [31:0]              inst_trace_pc      [p_num_be_lanes];
-  logic  [4:0]              inst_trace_waddr   [p_num_be_lanes];
-  logic [31:0]              inst_trace_wdata   [p_num_be_lanes];
-  logic                     inst_trace_wen     [p_num_be_lanes];
-  logic                     inst_trace_val     [p_num_be_lanes];
-  logic [p_seq_num_bits-1:0] inst_trace_seq_num [p_num_be_lanes];
 
   genvar i;
   generate
@@ -105,8 +282,14 @@ module BlimpV11_sim;
     end
   endgenerate
 
+`endif
+
   always @( posedge clk ) begin
-    #2;
+    `ifndef VCS_ASIC
+    #1;
+    `else
+    #(`CYCLE_TIME-`INPUT_DELAY);
+    `endif
     begin
       int num_committed;
       num_committed = 0;
@@ -121,8 +304,10 @@ module BlimpV11_sim;
           );
         end
       end
-      if( num_committed > 0 )
+      if( num_committed > 0 ) begin
         t.commit_notify( num_committed );
+        fl_dmem.notify_commit( num_committed );
+      end
     end
   end
 
@@ -149,7 +334,7 @@ module BlimpV11_sim;
     .p_recv_intv_delay ( 1 ),
     .p_opaq_bits       (p_opaq_bits)
   ) fl_dmem (
-    .dut (dmem_intf),
+    .dut (dmem_intf[0]),
     .*
   );
 
@@ -174,14 +359,16 @@ module BlimpV11_sim;
 
   // verilator lint_off BLKSEQ
   always @( posedge clk ) begin
-    #2;
+    #(`CYCLE_TIME-1);
     trace = "";
 
     trace = {trace, fl_imem.trace( t.trace_level )};
     trace = {trace, " || "};
     trace = {trace, fl_dmem.trace( t.trace_level )};
     trace = {trace, " || "};
+`ifndef VCS_ASIC
     trace = {trace, dut.trace( t.trace_level )};
+`endif
     trace = {trace, " || "};
 
     // Instruction trace
@@ -210,7 +397,7 @@ module BlimpV11_sim;
 
   // verilator lint_off BLKSEQ
   always @( posedge clk ) begin
-    #2;
+    #(`CYCLE_TIME-1);
     if( t.dump_json & !rst ) begin
       json_line = $sformatf("{\"cycle\":%0d", t.cycles);
 
@@ -218,8 +405,10 @@ module BlimpV11_sim;
       json_line = {json_line, ",", fl_imem.trace_json("imem")};
       json_line = {json_line, ",", fl_dmem.trace_json("dmem")};
 
+`ifndef VCS_ASIC
       // Processor pipeline
       json_line = {json_line, ",", dut.trace_json()};
+`endif
 
       // Committed instructions
       commit_json = "";
@@ -247,12 +436,34 @@ module BlimpV11_sim;
   // verilator lint_on BLKSEQ
 
   //----------------------------------------------------------------------
+  // SAIF Dumping
+  //----------------------------------------------------------------------
+
+`ifdef VTB_DUMP_SAIF
+  `define STRINGIFY(x) `"x`"
+`endif
+
+  //----------------------------------------------------------------------
   // Run the simulation
   //----------------------------------------------------------------------
 
   initial begin
+`ifdef VTB_DUMP_SAIF
+    $set_gate_level_monitoring("on");
+    $set_toggle_region(dut);
+    $toggle_start;
+    $display("SAIF dumping enabled: dumping to %s", `STRINGIFY(`VTB_DUMP_SAIF));
+`endif
     t.sim_begin();
     load_elf( t.elf_file );
   end
+
+`ifdef VTB_DUMP_SAIF
+  final begin
+    $toggle_stop;
+    $toggle_report(`STRINGIFY(`VTB_DUMP_SAIF), 1e-12, dut);
+    $display("SAIF dumping complete");
+  end
+`endif
 
 endmodule

@@ -12,8 +12,8 @@
 `define TEST_FL_MEM_INTF_TEST_SERVER_V
 
 module MemIntfTestServer #(
-  parameter type t_req_msg  = `MEM_REQ ( 8 ),
-  parameter type t_resp_msg = `MEM_RESP( 8 ),
+  parameter type t_req_msg  = logic,
+  parameter type t_resp_msg = logic,
   parameter p_opaq_bits     = 8,
   parameter p_num_words     = 1,
 
@@ -50,14 +50,25 @@ module MemIntfTestServer #(
   //----------------------------------------------------------------------
 
   localparam CYCLE_COUNT_ADDR = 32'hFFFFFF00;
+  localparam INST_COUNT_ADDR  = 32'hFFFFFF04;
 
   logic [31:0] cycle_count;
+  logic [31:0] inst_count;
 
   always_ff @( posedge clk ) begin
     if( rst )
       cycle_count <= '0;
     else
       cycle_count <= cycle_count + 1;
+  end
+
+  function void notify_commit( int num_insts );
+    inst_count = inst_count + num_insts;
+  endfunction
+
+  always @( posedge clk ) begin
+    if( rst )
+      inst_count = '0;
   end
 
   //----------------------------------------------------------------------
@@ -91,7 +102,7 @@ module MemIntfTestServer #(
 
     .send_val (1'b0),
     .send_rdy (),
-    .send_msg ('x),
+    .send_msg ('0),
 
     .recv_val (dut.resp_val),
     .recv_rdy (dut.resp_rdy),
@@ -108,6 +119,11 @@ module MemIntfTestServer #(
   t_resp_msg   curr_resp;
   logic [31:0] _temp_write_data;
 
+  initial begin
+    foreach ( mem[addr] )
+      mem[addr] = '0;
+  end
+
   // verilator lint_off BLKSEQ
   always @( posedge clk ) begin
     if( req_queue.num_msgs() > 0 ) begin
@@ -121,10 +137,12 @@ module MemIntfTestServer #(
               curr_resp.data[w*32 +: 32] = _temp_write_data;
             else if( (curr_req.addr + (w << 2)) == CYCLE_COUNT_ADDR )
               curr_resp.data[w*32 +: 32] = cycle_count;
+            else if( (curr_req.addr + (w << 2)) == INST_COUNT_ADDR )
+              curr_resp.data[w*32 +: 32] = inst_count;
             else if( mem.exists( curr_req.addr + (w << 2) ) == 1 )
               curr_resp.data[w*32 +: 32] = mem[curr_req.addr + (w << 2)];
             else
-              curr_resp.data[w*32 +: 32] = 'x;
+              curr_resp.data[w*32 +: 32] = '0;
           end
           curr_resp.strb  = curr_req.strb;
         end
@@ -143,15 +161,16 @@ module MemIntfTestServer #(
             if( ( curr_req.strb[i*4 +: 4] & 4'b1000 ) > 0 )
               _temp_write_data[31:24] = curr_req.data[i*32+24 +: 8];
             if( curr_req.strb[i*4 +: 4] == 4'b1111 ) begin
-              if( try_fl_write(curr_req.addr + (i << 2), _temp_write_data) );
-              else
+              if( try_fl_write(curr_req.addr + (i << 2), _temp_write_data) ) begin
+                if( fl_exit_requested() ) $finish;
+              end else
                 mem[curr_req.addr + (i << 2)] = _temp_write_data;
             end else begin
               mem[curr_req.addr + (i << 2)] = _temp_write_data;
             end
           end
 
-          curr_resp.data = 'x;
+          curr_resp.data = '0;
           curr_resp.strb  = curr_req.strb;
         end
       endcase

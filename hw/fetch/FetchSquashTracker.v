@@ -16,7 +16,9 @@ module FetchSquashTracker
   parameter p_num_fe_lanes  = 2,
 
   // Derived parameters (do not override)
-  parameter p_flight_bits   = $clog2(p_max_in_flight) + 1,
+  parameter p_flight_bits   = $clog2(p_max_in_flight) + 1 > $clog2(p_num_fe_lanes) + 1
+                               ? $clog2(p_max_in_flight) + 1
+                               : $clog2(p_num_fe_lanes) + 1,
   parameter p_lane_idx_bits = p_num_fe_lanes > 1
                                ? $clog2(p_num_fe_lanes) : 1
 )

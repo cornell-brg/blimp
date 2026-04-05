@@ -1,5 +1,5 @@
 //========================================================================
-// DIUBypassFifo.v
+// DIUFifo.v
 //========================================================================
 // Wraps FifoBypass and presents an instruction-window FIFO with
 // per-lane editable head state.
@@ -16,15 +16,14 @@
 `ifndef HW_DECODEISSUE_DIUBYPASSFIFO_V
 `define HW_DECODEISSUE_DIUBYPASSFIFO_V
 
-`include "hw/common/FifoBypass.v"
+`include "hw/common/Fifo.v"
 `include "intf/F__DIntf.v"
 
-module DIUBypassFifo
+module DIUFifo
 #(
   parameter type t_msg     = logic [31:0],
   parameter p_seq_num_bits = 5,
   parameter p_depth        = 2,
-  parameter p_bypass       = 0,
   parameter p_num_lanes    = 2
 )(
   input  logic clk,
@@ -86,7 +85,7 @@ module DIUBypassFifo
   genvar i;
   generate
     for( i = 0; i < p_num_lanes; i++ ) begin: PACK_GEN
-      assign F[i].rdy             = !fifo_full;
+      assign F[i].rdy             = !fifo_full | pop;
       assign F_val_vec[i]         = F[i].val;
       assign F_val_arr[i]         = F[i].val;
       assign F_inst_arr[i]        = F[i].inst;
@@ -110,34 +109,31 @@ module DIUBypassFifo
   end
 
   logic fifo_push;
-  assign fifo_push = |F_val_vec & !fifo_full;
+  assign fifo_push = |F_val_vec & (!fifo_full | pop);
 
   //----------------------------------------------------------------------
   // Underlying FIFO
   //----------------------------------------------------------------------
 
   logic                         fifo_empty;
-  logic                         fifo_bypassing;
   logic [p_fifo_entry_bits-1:0] fifo_rdata;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits (p_fifo_entry_bits),
-    .p_depth      (p_depth),
-    .p_bypass     (p_bypass)
+    .p_depth      (p_depth)
   ) fifo (
-    .clk       (clk),
-    .rst       (rst),
-    .clear     (clear),
-    .push      (fifo_push),
-    .pop       (pop),
-    .empty     (fifo_empty),
-    .full      (fifo_full),
-    .bypassing (fifo_bypassing),
-    .wdata     (fifo_wdata),
-    .rdata     (fifo_rdata)
+    .clk   (clk),
+    .rst   (rst),
+    .clear (clear),
+    .push  (fifo_push),
+    .pop   (pop),
+    .empty (fifo_empty),
+    .full  (fifo_full),
+    .wdata (fifo_wdata),
+    .rdata (fifo_rdata)
   );
 
-  assign empty = fifo_empty & ~fifo_bypassing;
+  assign empty = fifo_empty;
 
   //----------------------------------------------------------------------
   // Shadow State
@@ -170,7 +166,7 @@ module DIUBypassFifo
       lane = fifo_rdata[j*p_fifo_lane_bits +: p_fifo_lane_bits];
 
       o_msg[j]     = lane;
-      o_msg[j].val = (!fifo_empty | fifo_bypassing) & lane.val &
+      o_msg[j].val = !fifo_empty & lane.val &
                      (inst_state_r[j] != INST_STATUS_INVALID);
 
       if( inst_state_r[j] != INST_STATUS_READY )

@@ -110,10 +110,10 @@ lookup ports and register file read ports for independent operand resolution.
    :alt: A picture of the Level 8 Decode Issue Unit supporting superscalar decode and issue
    :class: bottompadding
 
-Instruction Window FIFO: DIUBypassFifo
+Instruction Window FIFO: DIUFifo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The DIU L8 uses a ``DIUBypassFifo`` to buffer fetched instruction blocks
+The DIU L8 uses a ``DIUFifo`` to buffer fetched instruction blocks
 between the fetch and decode-issue stages. The FIFO wraps a ``FifoBypass`` and
 presents an instruction-window abstraction with per-lane editable head state.
 Each lane in the head entry carries a 2-bit ``inst_status`` field with three

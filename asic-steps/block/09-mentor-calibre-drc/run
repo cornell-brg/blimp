@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 09-mentor-calibre-drc/run
+#=========================================================================
+
+# Colors
+
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+RESET=$'\e[0m'
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+# Determine which DRC types to run based on plusarg
+
+ALL_DRC_TYPES="main-drc antenna-drc"
+
+if [ -n "${1+x}" ]; then
+  case "$1" in
+    main)       DRC_TYPES="main-drc" ;;
+    antenna)    DRC_TYPES="antenna-drc" ;;
+    *)          echo "${RED}Unknown DRC type: $1${RESET}"; exit 1 ;;
+  esac
+else
+  DRC_TYPES="$ALL_DRC_TYPES"
+fi
+
+# Run using run.rule scripts
+
+first=true
+for DRC_TYPE in $DRC_TYPES; do
+  export DRC_TYPE
+  cd $DRC_TYPE
+  if $first; then
+    calibre -drc -hier -64 -turbo -hyper -waiver ../setup.waiver run.rule | tee run.log
+    first=false
+  else
+    calibre -drc -hier -64 -turbo -hyper -waiver ../setup.waiver run.rule | tee -a run.log
+  fi
+  cd ..
+done
+
+# Print DRC summary from BY CELL section of each report
+
+summary_files=""
+for DRC_TYPE in $DRC_TYPES; do
+  summary_files="$summary_files $DRC_TYPE/run.summary"
+done
+
+./print-summary $summary_files

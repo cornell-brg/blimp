@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+#=========================================================================
+# print-summary
+#=========================================================================
+# Parse LVS report and print pass/fail status.
+
+import sys
+from pathlib import Path
+
+RED   = "\033[31m"
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
+def print_lvs( lvs_report, lvs_log ):
+
+  if not Path(lvs_report).exists():
+    print(f" {lvs_report} not found")
+    return
+
+  if not Path(lvs_log).exists():
+    print(f" {lvs_log} not found")
+    return
+
+  with open( lvs_report, "r" ) as file:
+    lines = file.readlines()
+
+  # Check if log file contains "LVS completed."
+
+  with open( lvs_log, "r" ) as file:
+    log_content = file.read()
+
+  lvs_completed = "LVS completed." in log_content
+
+  design_name = "{{ design_name }}"
+
+  # Find the CELL SUMMARY section and check the result for the wrapper cell
+
+  in_cell_summary = False
+  for line in lines:
+    if "CELL  SUMMARY" in line:
+      in_cell_summary = True
+      continue
+    if in_cell_summary:
+      if design_name in line:
+        if line.strip().startswith("CORRECT") and lvs_completed:
+          print(f" {GREEN}LVS passed ({design_name}){RESET}")
+        else:
+          if not lvs_completed:
+            print(f" {RED}LVS FAILED ({design_name}): LVS did not complete{RESET}")
+          else:
+            print(f" {RED}LVS FAILED ({design_name}){RESET}")
+        return
+
+  print(f" {RED}LVS FAILED: {design_name} not found in CELL SUMMARY{RESET}")
+
+if __name__ == "__main__":
+  if len(sys.argv) < 3:
+    print("Usage: print-lvs-summary <lvs_report> <lvs_log>")
+    sys.exit(1)
+  print_lvs( sys.argv[1], sys.argv[2] )

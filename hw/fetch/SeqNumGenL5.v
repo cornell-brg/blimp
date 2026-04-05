@@ -14,7 +14,8 @@
 
 module SeqNumGenL5 #(
   parameter p_seq_num_bits  = 5,
-  parameter p_reclaim_width = 2, // Number of entries that can be reclaimed at once
+  parameter p_num_phys_regs = 36,
+  parameter p_reclaim_width = 2,
   parameter p_num_fe_lanes  = 2,
   parameter p_num_be_lanes  = 2
 )(
@@ -65,7 +66,8 @@ module SeqNumGenL5 #(
 
   SSSeqAge #(
     .p_num_be_lanes (p_num_be_lanes),
-    .p_seq_num_bits (p_seq_num_bits)
+    .p_seq_num_bits (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs)
   ) seq_age (
     .*
   );
@@ -111,7 +113,13 @@ module SeqNumGenL5 #(
           // Squashing - free all inst seq nums younger than squash inst's
           // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-          if( squash.val & seq_age.is_older( squash.seq_num, p_seq_num_bits'(i) ) )
+          // verilator lint_off UNSIGNED
+          // verilator lint_off CMPCONST
+          if( squash.val & ((squash.seq_num < i[p_seq_num_bits-1:0]) ^
+                           (squash.seq_num < oldest_seq_num)      ^
+                           (i[p_seq_num_bits-1:0] < oldest_seq_num)) )
+          // verilator lint_on UNSIGNED
+          // verilator lint_on CMPCONST
             // The corresponding instruction is squashed
             seq_num_list[i] <= FREE;
         end
@@ -144,13 +152,21 @@ module SeqNumGenL5 #(
   // During a squash, entries younger than squash.seq_num are being freed
   // this cycle (registered), so bypass the check — those entries are
   // guaranteed to become free at the next posedge.
-  logic alloc_entries_free;
+  logic                      alloc_entries_free;
+  logic [p_seq_num_bits-1:0] alloc_check_idx;
+
+  logic [p_num_fe_lanes_bits:0] alloc_check_cntr;
+
   always_comb begin
     alloc_entries_free = 1'b1;
+    alloc_check_idx    = curr_head_ptr[p_seq_num_bits-1:0];
+    alloc_check_cntr   = '0;
     if( !squash.val ) begin
       for( int k = 0; k < p_num_fe_lanes; k++ ) begin
-        if( k < alloc_try_cntr && seq_num_list[p_seq_num_bits'(curr_head_ptr[p_seq_num_bits-1:0] + k)] != FREE )
+        if( alloc_check_cntr < alloc_try_cntr && seq_num_list[alloc_check_idx] != FREE )
           alloc_entries_free = 1'b0;
+        alloc_check_idx  = alloc_check_idx  + 1'b1;
+        alloc_check_cntr = alloc_check_cntr + 1'b1;
       end
     end
   end
@@ -305,23 +321,16 @@ module SeqNumGenL5 #(
 
   // Find the maximum amount to reclaim
   logic [p_seq_num_bits:0] curr_tail_incr;
-  logic [p_seq_num_bits:0] curr_tail_incr_arr [p_reclaim_width];
-
-  generate
-    for( i = 0; i < p_reclaim_width; i++ ) begin: RECLAIM_INCR
-      always_comb begin
-        if( reclaim_select[i] )
-          curr_tail_incr_arr[i] = (p_seq_num_bits+1)'(i + 1);
-        else
-          curr_tail_incr_arr[i] = '0;
-      end
-    end
-  endgenerate
+  logic [p_seq_num_bits:0] curr_tail_incr_cntr;
 
   always_comb begin
-    curr_tail_incr = '0;
-    for (int j = 0; j < p_reclaim_width; j++)
-      curr_tail_incr = curr_tail_incr | curr_tail_incr_arr[j];
+    curr_tail_incr      = '0;
+    curr_tail_incr_cntr = '0;
+    for (int j = 0; j < p_reclaim_width; j++) begin
+      curr_tail_incr_cntr = curr_tail_incr_cntr + 1'b1;
+      if( reclaim_select[j] )
+        curr_tail_incr = curr_tail_incr_cntr;
+    end
   end
 
   always_ff @( posedge clk ) begin

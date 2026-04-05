@@ -44,14 +44,15 @@ module FifoTestSuite #(
     .p_entry_bits (p_entry_bits),
     .p_depth      (p_depth)
   ) DUT (
-    .clk     (clk),
-    .rst     (rst | dut_rst),
-    .push    (dut_push),
-    .pop     (dut_pop),
-    .empty   (dut_empty),
-    .full    (dut_full),
-    .wdata   (dut_wdata),
-    .rdata   (dut_rdata)
+    .clk   (clk),
+    .rst   (rst | dut_rst),
+    .clear (1'b0),
+    .push  (dut_push),
+    .pop   (dut_pop),
+    .empty (dut_empty),
+    .full  (dut_full),
+    .wdata (dut_wdata),
+    .rdata (dut_rdata)
   );
 
   //----------------------------------------------------------------------

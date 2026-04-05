@@ -38,27 +38,29 @@
 // verilator lint_off DECLFILENAME
 
 `define BLIMPV11_SUITE_PARAMS \
-  parameter p_suite_num              = 0,  \
-  parameter p_opaq_bits              = 8,  \
-  parameter p_seq_num_bits           = 5,  \
-  parameter p_num_phys_regs          = 36, \
-  parameter p_num_be_lanes           = 2,  \
-  parameter p_iq_depth               = 4,  \
-  parameter p_reclaim_width          = p_num_be_lanes, \
-  parameter p_max_in_flight          = 8,  \
-  parameter p_mem_send_intv_delay    = 1,  \
-  parameter p_mem_recv_intv_delay    = 1,  \
-  parameter p_num_fe_lanes           = 2,  \
-  parameter p_f_intf_fifo_depth      = 4,  \
-  parameter p_f_intf_fifo_bypass     = 0,  \
-  parameter p_x_intf_fifo_depth      = 4,  \
-  parameter p_x_intf_fifo_bypass     = 0,  \
-  parameter p_alu_d_intf_fifo_depth  = 4,  \
-  parameter p_mul_d_intf_fifo_depth  = 4,  \
-  parameter p_mem_d_intf_fifo_depth  = 4,  \
-  parameter p_mem_d_intf_fifo_bypass = 0,  \
-  parameter p_num_pipes              = 8,  \
-  parameter p_all_iq_in_order        = 0,  \
+  parameter p_suite_num               = 0,  \
+  parameter p_opaq_bits               = 8,  \
+  parameter p_seq_num_bits            = 5,  \
+  parameter p_num_phys_regs           = 36, \
+  parameter p_num_fe_lanes            = 4,  \
+  parameter p_num_be_lanes            = 4,  \
+  parameter p_iq_depth                = 4,  \
+  parameter p_reclaim_width           = p_num_be_lanes, \
+  parameter p_max_in_flight           = 8,  \
+  parameter p_f_intf_fifo_depth       = 4,  \
+  parameter p_x_intf_fifo_depth       = 4,  \
+  parameter p_alu_d_intf_fifo_depth   = 4,  \
+  parameter p_mul_d_intf_fifo_depth   = 4,  \
+  parameter p_mem_d_intf_fifo_depth   = 4,  \
+  parameter p_ctrl_d_intf_fifo_depth  = 4,  \
+  parameter p_num_alus                = 4,  \
+  parameter p_num_muls                = 2,  \
+  parameter p_num_ldstrs              = 1,  \
+  parameter p_all_iq_in_order         = 0,  \
+  parameter p_pipe_bypass             = '0, \
+  parameter p_num_pipes               = p_num_alus + p_num_muls + p_num_ldstrs + 1, \
+  parameter p_mem_send_intv_delay     = 1,  \
+  parameter p_mem_recv_intv_delay     = 1,  \
   parameter [p_num_fe_lanes*8-1:0] p_sim_f2d_bp = '0, \
   parameter [p_num_pipes*8-1:0]    p_sim_d2x_bp = '0, \
   parameter [p_num_pipes*8-1:0]    p_sim_x2w_bp = '0
@@ -81,19 +83,20 @@
     .p_iq_depth               (p_iq_depth), \
     .p_reclaim_width          (p_reclaim_width), \
     .p_max_in_flight          (p_max_in_flight), \
-    .p_mem_send_intv_delay    (p_mem_send_intv_delay), \
-    .p_mem_recv_intv_delay    (p_mem_recv_intv_delay), \
     .p_num_fe_lanes           (p_num_fe_lanes), \
     .p_f_intf_fifo_depth      (p_f_intf_fifo_depth), \
-    .p_f_intf_fifo_bypass     (p_f_intf_fifo_bypass), \
     .p_x_intf_fifo_depth      (p_x_intf_fifo_depth), \
-    .p_x_intf_fifo_bypass     (p_x_intf_fifo_bypass), \
     .p_alu_d_intf_fifo_depth  (p_alu_d_intf_fifo_depth), \
     .p_mul_d_intf_fifo_depth  (p_mul_d_intf_fifo_depth), \
     .p_mem_d_intf_fifo_depth  (p_mem_d_intf_fifo_depth), \
-    .p_mem_d_intf_fifo_bypass (p_mem_d_intf_fifo_bypass), \
-    .p_num_pipes              (p_num_pipes), \
+    .p_num_alus               (p_num_alus), \
+    .p_num_muls               (p_num_muls), \
+    .p_num_ldstrs             (p_num_ldstrs), \
     .p_all_iq_in_order        (p_all_iq_in_order), \
+    .p_pipe_bypass            (p_pipe_bypass), \
+    .p_num_pipes              (p_num_pipes), \
+    .p_mem_send_intv_delay    (p_mem_send_intv_delay), \
+    .p_mem_recv_intv_delay    (p_mem_recv_intv_delay), \
     .p_sim_f2d_bp             (p_sim_f2d_bp), \
     .p_sim_d2x_bp             (p_sim_d2x_bp), \
     .p_sim_x2w_bp             (p_sim_x2w_bp) \
@@ -256,47 +259,35 @@
     .p_num_be_lanes  (4)
   ) suite_16();
 
-  // Suite 17: 2-bit seq, 35 phys regs, 4 FE / 4 BE, all FIFO bypass
-  `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num              (17),
-    .p_seq_num_bits           (2),
-    .p_num_phys_regs          (35),
-    .p_num_fe_lanes           (4),
-    .p_num_be_lanes           (4),
-    .p_f_intf_fifo_bypass     (1),
-    .p_x_intf_fifo_bypass     (1),
-    .p_mem_d_intf_fifo_bypass (1)
-  ) suite_17();
-
   //----------------------------------------------------------------------
   // FIFO depth and microarchitectural variation suites
   //----------------------------------------------------------------------
 
-  // Suite 18: Shallow FIFOs (depth=2 for all inter-stage FIFOs)
+  // Suite 17: Shallow FIFOs (depth=2 for all inter-stage FIFOs)
   `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num             (18),
+    .p_suite_num             (17),
     .p_f_intf_fifo_depth     (2),
     .p_x_intf_fifo_depth     (2),
     .p_alu_d_intf_fifo_depth (2),
     .p_mul_d_intf_fifo_depth (2),
     .p_mem_d_intf_fifo_depth (2)
+  ) suite_17();
+
+  // Suite 18: Single-entry reclaim width (slower seq num freeing)
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num     (18),
+    .p_reclaim_width (1)
   ) suite_18();
 
-  // Suite 19: Single-entry reclaim width (slower seq num freeing)
+  // Suite 19: Low max_in_flight (4), stresses issue queue pressure
   `BLIMPV11_SUITE_MODULE #(
     .p_suite_num     (19),
-    .p_reclaim_width (1)
+    .p_max_in_flight (4)
   ) suite_19();
 
-  // Suite 20: Low max_in_flight (4), stresses issue queue pressure
+  // Suite 20: Shallow FIFOs (depth=2) + F2D backpressure, 4 FE / 4 BE
   `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num      (20),
-    .p_max_in_flight  (4)
-  ) suite_20();
-
-  // Suite 21: Shallow FIFOs (depth=2) + F2D backpressure, 4 FE / 4 BE
-  `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num             (21),
+    .p_suite_num             (20),
     .p_num_fe_lanes          (4),
     .p_num_be_lanes          (4),
     .p_f_intf_fifo_depth     (2),
@@ -305,12 +296,12 @@
     .p_mul_d_intf_fifo_depth (2),
     .p_mem_d_intf_fifo_depth (2),
     .p_sim_f2d_bp            ({8'd4, 8'd3, 8'd5, 8'd4})
-  ) suite_21();
+  ) suite_20();
 
-  // Suite 22: Combined stress — shallow FIFOs, low max_in_flight, slow
+  // Suite 21: Combined stress — shallow FIFOs, low max_in_flight, slow
   //           mem, single reclaim, combined backpressure
   `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num             (22),
+    .p_suite_num             (21),
     .p_num_fe_lanes          (4),
     .p_num_be_lanes          (4),
     .p_reclaim_width         (1),
@@ -325,32 +316,83 @@
     .p_sim_f2d_bp            ({8'd5, 8'd3, 8'd7, 8'd4}),
     .p_sim_d2x_bp            ({8'd0, 8'd0, 8'd4, 8'd3, 8'd0, 8'd0, 8'd5, 8'd3}),
     .p_sim_x2w_bp            ({8'd0, 8'd0, 8'd3, 8'd4, 8'd0, 8'd0, 8'd4, 8'd3})
+  ) suite_21();
+
+  //----------------------------------------------------------------------
+  // Issue queue depth and pipe bypass test suites
+  //----------------------------------------------------------------------
+  // p_pipe_bypass is one-hot: one bit per pipe.
+  // Default pipe layout (8 pipes): ALU0-3 [0:3], MUL0-1 [4:5],
+  //                                 MEM [6], CTRL [7]
+
+  // Suite 22: Bypass ALU pipe 0 only
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num    (22),
+    .p_pipe_bypass  (8'b00000001)
   ) suite_22();
 
-  // Suite 23: Deep FIFOs (depth=8), 4 FE / 4 BE, FIFO bypass on F and X
+  // Suite 23: Bypass all ALU pipes
   `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num             (23),
-    .p_num_fe_lanes          (4),
-    .p_num_be_lanes          (4),
-    .p_f_intf_fifo_depth     (8),
-    .p_f_intf_fifo_bypass    (1),
-    .p_x_intf_fifo_depth     (8),
-    .p_x_intf_fifo_bypass    (1),
-    .p_alu_d_intf_fifo_depth (8),
-    .p_mul_d_intf_fifo_depth (8),
-    .p_mem_d_intf_fifo_depth (8)
+    .p_suite_num    (23),
+    .p_pipe_bypass  (8'b00001111)
   ) suite_23();
 
-  // Suite 24: Minimal depth (1) for F and X FIFOs with bypass, 4 FE / 4 BE
+  // Suite 24: Bypass MUL pipes
   `BLIMPV11_SUITE_MODULE #(
-    .p_suite_num          (24),
-    .p_num_fe_lanes       (4),
-    .p_num_be_lanes       (4),
-    .p_f_intf_fifo_depth  (1),
-    .p_f_intf_fifo_bypass (1),
-    .p_x_intf_fifo_depth  (1),
-    .p_x_intf_fifo_bypass (1)
+    .p_suite_num    (24),
+    .p_pipe_bypass  (8'b00110000)
   ) suite_24();
+
+  // Suite 25: Bypass MEM pipe
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num    (25),
+    .p_pipe_bypass  (8'b01000000)
+  ) suite_25();
+
+  // Suite 26: Bypass all pipes
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num    (26),
+    .p_pipe_bypass  (8'b11111111)
+  ) suite_26();
+
+  // Suite 27: Shallow IQ (depth=2)
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num (27),
+    .p_iq_depth  (2)
+  ) suite_27();
+
+  // Suite 28: Deep IQ (depth=8)
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num (28),
+    .p_iq_depth  (8)
+  ) suite_28();
+
+  // Suite 29: Shallow IQ (depth=2) + bypass all ALU pipes
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num    (29),
+    .p_iq_depth     (2),
+    .p_pipe_bypass  (8'b00001111)
+  ) suite_29();
+
+  // Suite 30: Deep IQ (depth=8) + bypass all pipes
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num    (30),
+    .p_iq_depth     (8),
+    .p_pipe_bypass  (8'b11111111)
+  ) suite_30();
+
+  // Suite 31: All in-order IQ
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num       (31),
+    .p_all_iq_in_order (1)
+  ) suite_31();
+
+  // Suite 32: All in-order IQ + bypass all ALU and MUL pipes
+  `BLIMPV11_SUITE_MODULE #(
+    .p_suite_num       (32),
+    .p_all_iq_in_order (1),
+    .p_pipe_bypass     (8'b00111111)
+  ) suite_32();
 
   int s;
 
@@ -382,6 +424,14 @@
     if ((s <= 0) || (s == 22)) suite_22.run_test_suite();
     if ((s <= 0) || (s == 23)) suite_23.run_test_suite();
     if ((s <= 0) || (s == 24)) suite_24.run_test_suite();
+    if ((s <= 0) || (s == 25)) suite_25.run_test_suite();
+    if ((s <= 0) || (s == 26)) suite_26.run_test_suite();
+    if ((s <= 0) || (s == 27)) suite_27.run_test_suite();
+    if ((s <= 0) || (s == 28)) suite_28.run_test_suite();
+    if ((s <= 0) || (s == 29)) suite_29.run_test_suite();
+    if ((s <= 0) || (s == 30)) suite_30.run_test_suite();
+    if ((s <= 0) || (s == 31)) suite_31.run_test_suite();
+    if ((s <= 0) || (s == 32)) suite_32.run_test_suite();
 
     test_bench_end();
   end

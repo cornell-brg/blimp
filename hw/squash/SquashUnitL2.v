@@ -17,12 +17,8 @@
 // A helper module to arbitrate between two squash interfaces
 
 module SquashUnitL2Helper #(
-  parameter p_seq_num_bits = 5,
-  parameter p_num_be_lanes = 2
+  parameter p_seq_num_bits = 5
 )(
-  input  logic    clk,
-  input  logic    rst,
-
   //----------------------------------------------------------------------
   // Notifications to arbitrate between
   //----------------------------------------------------------------------
@@ -43,26 +39,16 @@ module SquashUnitL2Helper #(
   output logic                      gnt_val,
 
   //----------------------------------------------------------------------
-  // Commit to track age comparison
+  // Oldest sequence number for age comparison
   //----------------------------------------------------------------------
 
-  CommitNotif.sub commit [p_num_be_lanes]
+  input  logic [p_seq_num_bits-1:0] oldest_seq_num
 );
 
-  logic [p_seq_num_bits-1:0] oldest_seq_num;
-
-  SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes),
-    .p_seq_num_bits (p_seq_num_bits)
-  ) seq_age (
-    .*
-  );
-
   logic arb0_is_older;
-  assign arb0_is_older = seq_age.is_older(
-    arb0_seq_num,
-    arb1_seq_num
-  );
+  assign arb0_is_older = ( arb0_seq_num < arb1_seq_num    ) ^
+                         ( arb0_seq_num < oldest_seq_num ) ^
+                         ( arb1_seq_num < oldest_seq_num );
 
   always_comb begin
     // Choose the valid notification, if only one
@@ -97,8 +83,10 @@ endmodule
 //------------------------------------------------------------------------
 
 module SquashUnitL2 #(
-  parameter p_num_arb      = 2,
-  parameter p_num_be_lanes = 2
+  parameter p_num_arb       = 2,
+  parameter p_num_be_lanes  = 2,
+  parameter p_seq_num_bits  = 5,
+  parameter p_num_phys_regs = 36
 ) (
   input  logic clk,
   input  logic rst,
@@ -122,7 +110,22 @@ module SquashUnitL2 #(
   CommitNotif.sub commit [p_num_be_lanes]
 );
 
-  localparam p_seq_num_bits = gnt.p_seq_num_bits;
+  //----------------------------------------------------------------------
+  // Single SSSeqAge instance for age tracking
+  //----------------------------------------------------------------------
+
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+
+  SSSeqAge #(
+    .p_num_be_lanes  (p_num_be_lanes),
+    .p_seq_num_bits  (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs)
+  ) seq_age (
+    .clk            (clk),
+    .rst            (rst),
+    .oldest_seq_num (oldest_seq_num),
+    .commit         (commit)
+  );
 
   // Binary tree
   localparam p_num_levels = $clog2( p_num_arb );
@@ -157,8 +160,8 @@ module SquashUnitL2 #(
           assign intermediate_target[i]  = arb[i].target;
           assign intermediate_val[i]     = arb[i].val;
         end else begin
-          assign intermediate_seq_num[i] = 'x;
-          assign intermediate_target[i]  = 'x;
+          assign intermediate_seq_num[i] = '0;
+          assign intermediate_target[i]  = '0;
           assign intermediate_val[i]     = 1'b0;
         end
       end
@@ -166,19 +169,18 @@ module SquashUnitL2 #(
       for( i = 0; i < p_num_levels; i = i + 1 ) begin: LEVEL_ARBITRATE
         for( j = 0; j < (2 ** i); j = j + 1 ) begin: NODE_ARBITRATE
           SquashUnitL2Helper #(
-            .p_seq_num_bits (p_seq_num_bits),
-            .p_num_be_lanes (p_num_be_lanes)
+            .p_seq_num_bits (p_seq_num_bits)
           ) helper (
-            .arb0_seq_num ( intermediate_seq_num[p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
-            .arb0_target  ( intermediate_target [p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
-            .arb0_val     ( intermediate_val    [p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
-            .arb1_seq_num ( intermediate_seq_num[p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
-            .arb1_target  ( intermediate_target [p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
-            .arb1_val     ( intermediate_val    [p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
-            .gnt_seq_num  ( intermediate_seq_num[p_num_intf -      j  -      (2 ** i)     ] ),
-            .gnt_target   ( intermediate_target [p_num_intf -      j  -      (2 ** i)     ] ),
-            .gnt_val      ( intermediate_val    [p_num_intf -      j  -      (2 ** i)     ] ),
-            .*
+            .arb0_seq_num    ( intermediate_seq_num[p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
+            .arb0_target     ( intermediate_target [p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
+            .arb0_val        ( intermediate_val    [p_num_intf - (2 * j) - (2 * (2 ** i))    ] ),
+            .arb1_seq_num    ( intermediate_seq_num[p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
+            .arb1_target     ( intermediate_target [p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
+            .arb1_val        ( intermediate_val    [p_num_intf - (2 * j) - (2 * (2 ** i)) - 1] ),
+            .gnt_seq_num     ( intermediate_seq_num[p_num_intf -      j  -      (2 ** i)     ] ),
+            .gnt_target      ( intermediate_target [p_num_intf -      j  -      (2 ** i)     ] ),
+            .gnt_val         ( intermediate_val    [p_num_intf -      j  -      (2 ** i)     ] ),
+            .oldest_seq_num  ( oldest_seq_num )
           );
         end
       end
@@ -186,34 +188,6 @@ module SquashUnitL2 #(
       assign gnt.seq_num = intermediate_seq_num[p_num_intf - 1];
       assign gnt.target  = intermediate_target [p_num_intf - 1];
       assign gnt.val     = intermediate_val    [p_num_intf - 1];
-    end
-  endgenerate
-
-  //----------------------------------------------------------------------
-  // Unused signals
-  //----------------------------------------------------------------------
-  // Include those that are used by SeqAge, as they're not used in all
-  // cases
-
-  logic        unused_clk;
-  logic        unused_rst;
-  logic [31:0] unused_commit_pc    [p_num_be_lanes];
-  logic  [4:0] unused_commit_waddr [p_num_be_lanes];
-  logic [31:0] unused_commit_wdata [p_num_be_lanes];
-  logic        unused_commit_wen   [p_num_be_lanes];
-  logic        unused_commit_val   [p_num_be_lanes];
-
-  assign unused_clk          = clk;
-  assign unused_rst          = rst;
-
-  genvar k;
-  generate
-    for( k = 0; k < p_num_be_lanes; k = k + 1 ) begin: UNUSED_COMMIT_SIGNALS
-      assign unused_commit_pc[k]    = commit[k].pc;
-      assign unused_commit_waddr[k] = commit[k].waddr;
-      assign unused_commit_wdata[k] = commit[k].wdata;
-      assign unused_commit_wen[k]   = commit[k].wen;
-      assign unused_commit_val[k]   = commit[k].val;
     end
   endgenerate
 

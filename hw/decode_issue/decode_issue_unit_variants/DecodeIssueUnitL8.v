@@ -23,7 +23,7 @@
 `include "hw/decode_issue/IssueQueueInOrder.v"
 `include "hw/decode_issue/IssueQueueOOO.v"
 `include "hw/util/SSSeqAge.v"
-`include "hw/decode_issue/DIUBypassFifo.v"
+`include "hw/decode_issue/DIUFifo.v"
 `include "intf/F__DIntf.v"
 `include "intf/D__XIntf.v"
 `include "intf/CompleteNotif.v"
@@ -36,6 +36,7 @@ import ISA::*;
 
 module DecodeIssueUnitL8 #(
   parameter p_num_pipes      = 1,
+  parameter p_seq_num_bits   = 5,
   parameter p_num_phys_regs  = 36,
   parameter p_num_fe_lanes   = 2,
   parameter p_num_be_lanes   = 2,
@@ -52,9 +53,8 @@ module DecodeIssueUnitL8 #(
                                       OP_BLT_VEC  | OP_BGE_VEC  |
                                       OP_BLTU_VEC | OP_BGEU_VEC,
 
-  parameter p_f_intf_fifo_depth  = 4,
-  parameter p_f_intf_fifo_bypass = 0,
-  parameter p_iq_entries_bits    = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
+  parameter p_f_intf_fifo_depth = 4,
+  parameter p_iq_entries_bits   = p_iq_depth > 1 ? $clog2(p_iq_depth) : 1,
 
   // Bitmask of which pipes use bypass IQs.  Default ('0) auto-computes
   // to bypass only for the control-subset pipe.
@@ -65,7 +65,11 @@ module DecodeIssueUnitL8 #(
   parameter rv_op_vec p_mem_subset = '0,
 
   // When set, all issue queues use in-order issue (no OOO selection).
-  parameter p_all_iq_in_order = 0
+  parameter p_all_iq_in_order = 0,
+
+  // When set, instantiate one regfile per pipe (each with 1 lookup port)
+  // instead of a single shared regfile with p_num_pipes lookup ports.
+  parameter p_regfile_per_pipe = 0
 ) (
   input logic clk,
   input logic rst,
@@ -87,7 +91,6 @@ module DecodeIssueUnitL8 #(
   SquashNotif.sub    squash_sub
 );
 
-  localparam p_seq_num_bits     = F[0].p_seq_num_bits;
   localparam p_phys_addr_bits   = $clog2(p_num_phys_regs);
   localparam p_fe_lane_idx_bits = p_num_fe_lanes > 1 ? $clog2(p_num_fe_lanes) : 1;
 
@@ -194,18 +197,17 @@ module DecodeIssueUnitL8 #(
   //----------------------------------------------------------------------
   // Instruction window FIFO
   //----------------------------------------------------------------------
-
+  logic                      squash_pub_val_comb;
   logic                      fifo_pop;
   logic                      fifo_empty;
   logic [1:0]                fifo_update_head [p_num_fe_lanes];
 
   t_dio_inst_window F_curr [p_num_fe_lanes];
 
-  DIUBypassFifo #(
+  DIUFifo #(
     .t_msg          (t_dio_inst_window),
     .p_seq_num_bits (p_seq_num_bits),
     .p_depth        (p_f_intf_fifo_depth),
-    .p_bypass       (p_f_intf_fifo_bypass),
     .p_num_lanes    (p_num_fe_lanes)
   ) f_fifo (
     .clk             (clk),
@@ -400,7 +402,6 @@ module DecodeIssueUnitL8 #(
   // Rename table and register file
   //----------------------------------------------------------------------
 
-
   logic [4:0] lookup_new_inst_areg [p_num_fe_lanes][2];
   logic [4:0] alloc_areg          [p_num_fe_lanes];
   always_comb begin
@@ -461,41 +462,70 @@ module DecodeIssueUnitL8 #(
   logic [p_phys_addr_bits-1:0] raddr [p_num_pipes][2];
   logic [31:0]                 rdata [p_num_pipes][2];
 
-  SSRegfileL2 #(
-    .p_entry_bits       (32),
-    .p_num_regs         (p_num_phys_regs),
-    .p_num_lookup_ports (p_num_pipes),
-    .p_num_be_lanes     (p_num_be_lanes)
-  ) regfile (
-    .clk   (clk),
-    .rst   (rst),
-    .raddr (raddr),
-    .rdata (rdata),
-    .waddr (complete_preg),
-    .wdata (complete_wdata),
-    .wen   (complete_wen_and_val)
-  );
+  generate
+    if( p_regfile_per_pipe ) begin: REGFILE_PER_PIPE
 
+      for( i = 0; i < p_num_pipes; i++ ) begin: REGFILE_GEN
+
+        logic [p_phys_addr_bits-1:0] rf_raddr [1][2];
+        logic [31:0]                 rf_rdata [1][2];
+
+        assign rf_raddr[0] = raddr[i];
+        assign rdata[i]    = rf_rdata[0];
+
+        SSRegfileL2 #(
+          .p_entry_bits       (32),
+          .p_num_regs         (p_num_phys_regs),
+          .p_num_lookup_ports (1),
+          .p_num_be_lanes     (p_num_be_lanes)
+        ) regfile (
+          .clk   (clk),
+          .rst   (rst),
+          .raddr (rf_raddr),
+          .rdata (rf_rdata),
+          .waddr (complete_preg),
+          .wdata (complete_wdata),
+          .wen   (complete_wen_and_val)
+        );
+      end
+
+    end else begin: REGFILE_SHARED
+
+      SSRegfileL2 #(
+        .p_entry_bits       (32),
+        .p_num_regs         (p_num_phys_regs),
+        .p_num_lookup_ports (p_num_pipes),
+        .p_num_be_lanes     (p_num_be_lanes)
+      ) regfile (
+        .clk   (clk),
+        .rst   (rst),
+        .raddr (raddr),
+        .rdata (rdata),
+        .waddr (complete_preg),
+        .wdata (complete_wdata),
+        .wen   (complete_wen_and_val)
+      );
+
+    end
+  endgenerate
 
   //----------------------------------------------------------------------
   // Squashing
   //----------------------------------------------------------------------
 
-  logic        squash_pub_val_comb;
   logic [31:0] jump_base;
 
   DIUSquashPub #(
     .t_ctrl_info    (t_oldest_ctrl_inst),
     .p_seq_num_bits (p_seq_num_bits)
   ) squash_publisher (
-    .clk                          (clk),
-    .rst                          (rst),
     .oldest_ctrl_inst             (oldest_ctrl_inst),
     .oldest_ctrl_inst_jump_base   (jump_base),
     .oldest_ctrl_inst_dispatch_go (dispatch_go[oldest_ctrl_inst.idx]),
-    .squash_pub                   (squash_pub),
-    .squash_pub_val_comb          (squash_pub_val_comb)
+    .squash_pub                   (squash_pub)
   );
+
+  assign squash_pub_val_comb = squash_pub.val;
 
   //----------------------------------------------------------------------
   // Crossbar mapping and routing
@@ -534,8 +564,9 @@ module DecodeIssueUnitL8 #(
   logic [p_seq_num_bits-1:0] oldest_seq_num;
 
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes),
-    .p_seq_num_bits (p_seq_num_bits)
+    .p_num_be_lanes  (p_num_be_lanes),
+    .p_seq_num_bits  (p_seq_num_bits),
+    .p_num_phys_regs (p_num_phys_regs)
   ) seq_age (
     .clk            (clk),
     .rst            (rst),
@@ -614,7 +645,6 @@ module DecodeIssueUnitL8 #(
           .ins_msg         (iq_msg[i]),
           .ins_try         (iq_ins_try[i]),
           .ins_rdy         (iq_rdy[i]),
-          .ins_ack         (),
           .avail_slots     (iq_avail_slots[i]),
           .Ex              (Ex[i]),
           .rf_raddr        (raddr[i]),
@@ -630,14 +660,13 @@ module DecodeIssueUnitL8 #(
           .p_num_regs     (p_num_phys_regs),
           .p_seq_num_bits (p_seq_num_bits),
           .p_num_be_lanes (p_num_be_lanes),
-          .p_bypass       (0)
+          .p_bypass       (c_pipe_bypass[i])
         ) issue_queue (
           .clk             (clk),
           .rst             (rst),
           .ins_msg         (iq_msg[i]),
           .ins_try         (iq_ins_try[i]),
           .ins_rdy         (iq_rdy[i]),
-          .ins_ack         (),
           .avail_slots     (iq_avail_slots[i]),
           .Ex              (Ex[i]),
           .oldest_seq_num  (oldest_seq_num),
@@ -648,8 +677,8 @@ module DecodeIssueUnitL8 #(
 
       end
 
-      // JALR base register read -- assumes exactly one control pipe
-      if( c_pipe_bypass[i] ) begin
+      // JALR base register read -- exactly one control pipe
+      if( p_pipe_subsets[i] == p_ctrl_subset ) begin
         assign jump_base = rdata[i][0];
       end
     end

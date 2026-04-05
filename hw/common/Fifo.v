@@ -20,6 +20,7 @@ module Fifo
   // Control/Status Signals
   //----------------------------------------------------------------------
 
+  input  logic clear,  // Synchronous clear: empties FIFO, allows same-cycle push
   input  logic push,
   input  logic pop,
   output logic empty,
@@ -45,6 +46,9 @@ module Fifo
     if( rst ) begin
       rptr <= '0;
       wptr <= '0;
+    end else if( clear ) begin
+      rptr <= '0;
+      wptr <= '0;
     end else begin
       if( push ) wptr <= wptr + {(p_addr_bits + 1){1'b1}};
       if( pop  ) rptr <= rptr + {(p_addr_bits + 1){1'b1}};
@@ -52,12 +56,14 @@ module Fifo
   end
 
   assign empty = ( wptr == rptr );
+
   generate
-    if( p_depth == 1 )
+    if( p_depth == 1 ) begin : gen_full_depth_1
       assign full = ( wptr != rptr );
-    else
+    end else begin : gen_full_depth_gt_1
       assign full  = ( wptr[p_addr_bits-1:0] == rptr[p_addr_bits-1:0] )
                    & ( wptr[p_addr_bits]     != rptr[p_addr_bits]     );
+    end
   endgenerate
 
   //----------------------------------------------------------------------
@@ -65,7 +71,7 @@ module Fifo
   //----------------------------------------------------------------------
 
   generate
-    if( p_depth == 1 ) begin
+    if( p_depth == 1 ) begin : gen_depth_1
       logic [p_entry_bits-1:0] arr;
 
       always @( posedge clk ) begin
@@ -77,13 +83,13 @@ module Fifo
       end
       assign rdata = arr;
 
-    end else begin
+    end else begin : gen_depth_gt_1
       logic [p_entry_bits-1:0] arr [p_depth-1:0];
 
       always @( posedge clk ) begin
         if( rst ) begin
           arr <= '{default: '0};
-        end else if( push ) begin
+        end else if( push & ~clear ) begin
           arr[wptr[p_addr_bits-1:0]] <= wdata;
         end
       end
