@@ -27,34 +27,38 @@ module TestMSub #(
 
   t_msg dut_msg  [p_num_msgs];
   logic msg_recv [p_num_msgs];
-  logic waiting;
-
-  initial waiting = 1'b0;
+  logic all_recv;
 
   task sub (
     input t_msg exp_msg [p_num_msgs],
     input logic exp_val [p_num_msgs]
   );
 
-    waiting = 1'b1;
     for( int i = 0; i < p_num_msgs; i++ ) begin
-      fork
-        automatic int ii = i;
-        if( exp_val[ii] ) begin
-          do begin
-            #2;
-            msg_recv[ii] = val[ii];
-            dut_msg[ii]  = msg[ii];
-            @( posedge clk );
-            #1;
-          end while( !msg_recv[ii] );
-          `CHECK_EQ_SET( dut_msg[ii], exp_msg, exp_val );
-        end
-      join_none
+      msg_recv[i] = !exp_val[i];
     end
-    wait fork;
 
-    waiting = 1'b0;
+    // Loop & advance simulation time until the messages are received
+    do begin
+      all_recv = 1'b1;
+      #2;
+      for( int i = 0; i < p_num_msgs; i++ ) begin
+        if( exp_val[i] && !msg_recv[i] ) begin
+          msg_recv[i] = val[i];
+          dut_msg[i]  = msg[i];
+        end
+        all_recv = all_recv && msg_recv[i];
+      end
+      @( posedge clk );
+      #1;
+    end while( !all_recv );
+    
+    // Check that all received messages exist somewhere in the expected messages
+    for( int j = 0; j < p_num_msgs; j++ ) begin
+      if( exp_val[j] ) begin
+        `CHECK_EQ_SET( dut_msg[j], exp_msg, exp_val );
+      end
+    end
 
   endtask
 
@@ -80,11 +84,11 @@ module TestMSub #(
       if( i != 0 )
         trace = {trace, "  "};
 
-      if( val[i] & waiting )
+      if( val[i] & !all_recv )
         trace = $sformatf("%h", msg[i]);
       else if( val[i] )
         trace = {{(trace_len-1){" "}}, "X"};
-      else if( waiting )
+      else if( !all_recv )
         trace = {(trace_len){" "}};
       else
         trace = {{(trace_len-1){" "}}, "."};

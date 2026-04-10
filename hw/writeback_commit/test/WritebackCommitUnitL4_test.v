@@ -5,11 +5,11 @@
 // and support for multiple superscalar backend lanes
 
 `include "hw/writeback_commit/writeback_commit_unit_variants/WritebackCommitUnitL4.v"
-`include "test/fl/TestMSub.v"
-`include "test/fl/TestIstream.v"
 `include "intf/CompleteNotif.v"
 `include "intf/X__WIntf.v"
 `include "test/TestUtils.v"
+`include "test/fl/TestMSource.v"
+`include "test/fl/TestMSink.v"
 
 import TestEnv::*;
 
@@ -47,7 +47,8 @@ module WritebackCommitUnitL4TestSuite #(
   X__WIntf #(
     .p_seq_num_bits   (p_seq_num_bits),
     .p_phys_addr_bits (p_phys_addr_bits)
-  ) X__W_intfs [p_num_pipes-1:0]();
+  // ) X__W_intfs [p_num_pipes-1:0]();
+  ) X__W_intfs [p_num_pipes]();
 
   CompleteNotif #(
     .p_seq_num_bits   (p_seq_num_bits),
@@ -69,7 +70,7 @@ module WritebackCommitUnitL4TestSuite #(
   );
 
   //----------------------------------------------------------------------
-  // FL X Istreams
+  // X-Pipe Test M Source
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -82,87 +83,70 @@ module WritebackCommitUnitL4TestSuite #(
     logic [p_phys_addr_bits-1:0] ppreg;
   } t_x__w_msg;
 
-  t_x__w_msg x__w_msgs[p_num_pipes];
+  logic      x__w_val [p_num_pipes];
+  logic      x__w_rdy [p_num_pipes];
+  t_x__w_msg x__w_msg [p_num_pipes];
 
   genvar i;
   generate
     for( i = 0; i < p_num_pipes; i = i + 1 ) begin
-      assign X__W_intfs[i].pc      = x__w_msgs[i].pc;
-      assign X__W_intfs[i].seq_num = x__w_msgs[i].seq_num;
-      assign X__W_intfs[i].waddr   = x__w_msgs[i].waddr;
-      assign X__W_intfs[i].wdata   = x__w_msgs[i].wdata;
-      assign X__W_intfs[i].wen     = x__w_msgs[i].wen;
-      assign X__W_intfs[i].preg    = x__w_msgs[i].preg;
-      assign X__W_intfs[i].ppreg   = x__w_msgs[i].ppreg;
+      assign X__W_intfs[i].pc      = x__w_msg[i].pc;
+      assign X__W_intfs[i].seq_num = x__w_msg[i].seq_num;
+      assign X__W_intfs[i].waddr   = x__w_msg[i].waddr;
+      assign X__W_intfs[i].wdata   = x__w_msg[i].wdata;
+      assign X__W_intfs[i].wen     = x__w_msg[i].wen;
+      assign X__W_intfs[i].preg    = x__w_msg[i].preg;
+      assign X__W_intfs[i].ppreg   = x__w_msg[i].ppreg;
+      assign X__W_intfs[i].val     = x__w_val[i];
+      assign x__w_rdy[i]           = X__W_intfs[i].rdy;
     end
   endgenerate
 
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin: X_Istreams
-      TestIstream #( t_x__w_msg, p_X_send_intv_delay ) X_Istream (
-        .msg (x__w_msgs[i]),
-        .val (X__W_intfs[i].val),
-        .rdy (X__W_intfs[i].rdy),
-        .*
-      );
-    end
-  endgenerate
+  logic go;
+  logic x_done;
 
-  t_x__w_msg msgs_to_send     [p_num_pipes];
-  logic      msgs_to_send_val [p_num_pipes];
+  TestMSource #(
+    .t_msg      (t_x__w_msg),
+    .p_num_srcs (p_num_pipes),
+    .p_seq_len  (500)
+  ) x_src (
+    .clk  (clk),
+    .go   (go),
 
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin
-      always @( posedge clk ) begin
-        #1;
-        if (msgs_to_send_val[i]) begin
-          X_Istreams[i].X_Istream.send(
-            msgs_to_send[i]
-          );
-        end
-        
-        // verilator lint_off BLKSEQ
-        msgs_to_send_val[i] = 1'b0;
-        // verilator lint_on BLKSEQ
-      end
+    .val  (x__w_val),
+    .rdy  (x__w_rdy),
+    .msg  (x__w_msg),
 
-      initial begin
-        msgs_to_send_val[i] = 1'b0;
-      end
-    end
-  endgenerate
-
-  t_x__w_msg pipe_msg;
-
-  task send(
-    // verilator lint_off UNUSEDSIGNAL
-    input int                        pipe_num,
-    // verilator lint_on UNUSEDSIGNAL
-
-    input logic                 [31:0] pc,
-    input logic   [p_seq_num_bits-1:0] seq_num,
-    input logic                  [4:0] waddr,
-    input logic                 [31:0] wdata,
-    input logic                        wen,
-    input logic [p_phys_addr_bits-1:0] preg,
-    input logic [p_phys_addr_bits-1:0] ppreg
+    .done (x_done)
   );
-    pipe_msg.pc      = pc;
-    pipe_msg.seq_num = seq_num;
-    pipe_msg.waddr   = waddr;
-    pipe_msg.wdata   = wdata;
-    pipe_msg.wen     = wen;
-    pipe_msg.preg    = preg;
-    pipe_msg.ppreg   = ppreg;
 
-    msgs_to_send[pipe_num]     = pipe_msg;
-    msgs_to_send_val[pipe_num] = 1'b1;
+  t_x__w_msg pipe_msg [p_num_pipes];
 
-    wait(msgs_to_send_val[pipe_num] == 1'b0);
+  task enq_send(
+    input logic                 [31:0] pc      [p_num_pipes],
+    input logic   [p_seq_num_bits-1:0] seq_num [p_num_pipes],
+    input logic                  [4:0] waddr   [p_num_pipes],
+    input logic                 [31:0] wdata   [p_num_pipes],
+    input logic                        wen     [p_num_pipes],
+    input logic [p_phys_addr_bits-1:0] preg    [p_num_pipes],
+    input logic [p_phys_addr_bits-1:0] ppreg   [p_num_pipes],
+    input logic                        val     [p_num_pipes]
+  );
+    for( int i = 0; i < p_num_pipes; i++ ) begin
+      pipe_msg[i].pc      = pc[i];
+      pipe_msg[i].seq_num = seq_num[i];
+      pipe_msg[i].waddr   = waddr[i];
+      pipe_msg[i].wdata   = wdata[i];
+      pipe_msg[i].wen     = wen[i];
+      pipe_msg[i].preg    = preg[i];
+      pipe_msg[i].ppreg   = ppreg[i];
+    end
+
+    x_src.add_send( val, pipe_msg );
   endtask
 
   //----------------------------------------------------------------------
-  // Completion Test Subscriber
+  // Completion Test M Sink
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -175,6 +159,7 @@ module WritebackCommitUnitL4TestSuite #(
 
   t_complete_msg complete_msg [p_num_be_lanes];
   logic          complete_val [p_num_be_lanes];
+  logic          unused_complete_rdy [p_num_be_lanes];
 
   generate
     for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin
@@ -187,18 +172,27 @@ module WritebackCommitUnitL4TestSuite #(
     end
   endgenerate
 
-  TestMSub #(
-    .t_msg      (t_complete_msg),
-    .p_num_msgs (p_num_be_lanes)
-  ) CompleteSub (
-    .msg (complete_msg),
-    .val (complete_val),
-    .*
+  logic complete_done;
+
+  TestMSink #(
+    .p_ordered   (`SINK_UNORDERED),
+    .t_msg       (t_complete_msg),
+    .p_num_sinks (p_num_be_lanes),
+    .p_seq_len   (500)
+  ) complete_sink (
+    .clk  (clk),
+    .go   (go),
+
+    .val  (complete_val),
+    .rdy  (unused_complete_rdy),
+    .msg  (complete_msg),
+
+    .done (complete_done)
   );
 
   t_complete_msg msg_to_complete_sub [p_num_be_lanes];
 
-  task complete_sub(
+  task enq_complete(
     input logic   [p_seq_num_bits-1:0] seq_num [p_num_be_lanes],
     input logic                  [4:0] waddr   [p_num_be_lanes],
     input logic                 [31:0] wdata   [p_num_be_lanes],
@@ -214,11 +208,11 @@ module WritebackCommitUnitL4TestSuite #(
       msg_to_complete_sub[j].preg    = preg[j];
     end
 
-    CompleteSub.sub( msg_to_complete_sub, val );
+    complete_sink.add_exp( val, msg_to_complete_sub );
   endtask
 
   //----------------------------------------------------------------------
-  // Commit Test Subscriber
+  // Commit Test Sink
   //----------------------------------------------------------------------
 
   typedef struct packed {
@@ -232,6 +226,7 @@ module WritebackCommitUnitL4TestSuite #(
 
   t_commit_msg commit_msg [p_num_be_lanes];
   logic        commit_val [p_num_be_lanes];
+  logic        unused_commit_rdy [p_num_be_lanes];
 
   generate
     for( i = 0; i < p_num_be_lanes; i = i + 1 ) begin
@@ -245,18 +240,27 @@ module WritebackCommitUnitL4TestSuite #(
     end
   endgenerate
 
-  TestMSub #(
-    .t_msg      (t_commit_msg),
-    .p_num_msgs (p_num_be_lanes)
-  ) CommitSub (
-    .msg (commit_msg),
-    .val (commit_val),
-    .*
+  logic commit_done;
+
+  TestMSink #(
+    .p_ordered   (`SINK_ORDERED),
+    .t_msg       (t_commit_msg),
+    .p_num_sinks (p_num_be_lanes),
+    .p_seq_len   (500)
+  ) commit_sink (
+    .clk  (clk),
+    .go   (go),
+
+    .val  (commit_val),
+    .rdy  (unused_commit_rdy),
+    .msg  (commit_msg),
+
+    .done (commit_done)
   );
 
   t_commit_msg msg_to_commit_sub [p_num_be_lanes];
 
-  task commit_sub(
+  task enq_commit(
     input logic                 [31:0] pc      [p_num_be_lanes],
     input logic   [p_seq_num_bits-1:0] seq_num [p_num_be_lanes],
     input logic                  [4:0] waddr   [p_num_be_lanes],
@@ -274,63 +278,36 @@ module WritebackCommitUnitL4TestSuite #(
       msg_to_commit_sub[j].ppreg   = ppreg[j];
     end
 
-    CommitSub.sub( msg_to_commit_sub, val );
+    commit_sink.add_exp( val, msg_to_commit_sub );
+  endtask
+
+  //----------------------------------------------------------------------
+  // run
+  //----------------------------------------------------------------------
+
+  task automatic run();
+    @( posedge clk )
+    #1;
+
+    go = 1'b1;
+    wait( x_done && complete_done && commit_done );
+    go = 1'b0;
+
+    @( posedge clk )
+    #1;
   endtask
 
   //----------------------------------------------------------------------
   // Linetracing
   //----------------------------------------------------------------------
 
-  string X_traces [p_num_pipes-1:0];
-  generate
-    for( i = 0; i < p_num_pipes; i = i + 1 ) begin
-      // verilator lint_off BLKSEQ
-      always @( posedge clk ) begin
-        #2;
-        X_traces[i] = X_Istreams[i].X_Istream.trace( t.trace_level );
-      end
-      // verilator lint_on BLKSEQ
-    end
-  endgenerate
-
-  // Need to store other traces, to be aligned with X_Istream traces
-  string trace;
-  string dut_trace;
-  string CompleteSub_trace;
-  string CommitSub_trace;
-
-  // verilator lint_off BLKSEQ
-  always @( posedge clk ) begin
-    #2;
-    dut_trace         = dut.trace( t.trace_level );
-    CompleteSub_trace = CompleteSub.trace( t.trace_level );
-    CommitSub_trace   = CommitSub.trace( t.trace_level );
-
-    // Wait until X_Istream traces are ready
-    #1;
-    trace = "";
-
-    for( int j = 0; j < p_num_pipes; j++ ) begin
-      if( j > 0 )
-        trace = {trace, " "};
-      trace = {trace, X_traces[j]};
-    end
-    trace = {trace, " | "};
-    trace = {trace, dut_trace};
-    trace = {trace, " | "};
-    trace = {trace, CompleteSub_trace};
-    trace = {trace, " - "};
-    trace = {trace, CommitSub_trace};
-    
-    t.trace( trace );
-  end
-  // verilator lint_on BLKSEQ
+  // TODO: write line tracing here
 
   //----------------------------------------------------------------------
   // Include test cases
   //----------------------------------------------------------------------
 
-  `include "hw/writeback_commit/test/test_cases/multi_test_cases.v"
+  `include  "hw/writeback_commit/test/test_cases/superscalar_test_cases.v"
 
   //----------------------------------------------------------------------
   // run_test_suite
@@ -339,12 +316,13 @@ module WritebackCommitUnitL4TestSuite #(
   task run_test_suite();
     t.test_suite_begin( suite_name );
 
-    run_multi_test_cases();
+    run_superscalar_test_cases();
   endtask
+
 endmodule
 
 //========================================================================
-// WritebackCommitUnitL1_test
+// WritebackCommitUnitL4_test
 //========================================================================
 
 module WritebackCommitUnitL4_test;
@@ -361,10 +339,9 @@ module WritebackCommitUnitL4_test;
 
     if ((s <= 0) || (s == 1)) suite_1.run_test_suite();
     if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
-    if ((s <= 0) || (s == 2)) suite_3.run_test_suite();
-    if ((s <= 0) || (s == 2)) suite_4.run_test_suite();
+    if ((s <= 0) || (s == 3)) suite_3.run_test_suite();
+    if ((s <= 0) || (s == 4)) suite_4.run_test_suite();
 
     test_bench_end();
   end
 endmodule
-

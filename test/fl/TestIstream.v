@@ -31,7 +31,7 @@ module TestIstream #(
 
   // verilator lint_off BLKSEQ
   
-  task send (
+  task automatic send (
     input t_msg dut_msg
   );
 
@@ -49,7 +49,7 @@ module TestIstream #(
     msg = dut_msg;
 
     do begin
-      #2
+      #2;
       msg_sent = rdy;
       @( posedge clk );
       #1;
