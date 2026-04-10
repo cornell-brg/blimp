@@ -1,7 +1,6 @@
 __pycache__
-build/
-_build/
-build_*/
+build*/
+_build*/
 .vscode
 .DS_Store
 .claude/

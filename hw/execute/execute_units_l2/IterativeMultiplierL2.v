@@ -108,12 +108,12 @@ module IterativeMultiplierL2 #(
     if ( rst )
       D_reg <= '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        uop:     'x,
-        preg:    'x,
-        ppreg:   'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        uop:     '0,
+        preg:    '0,
+        ppreg:   '0
       };
     else
       D_reg <= D_reg_next;
@@ -136,12 +136,12 @@ module IterativeMultiplierL2 #(
     else if ( W_xfer )
       D_reg_next = '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        uop:     'x,
-        preg:    'x,
-        ppreg:   'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        uop:     '0,
+        preg:    '0,
+        ppreg:   '0
       };
     else
       D_reg_next = D_reg;

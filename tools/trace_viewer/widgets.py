@@ -12,6 +12,13 @@ from sections import SectionDef, FieldDef, SECTION_REGISTRY, GROUP_COLUMNS, GROU
 from theme import COLORS, FIELD_STYLES, FONTS
 
 
+_INST_STATUS_NAMES = {
+    "00": "INVALID",
+    "01": "READY",
+    "10": "DISPATCHED",
+}
+
+
 class StageCard(tk.LabelFrame):
     """A card that displays one trace section's fields."""
 
@@ -54,13 +61,16 @@ class StageCard(tk.LabelFrame):
     def _pick_bg(self, data: dict) -> str:
         """Pick background color based on card state.
 
-        - Red tint for DIU lanes when dispatched=1 or inst_valid=0
+        - Red tint for DIU lanes when inst_status is INVALID (00)
+        - Green tint for DIU lanes when inst_status is DISPATCHED (10)
         """
         if self.section_def.key.startswith("diu_"):
-            dispatched = data.get("dispatched")
-            inst_valid = data.get("inst_valid")
-            if dispatched == "1" or inst_valid == "0":
-                return COLORS["card_diu_alert"]
+            inst_status = data.get("inst_status")
+            if inst_status is not None:
+                if inst_status == "00":
+                    return COLORS["card_diu_alert"]
+                if inst_status == "10":
+                    return COLORS["card_diu_dispatched"]
 
         return COLORS["card_active"]
 
@@ -86,6 +96,9 @@ class StageCard(tk.LabelFrame):
                 if raw_val is None:
                     display = "--"
                     fg = COLORS["label"]
+                elif field.style == "inst_status":
+                    display = _INST_STATUS_NAMES.get(str(raw_val), str(raw_val))
+                    fg = FIELD_STYLES.get("default", FIELD_STYLES["default"])
                 else:
                     display = str(raw_val)
                     fg = FIELD_STYLES.get(field.style, FIELD_STYLES["default"])

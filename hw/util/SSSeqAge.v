@@ -11,10 +11,19 @@
 `include "intf/CommitNotif.v"
 
 module SSSeqAge #(
-  parameter p_num_be_lanes = 2
+  parameter p_num_be_lanes   = 2,
+  parameter p_seq_num_bits   = 5, 
+  parameter p_num_phys_regs  = 36,
+  parameter p_phys_addr_bits = $clog2(p_num_phys_regs)
 ) (
   input  logic clk,
   input  logic rst,
+
+  //----------------------------------------------------------------------
+  // Oldest sequence number
+  //----------------------------------------------------------------------
+
+  output logic [p_seq_num_bits-1:0] oldest_seq_num,
 
   //----------------------------------------------------------------------
   // Commit Interface
@@ -22,9 +31,6 @@ module SSSeqAge #(
 
   CommitNotif.sub commit [p_num_be_lanes]
 );
-
-  localparam p_seq_num_bits   = commit[0].p_seq_num_bits;
-  localparam p_phys_addr_bits = commit[0].p_phys_addr_bits;
 
   logic                 [31:0] commit_pc      [p_num_be_lanes-1:0];
   logic   [p_seq_num_bits-1:0] commit_seq_num [p_num_be_lanes-1:0];
@@ -48,7 +54,6 @@ module SSSeqAge #(
   end
 
   // Keep track of the oldest in-flight sequence number
-  logic [p_seq_num_bits-1:0] oldest_seq_num;
   logic [p_seq_num_bits-1:0] youngest_commit_seq_num;
   logic                      any_commit;
   assign any_commit = |commit_val_packed;
@@ -65,7 +70,8 @@ module SSSeqAge #(
   always_comb begin
     youngest_commit_seq_num = oldest_seq_num;
     for( int j = 1; j < p_num_be_lanes; j++ ) begin
-      if( commit_val[j] && is_older(youngest_commit_seq_num, commit_seq_num[j]) )
+      // if( commit_val[j] && is_older(youngest_commit_seq_num, commit_seq_num[j]) )
+      if( commit_val[j] && (youngest_commit_seq_num < commit_seq_num[j] ^ (youngest_commit_seq_num < oldest_seq_num) ^ (commit_seq_num[j] < oldest_seq_num) ) )
         youngest_commit_seq_num = commit_seq_num[j];
     end
   end

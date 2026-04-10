@@ -9,9 +9,9 @@
 `define HW_WRITEBACK_WRITEBACKCOMMITUNITVARIANTS_WRITEBACKCOMMITUNITL4_V
 
 `include "hw/writeback_commit/MROB.v"
-`include "hw/writeback_commit/WritebackCommitUnitBypassFifo.v"
+`include "hw/writeback_commit/WCUFifo.v"
 `include "hw/common/MRRArb.v"
-`include "hw/writeback_commit/SSWBArb.v"
+`include "hw/writeback_commit/SSWCUArb.v"
 `include "intf/CompleteNotif.v"
 `include "intf/CommitNotif.v"
 `include "intf/X__WIntf.v"
@@ -19,9 +19,10 @@
 module WritebackCommitUnitL4 #(
   parameter p_num_pipes          = 1,
   parameter p_num_be_lanes       = 2,
-  parameter p_x_intf_fifo_depth  = 4,
-  parameter p_x_intf_fifo_bypass = 0,
-  parameter p_use_age_arb        = 1
+  parameter p_seq_num_bits       = 5,
+  parameter p_phys_addr_bits     = 6,
+  parameter p_x_intf_fifo_depth = 4,
+  parameter p_use_age_arb       = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -45,9 +46,12 @@ module WritebackCommitUnitL4 #(
   CommitNotif.pub commit [p_num_be_lanes]
 );
 
-  localparam p_seq_num_bits   = complete.p_seq_num_bits;
-  localparam p_phys_addr_bits = complete.p_phys_addr_bits;
-  localparam p_rob_depth      = 2 ** p_seq_num_bits;
+  localparam p_rob_depth = 2 ** p_seq_num_bits;
+
+  CommitNotif #(
+    .p_seq_num_bits   (p_seq_num_bits),
+    .p_phys_addr_bits (p_phys_addr_bits)
+  ) local_commit [p_num_be_lanes]();
 
   //----------------------------------------------------------------------
   // Writeback message struct (used throughout the pipeline)
@@ -91,11 +95,12 @@ module WritebackCommitUnitL4 #(
   //----------------------------------------------------------------------
 
   logic fifo_full;
+  logic fifo_pop;
 
   logic [p_seq_num_bits:0]         avail_slots_mrob;
   logic [$clog2(p_num_be_lanes):0] avail_slots_arb;
 
-  assign avail_slots_arb = fifo_full ? '0 :
+  assign avail_slots_arb = (fifo_full & !fifo_pop) ? '0 :
                            ($clog2(p_num_be_lanes)+1)'(avail_slots_mrob > p_num_be_lanes ?
                                                   p_num_be_lanes :
                                                   avail_slots_mrob);
@@ -103,7 +108,7 @@ module WritebackCommitUnitL4 #(
   //----------------------------------------------------------------------
   // Arbitration and selection
   //----------------------------------------------------------------------
-  // SSWBArb (age-based) handles arbitration + selection muxing internally.
+  // SSWCUArb (age-based) handles arbitration + selection muxing internally.
   // MRRArb (round-robin) only provides grant; muxing is done here.
 
   t_wb_msg Ex_msg_sel [p_num_be_lanes];
@@ -111,7 +116,7 @@ module WritebackCommitUnitL4 #(
   generate
     if (p_use_age_arb) begin : gen_age_arb
 
-      SSWBArb #(
+      SSWCUArb #(
         .t_msg          (t_wb_msg),
         .p_num_pipes    (p_num_pipes),
         .p_num_be_lanes (p_num_be_lanes),
@@ -124,7 +129,7 @@ module WritebackCommitUnitL4 #(
         .in_msg  (Ex_msg),
         .rdy     (Ex_rdy),
         .sel_msg (Ex_msg_sel),
-        .commit  (commit)
+        .commit  (local_commit)
       );
 
     end else begin : gen_rr_arb
@@ -202,17 +207,16 @@ module WritebackCommitUnitL4 #(
     end
   endgenerate
 
-  logic fifo_push, fifo_pop, fifo_empty;
-  assign fifo_push = |Ex_val_sel_packed & !fifo_full;
+  logic fifo_push, fifo_empty;
+  assign fifo_push = |Ex_val_sel_packed & (!fifo_full | fifo_pop);
   assign fifo_pop  = !fifo_empty;
 
   t_wb_msg X_curr [p_num_be_lanes];
 
-  WritebackCommitUnitBypassFifo #(
-    .t_msg       (t_wb_msg),
-    .p_depth     (p_x_intf_fifo_depth),
-    .p_bypass    (p_x_intf_fifo_bypass),
-    .p_num_lanes (p_num_be_lanes)
+  WCUFifo #(
+    .p_entry_bits (p_num_be_lanes * $bits(t_wb_msg)),
+    .p_depth      (p_x_intf_fifo_depth),
+    .p_num_lanes  (p_num_be_lanes)
   ) x_fifo (
     .clk   (clk),
     .rst   (rst),
@@ -271,12 +275,19 @@ module WritebackCommitUnitL4 #(
   generate
     for( i = 0; i < p_num_be_lanes; i++ ) begin: GEN_COMMIT_OUTPUT
       assign commit[i].pc      = rob_output[i].pc;
+      assign local_commit[i].pc = rob_output[i].pc;
       assign commit[i].waddr   = rob_output[i].waddr;
+      assign local_commit[i].waddr = rob_output[i].waddr;
       assign commit[i].wdata   = rob_output[i].wdata;
+      assign local_commit[i].wdata = rob_output[i].wdata;
       assign commit[i].wen     = rob_output[i].wen;
+      assign local_commit[i].wen = rob_output[i].wen;
       assign commit[i].ppreg   = rob_output[i].ppreg;
+      assign local_commit[i].ppreg = rob_output[i].ppreg;
       assign commit[i].val     = deq_msg_val[i] & deq_rdy;
+      assign local_commit[i].val = deq_msg_val[i] & deq_rdy;
       assign commit[i].seq_num = rob_output_seq_num[i];
+      assign local_commit[i].seq_num = rob_output_seq_num[i];
     end
   endgenerate
 

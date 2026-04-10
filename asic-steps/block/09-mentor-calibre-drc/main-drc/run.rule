@@ -1,0 +1,16 @@
+//=========================================================================
+// 09-mentor-calibre-drc/main-drc/run.rule
+//=========================================================================
+
+LAYOUT PATH "../../05-cadence-innovus-pnr/post-pnr.gds"
+LAYOUT SYSTEM GDSII
+LAYOUT PRIMARY "{{ design_name }}"
+
+DRC RESULTS DATABASE "run.results" ASCII
+DRC CELL NAME YES CELL SPACE XFORM
+DRC SUMMARY REPORT "run.summary" REPLACE HIER
+DRC MAXIMUM RESULTS ALL
+DRC MAXIMUM VERTEX ALL
+DRC ICSTATION YES
+
+INCLUDE "$TSMC_180NM/main-drc.rule"

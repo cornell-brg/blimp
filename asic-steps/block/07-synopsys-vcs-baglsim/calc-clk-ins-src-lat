@@ -1,0 +1,42 @@
+#!/usr/bin/env python
+#=========================================================================
+# calc-clk-ins-src-lat <post-pnr.sdc>
+#=========================================================================
+# Calculates the clock insertion source latency by scanning through
+# the given post-pnr.sdc file. The post-pnr.sdc file will have lines
+# like this:
+#
+#  set_clock_latency -source -early -max -rise -0.038 [get_ports {clk[0]}] -clock ideal_clock1
+#  set_clock_latency -source -early -max -fall -0.041 [get_ports {clk[0]}] -clock ideal_clock1
+#  set_clock_latency -source -late  -max -rise -0.038 [get_ports {clk[0]}] -clock ideal_clock1
+#  set_clock_latency -source -late  -max -fall -0.041 [get_ports {clk[0]}] -clock ideal_clock1
+#
+# The script will output the minimum of all four delays.
+#
+# Author : Christopher Batten
+# Date   : February 18, 2025
+#
+
+import sys
+
+#-------------------------------------------------------------------------
+# main
+#-------------------------------------------------------------------------
+
+def main():
+
+  post_pnr_sdc_file = sys.argv[1]
+
+  clk_ins_src_lat = 0;
+  with open( post_pnr_sdc_file, "r" ) as file:
+    for line in file:
+      if line.startswith("set_clock_latency"):
+        latency = float(line.split()[5].strip())
+        if latency < clk_ins_src_lat:
+          clk_ins_src_lat = latency
+
+  print(clk_ins_src_lat)
+
+if __name__ == "__main__":
+  main()
+

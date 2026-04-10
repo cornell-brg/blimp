@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 09-mentor-calibre-drc/run-interactive
+#=========================================================================
+
+# Colors
+
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+RESET=$'\e[0m'
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+cp $TSMC_180NM/calibre.layerprops ../05-cadence-innovus-pnr/post-pnr.gds.layerprops
+
+if [ "$1" != "main" ] && [ "$1" != "antenna" ]; then
+  echo "Usage: $0 {main|antenna}"
+  exit 1
+fi
+
+calibredrv \
+  -m ../05-cadence-innovus-pnr/post-pnr.gds \
+  -rve \
+  -drc ${1}-drc/run.results

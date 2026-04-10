@@ -82,29 +82,25 @@ SECTION_REGISTRY: list[SectionDef] = [
     SectionDef("diu_0", "DIU Lane 0", "Decode / Issue", [
         FieldDef("seq",        "Seq",       style="seq"),
         FieldDef("inst",       "Inst",      style="inst"),
-        FieldDef("dispatched", "Dispatched", style="bool"),
-        FieldDef("inst_valid", "Inst Valid", style="bool"),
+        FieldDef("inst_status", "Status",     style="inst_status"),
     ], group_order=0),
 
     SectionDef("diu_1", "DIU Lane 1", "Decode / Issue", [
         FieldDef("seq",        "Seq",       style="seq"),
         FieldDef("inst",       "Inst",      style="inst"),
-        FieldDef("dispatched", "Dispatched", style="bool"),
-        FieldDef("inst_valid", "Inst Valid", style="bool"),
+        FieldDef("inst_status", "Status",     style="inst_status"),
     ], group_order=1),
 
     SectionDef("diu_2", "DIU Lane 2", "Decode / Issue", [
         FieldDef("seq",        "Seq",       style="seq"),
         FieldDef("inst",       "Inst",      style="inst"),
-        FieldDef("dispatched", "Dispatched", style="bool"),
-        FieldDef("inst_valid", "Inst Valid", style="bool"),
+        FieldDef("inst_status", "Status",     style="inst_status"),
     ], group_order=2),
 
     SectionDef("diu_3", "DIU Lane 3", "Decode / Issue", [
         FieldDef("seq",        "Seq",       style="seq"),
         FieldDef("inst",       "Inst",      style="inst"),
-        FieldDef("dispatched", "Dispatched", style="bool"),
-        FieldDef("inst_valid", "Inst Valid", style="bool"),
+        FieldDef("inst_status", "Status",     style="inst_status"),
     ], group_order=3),
 
     # ------------------------------------------------------------------

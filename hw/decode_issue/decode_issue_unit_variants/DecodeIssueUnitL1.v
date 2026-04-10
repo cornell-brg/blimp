@@ -66,7 +66,7 @@ module DecodeIssueUnitL1 #(
 
   always_ff @( posedge clk ) begin
     if ( rst )
-      F_reg <= '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg <= '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg <= F_reg_next;
   end
@@ -77,7 +77,7 @@ module DecodeIssueUnitL1 #(
     if ( F_xfer )
       F_reg_next = '{ val: 1'b1, inst: F.inst, pc: F.pc, seq_num: F.seq_num };
     else if ( X_xfer )
-      F_reg_next = '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg_next = '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg_next = F_reg;
   end
@@ -187,8 +187,8 @@ module DecodeIssueUnitL1 #(
       assign Ex[k].waddr   = decoder_waddr;
       assign Ex[k].seq_num = F_reg.seq_num;
 
-      assign Ex[k].preg    = 'x;
-      assign Ex[k].ppreg   = 'x;
+      assign Ex[k].preg    = '0;
+      assign Ex[k].ppreg   = '0;
     end
   endgenerate
 

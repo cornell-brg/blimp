@@ -7,7 +7,6 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L7_LOADSTOREUNITL7_V
 
 `include "defs/UArch.v"
-`include "hw/common/FifoBypass.v"
 `include "hw/common/Fifo.v"
 `include "intf/D__XIntf.v"
 `include "intf/X__WIntf.v"
@@ -16,10 +15,9 @@
 import UArch::*;
 
 module LoadStoreUnitL7 #(
-  parameter p_opaq_bits          = 8,
-  parameter p_num_in_flight      = 8,
-  parameter p_d_intf_fifo_depth  = 4,
-  parameter p_d_intf_fifo_bypass = 0
+  parameter p_opaq_bits         = 8,
+  parameter p_num_in_flight     = 8,
+  parameter p_d_intf_fifo_depth = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -101,13 +99,13 @@ module LoadStoreUnitL7 #(
 
   D_input D_curr;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits ($bits(D_input)),
-    .p_depth      (p_d_intf_fifo_depth),
-    .p_bypass     (p_d_intf_fifo_bypass)
+    .p_depth      (p_d_intf_fifo_depth)
   ) d_fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (d_fifo_push),
     .pop   (d_fifo_pop),
     .empty (d_fifo_empty),
@@ -119,10 +117,10 @@ module LoadStoreUnitL7 #(
   logic      stage2_rdy;
   logic      stage2_push, stage2_pop, stage2_empty, stage2_full;
 
-  assign d_fifo_push = D.val & !d_fifo_full;
+  assign d_fifo_push = D.val & (!d_fifo_full | d_fifo_pop);
   assign d_fifo_pop  = !d_fifo_empty & mem.req_rdy & stage2_rdy;
 
-  assign D.rdy = !d_fifo_full;
+  assign D.rdy = !d_fifo_full | d_fifo_pop;
 
   //----------------------------------------------------------------------
   // Memory Operations
@@ -164,7 +162,7 @@ module LoadStoreUnitL7 #(
       OP_SB:   base_strb = 4'b0001;
       OP_SH:   base_strb = 4'b0011;
       OP_SW:   base_strb = 4'b1111;
-      default: base_strb = 'x;
+      default: base_strb = '0;
     endcase
   end
 
@@ -178,7 +176,7 @@ module LoadStoreUnitL7 #(
   assign mem.req_msg.opaque = '0;
   assign mem.req_msg.strb   = base_strb << stage1_addr_offset;
   assign mem.req_msg.addr   = aligned_addr;
-  assign mem.req_val        = !d_fifo_empty & stage2_rdy;
+  assign mem.req_val        = !d_fifo_empty & stage2_rdy && !rst;
 
   always_comb begin
     case( stage1_addr_offset )
@@ -210,6 +208,7 @@ module LoadStoreUnitL7 #(
   ) stage2_fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (stage2_push),
     .pop   (stage2_pop),
     .empty (stage2_empty),
@@ -233,13 +232,13 @@ module LoadStoreUnitL7 #(
     if ( rst )
       stage2_reg <= '{
         val:     1'b0,
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        preg:    'x,
-        ppreg:   'x,
-        uop:     'x,
-        offset:  'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        preg:    '0,
+        ppreg:   '0,
+        uop:     '0,
+        offset:  '0
       };
     else
       stage2_reg <= stage2_reg_next;
@@ -253,13 +252,13 @@ module LoadStoreUnitL7 #(
     else if ( W_xfer )
       stage2_reg_next = '{
         val:     1'b0,
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        preg:    'x,
-        ppreg:   'x,
-        uop:     'x,
-        offset:  'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        preg:    '0,
+        ppreg:   '0,
+        uop:     '0,
+        offset:  '0
       };
     else
       stage2_reg_next = stage2_reg;
@@ -287,10 +286,10 @@ module LoadStoreUnitL7 #(
       OP_LW:   sext_data = base_data;
       OP_LBU:  sext_data = { 24'b0, base_data[7:0]  };
       OP_LHU:  sext_data = { 16'b0, base_data[15:0] };
-      OP_SB:   sext_data = 'x;
-      OP_SH:   sext_data = 'x;
-      OP_SW:   sext_data = 'x;
-      default: sext_data = 'x;
+      OP_SB:   sext_data = '0;
+      OP_SH:   sext_data = '0;
+      OP_SW:   sext_data = '0;
+      default: sext_data = '0;
     endcase
   end
 
@@ -410,6 +409,16 @@ module LoadStoreUnitL7 #(
     else
       trace_json = "null";
   endfunction
+
+  // Signal-based trace outputs for use from generate blocks
+  string trace_str_l0;
+  string trace_str_l1;
+  string trace_json_str;
+  always_comb begin
+    trace_str_l0   = trace( 0 );
+    trace_str_l1   = trace( 1 );
+    trace_json_str = trace_json();
+  end
 `endif
 
 endmodule

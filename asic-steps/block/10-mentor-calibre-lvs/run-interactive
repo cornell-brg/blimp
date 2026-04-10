@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 10-mentor-calibre-lvs/run-interactive
+#=========================================================================
+
+# Colors
+
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+RESET=$'\e[0m'
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+cp $TSMC_180NM/calibre.layerprops ../05-cadence-innovus-pnr/post-pnr.gds.layerprops
+
+calibredrv \
+  -m ../05-cadence-innovus-pnr/post-pnr.gds \
+  -rve \
+  -lvs svdb

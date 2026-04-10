@@ -1,0 +1,592 @@
+#!/usr/bin/env python
+#=========================================================================
+# summarize-results
+#=========================================================================
+# Parse reports from various EDA tools to summarize as follows:
+#
+#  - Timestamp
+#  - Design name
+#  - Clock period in ns
+#  - Four-state RTL simulation results
+#  - Synthesis setup slack in ns
+#  - Synthesis num stdcells
+#  - Synthesis area in um^2
+#  - Fast-functional gate-level simulation results
+#  - Place-and-route setup slack in ns
+#  - Place-and-route hold slack in ns
+#  - Place-and-route clock insertion source latency in ns
+#  - Place-and-route num stdcells
+#  - Place-and-route area in um^2
+#  - Back-annotated gate-level simulation results
+#  - For each evaluation
+#     + Execution time in cycles
+#     + Execution time in ns
+#     + Power in mW
+#     + Energy in nJ
+#
+# Author : Christopher Batten & Parker Schless
+# Date   : April 2025
+#
+
+import re
+from datetime import datetime
+from pathlib import Path
+
+RED   = "\033[31m"
+GREEN = "\033[32m"
+RESET = "\033[0m"
+
+W = 24  # label column width (chars before '=')
+
+failures = []
+
+#-------------------------------------------------------------------------
+# print_resolved_params
+#-------------------------------------------------------------------------
+
+def print_resolved_params( run_log ):
+
+  label = "resolved_params"
+  if not Path(run_log).exists():
+    print(f" {label:<{W}} = {RED}{run_log} not found{RESET}")
+    return
+
+  in_params = False
+  with open( run_log, "r" ) as file:
+    for line in file:
+      if "Resolved top-level parameters:" in line:
+        in_params = True
+        print("")
+        print(f" {label}")
+        continue
+      if in_params:
+        if line.startswith("---"):
+          continue
+        stripped = line.strip()
+        if stripped == "":
+          break
+        # Parse "parameter <name> = <value>,"
+        match = re.match(r'parameter\s+(\S+)\s*=\s*(.+?),?\s*$', stripped)
+        if match:
+          name  = match.group(1)
+          value = match.group(2).strip()
+          print(f"  - {name:<{W}} = {value}")
+
+#-------------------------------------------------------------------------
+# print_sim
+#-------------------------------------------------------------------------
+
+def print_sim( sim_log, name ):
+
+  if not Path(sim_log).exists():
+    print(f" {name:<{W}} = {RED}{sim_log} not found{RESET}")
+    failures.append(f"{name}: {sim_log} not found")
+    return
+
+  num_passed = 0
+  num_failed = 0
+  with open( sim_log, "r" ) as file:
+    for line in file:
+      if "passed" in line:
+        num_passed += 1
+      elif "FAILED" in line:
+        num_failed += 1
+
+  check_str = ""
+  if num_failed > 0:
+    check_str = f"{RED}(all tests must pass!){RESET}"
+    failures.append(f"{name}: {num_failed} test(s) failed")
+
+  print(f" {name:<{W}} = {num_passed}/{num_passed+num_failed} passed {check_str}")
+
+#-------------------------------------------------------------------------
+# print_verilator_pickle_errors
+#-------------------------------------------------------------------------
+
+def print_verilator_pickle_errors( run_log ):
+
+  label = "verilator-pickle-errors"
+  if not Path(run_log).exists():
+    print(f" {label:<{W}} = {RED}{run_log} not found{RESET}")
+    failures.append(f"{label}: {run_log} not found")
+    return
+
+  with open( run_log, "r" ) as file:
+    content = file.read()
+
+  if "ERROR" in content or 'error' in content or 'Error' in content:
+    print(f" {label:<{W}} = {RED}ERROR found in {run_log}{RESET}")
+    failures.append(f"{label}: ERROR found in {run_log}")
+  else:
+    print(f" {label:<{W}} = no errors")
+
+#-------------------------------------------------------------------------
+# print_synth_slack
+#-------------------------------------------------------------------------
+
+def print_synth_slack( synth_slack_report ):
+
+  label = "synth_setup_slack"
+  if not Path(synth_slack_report).exists():
+    print(f" {label:<{W}} = {RED}{synth_slack_report} not found{RESET}" )
+    failures.append(f"{label}: {synth_slack_report} not found")
+    return
+
+  with open( synth_slack_report, "r" ) as file:
+    for line in file:
+      if line.startswith("  slack "):
+        fields = line.split()
+        print(f" {label:<{W}} = {float(fields[2]):0.4f} ns" )
+
+#-------------------------------------------------------------------------
+# print_synth_area
+#-------------------------------------------------------------------------
+
+def print_synth_area( synth_area_report ):
+
+  label_cells = "synth_num_stdcells"
+  label_area  = "synth_area"
+  if not Path(synth_area_report).exists():
+    print(f" {label_cells:<{W}} = {RED}{synth_area_report} not found{RESET}" )
+    print(f" {label_area:<{W}} = {RED}{synth_area_report} not found{RESET}" )
+    failures.append(f"synth_area: {synth_area_report} not found")
+    return
+
+  with open( synth_area_report, "r" ) as file:
+    for line in file:
+      if line.startswith("Number of cells:"):
+        fields = line.split(":")
+        print(f" {label_cells:<{W}} = {fields[1].strip()}" )
+      if line.startswith("Total cell area:"):
+        fields = line.split(":")
+        print(f" {label_area:<{W}} = {float(fields[1]):0.3f} um^2" )
+
+#-------------------------------------------------------------------------
+# print_slack
+#-------------------------------------------------------------------------
+
+def print_pnr_slack( pnr_timing_setup_report, name ):
+
+  label = f"pnr_{name}"
+  if not Path(pnr_timing_setup_report).exists():
+    print(f" {label:<{W}} = {RED}{pnr_timing_setup_report} not found{RESET}" )
+    failures.append(f"{label}: {pnr_timing_setup_report} not found")
+    return
+
+  slack = ""
+  with open( pnr_timing_setup_report, "r" ) as file:
+    for line in file:
+      if line[2:12] == "Slack Time":
+        fields = line.split("Time")
+        slack = fields[1].strip()
+        break
+
+  if slack != "":
+    check_str = ""
+    if float(slack) < 0:
+      check_str = f"{RED}(must have positive slack!){RESET}"
+      failures.append(f"{label}: negative slack ({slack} ns)")
+    print(f" {label:<{W}} = {slack} ns {check_str}")
+  else:
+    print(f" {label:<{W}} = no hold-constrained paths found")
+
+#-------------------------------------------------------------------------
+# print_pnr_area
+#-------------------------------------------------------------------------
+
+def print_pnr_area( pnr_area_report ):
+
+  label_density   = "pnr_density"
+  label_cells     = "pnr_num_stdcells"
+  label_cell_area = "pnr_cell_area"
+  label_core_area = "pnr_core_area"
+
+  if not Path(pnr_area_report).exists():
+    print(f" {label_density:<{W}} = {RED}{pnr_area_report} not found{RESET}" )
+    print(f" {label_cells:<{W}} = {RED}{pnr_area_report} not found{RESET}" )
+    print(f" {label_cell_area:<{W}} = {RED}{pnr_area_report} not found{RESET}" )
+    print(f" {label_core_area:<{W}} = {RED}{pnr_area_report} not found{RESET}" )
+    failures.append(f"pnr_area: {pnr_area_report} not found")
+    return
+
+  density = None
+  num_stdcells = None
+  cell_area = None
+  core_area = None
+
+  in_pre_filler = False
+  in_post_filler = False
+  found_pre_header = False
+  found_post_header = False
+
+  with open( pnr_area_report, "r" ) as file:
+    for line in file:
+      # Track which section we're in
+      if "Area pre-filler" in line:
+        in_pre_filler = True
+        in_post_filler = False
+        continue
+      if "Area post-filler" in line:
+        in_pre_filler = False
+        in_post_filler = True
+        continue
+
+      # Extract placement density from pre-filler section (not including fixed std cells)
+      if in_pre_filler and line.strip().startswith("Placement Density:") and "including fixed" not in line:
+        match = re.search(r'Placement Density:(\d+\.\d+)%', line)
+        if match:
+          density = match.group(1)
+
+      # Look for header line to find data rows
+      if "Hinst Name" in line and "Module Name" in line:
+        if in_pre_filler:
+          found_pre_header = True
+        elif in_post_filler:
+          found_post_header = True
+        continue
+
+      # Skip the dashed separator line
+      if line.startswith("----"):
+        continue
+
+      # Extract pre-filler stats (first data row after header)
+      if in_pre_filler and found_pre_header and num_stdcells is None:
+        fields = line.split()
+        if len(fields) >= 3:
+          num_stdcells = fields[-2]
+          cell_area = fields[-1]
+
+      # Extract post-filler stats (first data row after header)
+      if in_post_filler and found_post_header and core_area is None:
+        fields = line.split()
+        if len(fields) >= 3:
+          core_area = fields[-1]
+
+  if density:
+    print(f" {label_density:<{W}} = {density}%")
+  else:
+    print(f" {label_density:<{W}} = {RED}not found{RESET}")
+
+  if num_stdcells:
+    print(f" {label_cells:<{W}} = {num_stdcells}")
+  else:
+    print(f" {label_cells:<{W}} = {RED}not found{RESET}")
+
+  if cell_area:
+    print(f" {label_cell_area:<{W}} = {cell_area} um^2")
+  else:
+    print(f" {label_cell_area:<{W}} = {RED}not found{RESET}")
+
+  if core_area:
+    print(f" {label_core_area:<{W}} = {core_area} um^2")
+  else:
+    print(f" {label_core_area:<{W}} = {RED}not found{RESET}")
+
+#-------------------------------------------------------------------------
+# print_pnr_clk_ins_src_lat
+#-------------------------------------------------------------------------
+
+def print_pnr_clk_ins_src_lat( pnr_sdc_file ):
+
+  label = "pnr_clk_ins_src_lat"
+  if not Path(pnr_sdc_file).exists():
+    print(f" {label:<{W}} = {RED}{pnr_sdc_file} not found{RESET}" )
+    return
+
+  clk_ins_src_lat = 0;
+  with open( pnr_sdc_file, "r" ) as file:
+    for line in file:
+      if line.startswith("set_clock_lat"):
+        lat = float(line.split()[5].strip())
+        if lat < clk_ins_src_lat:
+          clk_ins_src_lat = lat
+
+  print(f" {label:<{W}} = {clk_ins_src_lat} ns")
+
+#-------------------------------------------------------------------------
+# print_sta_slack
+#-------------------------------------------------------------------------
+
+def print_sta_slack( sta_timing_report, name ):
+
+  label = f"sta_{name}"
+  if not Path(sta_timing_report).exists():
+    print(f" {label:<{W}} = {RED}{sta_timing_report} not found{RESET}" )
+    failures.append(f"{label}: {sta_timing_report} not found")
+    return
+
+  slack = ""
+  with open( sta_timing_report, "r" ) as file:
+    for line in file:
+      if line.startswith("  slack "):
+        fields = line.split()
+        slack = fields[2]
+
+  if slack != "":
+    check_str = ""
+    if float(slack) < 0:
+      check_str = f" {RED}(must have positive slack!){RESET}"
+      failures.append(f"{label}: negative slack ({slack} ns)")
+    print(f" {label:<{W}} = {float(slack):0.4f} ns{check_str}" )
+  else:
+    print(f" {label:<{W}} = no hold-constrained paths found" )
+
+#-------------------------------------------------------------------------
+# print_eval
+#-------------------------------------------------------------------------
+
+def print_eval( name ):
+
+  eval_saif_file    = f"../07-synopsys-vcs-baglsim/{name}.saif"
+  eval_power_report = f"../08-synopsys-pt-pwr/{name}-summary.rpt"
+
+  print("")
+  print(f" {name}")
+
+  if not Path(eval_saif_file).exists():
+    print(f" - {RED}{eval_saif_file} not found{RESET}" )
+    return
+
+  if not Path(eval_power_report).exists():
+    print(f" - {RED}{eval_power_report} not found{RESET}" )
+    return
+
+  exec_time_ns     = 0.0
+  exec_time_cycles = 0.0
+  with open( eval_saif_file, "r" ) as file:
+    for line in file:
+      if line.startswith("(DURATION "):
+        exec_time_ps     = float(line.split()[1].strip(')'))
+        exec_time_ns     = exec_time_ps/1000.0
+        exec_time_cycles = int(exec_time_ns/{{clock_period}})
+
+  power_mw  = 0.0
+  energy_nj = 0.0
+  with open( eval_power_report, "r" ) as file:
+    for line in file:
+      if line.startswith("Total Power"):
+        power_watts     = float(line.split()[3].strip())
+        power_mw        = power_watts*1000.0
+        energy_nj       = power_watts*exec_time_ns
+
+  print(f"  - exec_time = {exec_time_cycles} cycles")
+  print(f"  - exec_time = {exec_time_ns:0.4f} ns")
+  print(f"  - power     = {power_mw:0.4f} mW")
+  print(f"  - energy    = {energy_nj:0.4f} nJ")
+
+#-------------------------------------------------------------------------
+# print_log_errors
+#-------------------------------------------------------------------------
+
+def print_log_errors( log_dir, label, log_file_name=None ):
+
+  log_dir_path = Path(log_dir)
+  if not log_dir_path.exists():
+    print(f" {label:<{W}} = {RED}{log_dir} not found{RESET}")
+    failures.append(f"{label}: {log_dir} not found")
+    return
+
+  if log_file_name:
+    log_files = [log_dir_path / log_file_name]
+    if not log_files[0].exists():
+      print(f" {label:<{W}} = {RED}{log_files[0]} not found{RESET}")
+      failures.append(f"{label}: {log_files[0]} not found")
+      return
+  else:
+    log_files = sorted(log_dir_path.glob("*.log"))
+    if not log_files:
+      print(f" {label:<{W}} = {RED}no log files found in {log_dir}{RESET}")
+      failures.append(f"{label}: no log files found in {log_dir}")
+      return
+
+  for log_file in log_files:
+    error_count = 0
+    with open( log_file, "r" ) as file:
+      for line in file:
+        if re.search( r"error", line, re.IGNORECASE ):
+          # Skip lines that report "0 error" (but not "10 error", "20 error", etc.)
+          if re.search( r"(?<!\d)0\s+error", line, re.IGNORECASE ):
+            continue
+          error_count += 1
+
+    log_name = f"{log_file.stem} ({label})"
+    if error_count > 0:
+      print(f" {log_name:<{W}} = {RED}{error_count} error(s) found{RESET}")
+      failures.append(f"{label}: {log_file.stem} has {error_count} error(s)")
+    else:
+      print(f" {log_name:<{W}} = no errors")
+
+#-------------------------------------------------------------------------
+# print_drc
+#-------------------------------------------------------------------------
+
+def print_drc( drc_reports ):
+
+  for drc_report in drc_reports:
+    label = Path(drc_report).parent.name
+
+    if not Path(drc_report).exists():
+      print(f" {label:<{W}} = {RED}{drc_report} not found{RESET}")
+      failures.append(f"drc: {drc_report} not found")
+      continue
+
+    in_section = False
+    found = False
+    with open( drc_report, "r" ) as file:
+      for line in file:
+        if "RULECHECK RESULTS STATISTICS (BY CELL)" in line:
+          next(file)  # skip "---" line
+          in_section = True
+          continue
+        if in_section:
+          if "------------" in line:
+            break
+          if line.startswith("CELL"):
+            total = line.split("TOTAL Result Count = ")[1].split()[0]
+            if int(total) > 0:
+              print(f" {label:<{W}} = {RED}{total} DRC violations{RESET}")
+              failures.append(f"drc: {drc_report} has {total} violations")
+            else:
+              print(f" {label:<{W}} = {total} DRC violations")
+            found = True
+          elif "RULECHECK" in line:
+            rule  = line.split("RULECHECK")[1].split()[0]
+            parts = line.split()
+            count = parts[-2]
+            print(f"  - {rule:<{W}} = {count}")
+
+    if not found:
+      print(f" {label:<{W}} = no violations found")
+
+#-------------------------------------------------------------------------
+# print_lvs
+#-------------------------------------------------------------------------
+
+def print_lvs( lvs_report, lvs_log ):
+
+  label = "lvs"
+  if not Path(lvs_report).exists():
+    print(f" {label:<{W}} = {RED}{lvs_report} not found{RESET}")
+    failures.append(f"lvs: {lvs_report} not found")
+    return
+
+  if not Path(lvs_log).exists():
+    print(f" {label:<{W}} = {RED}{lvs_log} not found{RESET}")
+    failures.append(f"lvs: {lvs_log} not found")
+    return
+
+  # Check if log file contains "LVS completed."
+
+  with open( lvs_log, "r" ) as file:
+    log_content = file.read()
+
+  lvs_completed = "LVS completed." in log_content
+
+  with open( lvs_report, "r" ) as file:
+    lines = file.readlines()
+
+  design_name = "{{ design_name }}"
+
+  # Find the CELL SUMMARY section and check the result for the wrapper cell
+
+  in_cell_summary = False
+  for line in lines:
+    if "CELL  SUMMARY" in line:
+      in_cell_summary = True
+      continue
+    if in_cell_summary:
+      if design_name in line:
+        if line.strip().startswith("CORRECT") and lvs_completed:
+          print(f" {label:<{W}} = no violations found")
+        else:
+          if not lvs_completed:
+            print(f" {label:<{W}} = {RED}FAILED: LVS did not complete{RESET}")
+            failures.append(f"lvs: LVS did not complete")
+          else:
+            print(f" {label:<{W}} = {RED}FAILED{RESET}")
+            failures.append(f"lvs: layout vs. schematic check failed")
+        return
+
+  print(f" {label:<{W}} = {RED}FAILED: {design_name} not found in CELL SUMMARY{RESET}")
+  failures.append(f"lvs: {design_name} not found in CELL SUMMARY")
+
+#-------------------------------------------------------------------------
+# main
+#-------------------------------------------------------------------------
+
+def main():
+
+  # Print Header
+  print("")
+  print(f" {'timestamp':<{W}} = {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+  print(f" {'design_name':<{W}} = {{design_name}}")
+  print(f" {'clock_period':<{W}} = {{clock_period}}")
+
+  # Resolved Top-Level Parameters
+  print_resolved_params("../01-verilator-pickle/run.log")
+
+  print("")
+
+  # PyMTL RTL Simulation
+  print_sim("../01-verilator-pickle/run.log","verilator-pickle")
+  print_verilator_pickle_errors("../01-verilator-pickle/run.log")
+
+  # Four-State RTL Simulation
+  print_sim("../02-synopsys-vcs-rtlsim/run.log","vcs-rtlsim")
+
+  # Synthesis Summary
+  print_synth_slack("../03-synopsys-dc-synth/timing.rpt")
+  print_synth_area("../03-synopsys-dc-synth/area.rpt")
+  print_log_errors("../03-synopsys-dc-synth","synthesis","run.log")
+
+  # Fast-Functional Gate-Level Simulation
+  print_sim("../04-synopsys-vcs-ffglsim/run.log","ffglsim")
+
+  # Place-and-Route Summary
+  print_pnr_slack("../05-cadence-innovus-pnr/timing-setup.rpt","setup_slack")
+  print_pnr_slack("../05-cadence-innovus-pnr/timing-hold.rpt","hold_slack")
+  print_pnr_clk_ins_src_lat("../05-cadence-innovus-pnr/post-pnr.sdc")
+  print_pnr_area("../05-cadence-innovus-pnr/area.rpt")
+  print_log_errors("../05-cadence-innovus-pnr","pnr","run.log")
+
+  # Static Timing Analysis Summary
+  print_sta_slack("../06-synopsys-pt-sta/timing-setup.rpt","setup_slack")
+  print_sta_slack("../06-synopsys-pt-sta/timing-hold.rpt","hold_slack")
+
+  # Back-Annotated Gate-Level Simulation
+  print_sim("../07-synopsys-vcs-baglsim/run.log","baglsim")
+
+  # Design Rules Check
+  print_drc([
+    "../09-mentor-calibre-drc/main-drc/run.summary",
+    "../09-mentor-calibre-drc/antenna-drc/run.summary"
+  ])
+
+  # Layout vs. Schematic Check
+  print_lvs("../10-mentor-calibre-lvs/lvs.report", "../10-mentor-calibre-lvs/run.log")
+
+  # Print each evaluation sim and power results
+  {% for item in evals | default([]) -%}
+  {% if item is mapping -%}
+  {% for sim_name, config in item.items() -%}
+  print_eval("{{ sim_name }}-{{ config.elf | replace("/", "-") }}")
+  {% endfor -%}
+  {% endif -%}
+  {% endfor %}
+
+  # Print Summary
+
+  print("")
+  if len(failures) == 0:
+    print(" \033[32mAll checks passed\033[0m")
+  else:
+    print(f" \033[31m{len(failures)} check(s) failed:\033[0m")
+    for failure in failures:
+      print(f"  - {failure}")
+
+  print("")
+
+if __name__ == "__main__":
+  main()
+
+

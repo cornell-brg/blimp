@@ -1,0 +1,41 @@
+//=========================================================================
+// 10-mentor-calibre-lvs/run.rule
+//=========================================================================
+
+// Input layout settings
+LAYOUT PATH "../05-cadence-innovus-pnr/post-pnr.gds"
+LAYOUT SYSTEM GDSII
+LAYOUT PRIMARY "{{ design_name }}"
+
+// Input spice settings
+SOURCE PATH "post-pnr.sp"
+SOURCE SYSTEM SPICE
+SOURCE PRIMARY "{{ design_name }}"
+
+// LVS database output
+MASK SVDB DIRECTORY "svdb" QUERY
+
+// Report settings
+LVS REPORT "lvs.report"
+LVS REPORT OPTION NONE
+LVS FILTER UNUSED OPTION NONE SOURCE
+LVS FILTER UNUSED OPTION NONE LAYOUT
+LVS REPORT MAXIMUM ALL
+
+// Run settings
+LVS RECOGNIZE GATES ALL
+LVS ABORT ON SOFTCHK NO
+LVS ABORT ON SUPPLY ERROR YES
+LVS IGNORE PORTS NO
+LVS SHOW SEED PROMOTIONS NO
+LVS SHOW SEED PROMOTIONS MAXIMUM 50
+LVS ISOLATE SHORTS NO
+
+// ERC run
+LVS EXECUTE ERC YES
+ERC RESULTS DATABASE "erc.results"
+ERC CELL NAME YES CELL SPACE XFORM
+DRC ICSTATION YES
+
+// PDK rule deck
+INCLUDE "$TSMC_180NM/lvs.rule"

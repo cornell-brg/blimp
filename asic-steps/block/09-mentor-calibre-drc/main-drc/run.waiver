@@ -1,0 +1,21 @@
+#=========================================================================
+# 09-mentor-calibre-drc/main-drc/run.waiver
+#=========================================================================
+# Waived rules for block-level:
+# - PO.R.3: If the design is super small, then likely we just don't even have
+#           enough poly in the design anyway
+# - Mx/UTM40K.R.1: Minimum area coverage for metal layers - we can waive 
+#           this since we do not do mfill at the block-level
+# - DRM.R.1: Generic DRC rule that always fails - just tells user to check
+#            final design carefully against DRM before tapeout
+
+# Main design
+PO.R.3     WAIVE_EXTENT {{ design_name }}
+M1.R.1     WAIVE_EXTENT {{ design_name }}
+M2.R.1     WAIVE_EXTENT {{ design_name }}
+M3.R.1     WAIVE_EXTENT {{ design_name }}
+M4.R.1     WAIVE_EXTENT {{ design_name }}
+M5.R.1     WAIVE_EXTENT {{ design_name }}
+M6.R.1     WAIVE_EXTENT {{ design_name }}
+UTM40K.R.1 WAIVE_EXTENT {{ design_name }}
+DRM.R.1    WAIVE_EXTENT {{ design_name }}

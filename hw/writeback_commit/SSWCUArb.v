@@ -1,5 +1,5 @@
 //========================================================================
-// SSWBArb.v
+// SSWCUArb.v
 //========================================================================
 // An age-based iSLIP arbiter for writeback with integrated selection
 // muxing. Selects up to m of the oldest requesting inputs across
@@ -9,14 +9,14 @@
 //
 // The message struct (t_msg) must contain .val and .seq_num fields.
 
-`ifndef HW_WRITEBACK_SSWBARB_V
-`define HW_WRITEBACK_SSWBARB_V
+`ifndef HW_WRITEBACK_SSWCUARB_V
+`define HW_WRITEBACK_SSWCUARB_V
 
 `include "hw/common/ISLIPCore.v"
 `include "hw/util/SSSeqAge.v"
 `include "intf/CommitNotif.v"
 
-module SSWBArb #(
+module SSWCUArb #(
   parameter type t_msg         = logic,
   parameter p_num_pipes        = 8,
   parameter p_num_be_lanes     = 2,
@@ -56,14 +56,17 @@ module SSWBArb #(
   // Age tracking
   //----------------------------------------------------------------------
 
-  SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
-  ) seq_age (
-    .*
-  );
-
   logic [p_seq_num_bits-1:0] oldest_seq_num;
-  assign oldest_seq_num = seq_age.oldest_seq_num;
+
+  SSSeqAge #(
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
+    .clk              (clk),
+    .rst              (rst),
+    .oldest_seq_num   (oldest_seq_num),
+    .commit           (commit)
+  );
 
   //----------------------------------------------------------------------
   // Build request and compatibility matrix
@@ -120,7 +123,7 @@ module SSWBArb #(
     .p_num_outputs  (p_num_be_lanes),
     .p_seq_num_bits (p_seq_num_bits),
     .p_num_iter     (p_num_iter),
-    .p_accept_lsb   (1),
+    .p_accept_mode  (1),             // Lowest-index accept
     .p_slot_bits    (1)
   ) u_islip (
     .compat           (compat),
@@ -177,4 +180,4 @@ module SSWBArb #(
 
 endmodule
 
-`endif // HW_WRITEBACK_SSWBARB_V
+`endif // HW_WRITEBACK_SSWCUARB_V

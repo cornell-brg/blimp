@@ -1,5 +1,5 @@
 //========================================================================
-// DecodeIssueUnitBypassFifo.v
+// DIUFifo.v
 //========================================================================
 // Wraps FifoBypass and presents an instruction-window FIFO with
 // per-lane editable head state.
@@ -13,22 +13,22 @@
 //
 // Shadow state resets to zero on pop (new head gets clean state).
 
-`ifndef HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
-`define HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
+`ifndef HW_DECODEISSUE_DIUBYPASSFIFO_V
+`define HW_DECODEISSUE_DIUBYPASSFIFO_V
 
-`include "hw/common/FifoBypass.v"
+`include "hw/common/Fifo.v"
 `include "intf/F__DIntf.v"
 
-module DecodeIssueUnitBypassFifo
+module DIUFifo
 #(
   parameter type t_msg     = logic [31:0],
   parameter p_seq_num_bits = 5,
   parameter p_depth        = 2,
-  parameter p_bypass       = 0,
   parameter p_num_lanes    = 2
 )(
   input  logic clk,
   input  logic rst,
+  input  logic clear,
 
   //----------------------------------------------------------------------
   // Fetch Interface (push side)
@@ -53,13 +53,16 @@ module DecodeIssueUnitBypassFifo
   // Per-lane Edit Signals (head entry only)
   //----------------------------------------------------------------------
 
-  input  logic [p_num_lanes-1:0] edit_set_invalid,
-  input  logic [p_num_lanes-1:0] edit_set_dispatched
+  input  logic [1:0] edit_inst_state [p_num_lanes]
 );
 
   //----------------------------------------------------------------------
   // Internal Types
   //----------------------------------------------------------------------
+
+  localparam [1:0] INST_STATUS_INVALID    = 2'b00,
+                   INST_STATUS_READY      = 2'b01,
+                   INST_STATUS_DISPATCHED = 2'b10;
 
   localparam p_fifo_lane_bits  = $bits(t_msg);
   localparam p_fifo_entry_bits = p_num_lanes * p_fifo_lane_bits;
@@ -77,18 +80,18 @@ module DecodeIssueUnitBypassFifo
   logic [31:0]               F_inst_arr       [p_num_lanes];
   logic [31:0]               F_pc_arr         [p_num_lanes];
   logic [p_seq_num_bits-1:0] F_seq_num_arr    [p_num_lanes];
-  logic                      F_inst_valid_arr [p_num_lanes];
+  logic [1:0]                F_inst_status_arr [p_num_lanes];
 
   genvar i;
   generate
     for( i = 0; i < p_num_lanes; i++ ) begin: PACK_GEN
-      assign F[i].rdy            = !fifo_full;
-      assign F_val_vec[i]        = F[i].val;
-      assign F_val_arr[i]        = F[i].val;
-      assign F_inst_arr[i]       = F[i].inst;
-      assign F_pc_arr[i]         = F[i].pc;
-      assign F_seq_num_arr[i]    = F[i].seq_num;
-      assign F_inst_valid_arr[i] = F[i].inst_valid;
+      assign F[i].rdy             = !fifo_full | pop;
+      assign F_val_vec[i]         = F[i].val;
+      assign F_val_arr[i]         = F[i].val;
+      assign F_inst_arr[i]        = F[i].inst;
+      assign F_pc_arr[i]          = F[i].pc;
+      assign F_seq_num_arr[i]     = F[i].seq_num;
+      assign F_inst_status_arr[i] = F[i].inst_status;
     end
   endgenerate
 
@@ -100,13 +103,13 @@ module DecodeIssueUnitBypassFifo
       packed_lane.inst       = F_inst_arr[ii];
       packed_lane.pc         = F_pc_arr[ii];
       packed_lane.seq_num    = F_seq_num_arr[ii];
-      packed_lane.inst_valid = F_inst_valid_arr[ii];
+      packed_lane.inst_status = F_inst_status_arr[ii];
       fifo_wdata[ii*p_fifo_lane_bits +: p_fifo_lane_bits] = packed_lane;
     end
   end
 
   logic fifo_push;
-  assign fifo_push = |F_val_vec & !fifo_full;
+  assign fifo_push = |F_val_vec & (!fifo_full | pop);
 
   //----------------------------------------------------------------------
   // Underlying FIFO
@@ -115,13 +118,13 @@ module DecodeIssueUnitBypassFifo
   logic                         fifo_empty;
   logic [p_fifo_entry_bits-1:0] fifo_rdata;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits (p_fifo_entry_bits),
-    .p_depth      (p_depth),
-    .p_bypass     (p_bypass)
+    .p_depth      (p_depth)
   ) fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (clear),
     .push  (fifo_push),
     .pop   (pop),
     .empty (fifo_empty),
@@ -136,16 +139,20 @@ module DecodeIssueUnitBypassFifo
   // Shadow State
   //----------------------------------------------------------------------
 
-  logic [p_num_lanes-1:0] invalid_r;
-  logic [p_num_lanes-1:0] dispatched_r;
+  logic [1:0] inst_state_r [p_num_lanes];
 
   always_ff @( posedge clk ) begin
-    if ( rst || pop ) begin
-      invalid_r    <= '0;
-      dispatched_r <= '0;
+    if ( rst || pop || clear ) begin
+      for( int j = 0; j < p_num_lanes; j++ )
+        inst_state_r[j] <= INST_STATUS_READY;
     end else begin
-      invalid_r    <= invalid_r    | edit_set_invalid;
-      dispatched_r <= dispatched_r | edit_set_dispatched;
+      for( int j = 0; j < p_num_lanes; j++ ) begin
+        if( inst_state_r[j] == INST_STATUS_INVALID ||
+            edit_inst_state[j] == INST_STATUS_INVALID )
+          inst_state_r[j] <= INST_STATUS_INVALID;
+        else if( edit_inst_state[j] == INST_STATUS_DISPATCHED )
+          inst_state_r[j] <= INST_STATUS_DISPATCHED;
+      end
     end
   end
 
@@ -158,12 +165,15 @@ module DecodeIssueUnitBypassFifo
       t_msg lane;
       lane = fifo_rdata[j*p_fifo_lane_bits +: p_fifo_lane_bits];
 
-      o_msg[j]            = lane;
-      o_msg[j].val        = !fifo_empty & lane.val & !invalid_r[j];
-      o_msg[j].dispatched = dispatched_r[j];
+      o_msg[j]     = lane;
+      o_msg[j].val = !fifo_empty & lane.val &
+                     (inst_state_r[j] != INST_STATUS_INVALID);
+
+      if( inst_state_r[j] != INST_STATUS_READY )
+        o_msg[j].inst_status = inst_state_r[j];
     end
   end
 
 endmodule
 
-`endif // HW_DECODEISSUE_DECODEISSUEUNITBYPASSFIFO_V
+`endif // HW_DECODEISSUE_DIUBYPASSFIFO_V

@@ -1,12 +1,12 @@
 //========================================================================
 // FetchUnitL3.v
 //========================================================================
-// A basic modular fetch unit for fetching instructions with squashing
+// A FIFO-less fetch unit for fetching instructions with squashing.
+// Memory responses flow directly to the D interface with no buffering.
 
 `ifndef HW_FETCH_FETCHUNITVARIANTS_FETCHUNITL3_V
 `define HW_FETCH_FETCHUNITVARIANTS_FETCHUNITL3_V
 
-`include "hw/common/Fifo.v"
 `include "hw/fetch/SeqNumGenL3.v"
 `include "intf/F__DIntf.v"
 `include "intf/MemIntf.v"
@@ -16,7 +16,7 @@
 module FetchUnitL3
 #(
   parameter p_reclaim_width = 2,
-  parameter p_max_in_flight = 16
+  parameter p_max_in_flight = 8
 )
 ( 
   input  logic    clk,
@@ -102,7 +102,6 @@ module FetchUnitL3
 
   logic [p_flight_bits-1:0] num_to_squash;
   logic [p_flight_bits-1:0] num_to_squash_next;
-  logic resp_push, resp_pop, resp_empty, resp_full;
 
   always_ff @( posedge clk ) begin
     if ( rst )
@@ -117,7 +116,7 @@ module FetchUnitL3
     if( squash.val ) // Copy over from in-flight requests
       num_to_squash_next = num_to_squash_next + num_in_flight;
 
-    if( !resp_empty & ( num_to_squash_next > 0 ) ) // Decrement
+    if( mem.resp_val & ( num_to_squash_next > 0 ) ) // Decrement
       num_to_squash_next = num_to_squash_next - 1;
   end
 
@@ -163,9 +162,9 @@ module FetchUnitL3
   always_comb begin
     mem.req_val        = (num_in_flight + num_to_squash < p_max_in_flight);
     mem.req_msg.op     = MEM_MSG_READ;
-    mem.req_msg.opaque = 'x;
+    mem.req_msg.opaque = '0;
     mem.req_msg.strb   = '0;
-    mem.req_msg.data   = 'x;
+    mem.req_msg.data   = '0;
   end
 
   //----------------------------------------------------------------------
@@ -191,43 +190,14 @@ module FetchUnitL3
   // Other response signals
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  typedef struct packed {
-    t_op                    op;
-    logic [31:0]            addr;
-    logic [3:0]             strb;
-    logic [31:0]            data;
-  } mem_msg_t;
-
-  mem_msg_t fifo_rdata, fifo_wdata;
-
-  Fifo #(
-    .p_entry_bits ($bits(mem_msg_t)),
-    .p_depth      (8)
-  ) resp_fifo (
-    .clk   (clk),
-    .rst   (rst),
-    .push  (resp_push),
-    .pop   (resp_pop),
-    .empty (resp_empty),
-    .full  (resp_full),
-    .wdata (fifo_wdata),
-    .rdata (fifo_rdata)
-  );
-
-  assign fifo_wdata.op   = mem.resp_msg.op;
-  assign fifo_wdata.addr = mem.resp_msg.addr;
-  assign fifo_wdata.strb = mem.resp_msg.strb;
-  assign fifo_wdata.data = mem.resp_msg.data;
-
-  assign resp_push    = mem.resp_val & !resp_full;
-  assign mem.resp_rdy = !resp_full;
-  assign resp_pop     = ((D.rdy & alloc_val) | should_drop) & !resp_empty;
-  assign D.val        = !resp_empty & alloc_val & !should_drop;
-  assign alloc_rdy    = !resp_empty & D.rdy     & !should_drop;
+  // Accept memory responses when dropping stale data or when D is ready
+  assign mem.resp_rdy = should_drop | (D.rdy & alloc_val);
+  assign D.val        = mem.resp_val & alloc_val & !should_drop;
+  assign alloc_rdy    = mem.resp_val & D.rdy     & !should_drop;
 
   always_comb begin
-    D.inst       = fifo_rdata.data;
-    D.pc         = fifo_rdata.addr;
+    D.inst       = mem.resp_msg.data;
+    D.pc         = mem.resp_msg.addr;
     D.seq_num    = alloc_seq_num;
   end
 
@@ -235,14 +205,9 @@ module FetchUnitL3
   // Unused signals
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  logic                      unused_resp_op;
-  logic                [3:0] unused_resp_strb;
   logic [p_seq_num_bits-1:0] unused_squash_seq_num;
 
   always_comb begin
-    unused_resp_op   = fifo_rdata.op;
-    unused_resp_strb = fifo_rdata.strb;
-
     unused_squash_seq_num = squash.seq_num;
   end
 

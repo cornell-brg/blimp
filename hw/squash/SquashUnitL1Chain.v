@@ -42,7 +42,9 @@ module SquashUnitL1Chain #(
   // Age logic
   //----------------------------------------------------------------------
 
-  SeqAge seq_age (
+  SeqAge #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) seq_age (
     .*
   );
 

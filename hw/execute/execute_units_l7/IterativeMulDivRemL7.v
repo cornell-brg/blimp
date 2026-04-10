@@ -8,7 +8,7 @@
 `define HW_EXECUTE_EXECUTE_VARIANTS_L7_ITERATIVEMULDIVREML7_V
 
 `include "defs/UArch.v"
-`include "hw/common/FifoBypass.v"
+`include "hw/common/Fifo.v"
 `include "intf/D__XIntf.v"
 `include "intf/X__WIntf.v"
 
@@ -144,8 +144,7 @@ endmodule
 //------------------------------------------------------------------------
 
 module IterativeMulDivRemL7 #(
-  parameter p_d_intf_fifo_depth  = 4,
-  parameter p_d_intf_fifo_bypass = 0
+  parameter p_d_intf_fifo_depth = 1
 )(
   input  logic clk,
   input  logic rst,
@@ -210,23 +209,34 @@ module IterativeMulDivRemL7 #(
 
   // verilator lint_on ENUMVALUE
 
+  typedef enum {
+    IDLE,
+    SWAP_SIGN,
+    CALC,
+    RESTORE_SIGN,
+    DONE
+  } mul_state_t;
+
+  mul_state_t next_state;
+  mul_state_t curr_state;
+
   logic fifo_full, fifo_empty;
   logic fifo_push, fifo_pop;
   logic W_xfer;
 
-  assign fifo_push = D.val & !fifo_full;
+  assign fifo_push = D.val & (!fifo_full | fifo_pop);
   assign W_xfer    = W.val & W.rdy;
   assign fifo_pop  = (curr_state == DONE) & W.rdy & !fifo_empty;
 
   D_input D_curr;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits ($bits(D_input)),
-    .p_depth      (p_d_intf_fifo_depth),
-    .p_bypass     (p_d_intf_fifo_bypass)
+    .p_depth      (p_d_intf_fifo_depth)
   ) d_fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (fifo_push),
     .pop   (fifo_pop),
     .empty (fifo_empty),
@@ -238,17 +248,6 @@ module IterativeMulDivRemL7 #(
   //----------------------------------------------------------------------
   // State Machine
   //----------------------------------------------------------------------
-
-  typedef enum {
-    IDLE,
-    SWAP_SIGN,
-    CALC,
-    RESTORE_SIGN,
-    DONE
-  } mul_state_t;
-
-  mul_state_t curr_state;
-  mul_state_t next_state;
 
   always_ff @( posedge clk ) begin
     if( rst )
@@ -379,7 +378,7 @@ module IterativeMulDivRemL7 #(
   // Assign outputs
   //----------------------------------------------------------------------
 
-  assign D.rdy = !fifo_full;
+  assign D.rdy = !fifo_full | fifo_pop;
 
   assign W.val     = ( curr_state == DONE );
   assign W.pc      = D_curr.pc;
@@ -459,6 +458,16 @@ module IterativeMulDivRemL7 #(
     else
       trace_json = "null";
   endfunction
+
+  // Signal-based trace outputs for use from generate blocks
+  string trace_str_l0;
+  string trace_str_l1;
+  string trace_json_str;
+  always_comb begin
+    trace_str_l0   = trace( 0 );
+    trace_str_l1   = trace( 1 );
+    trace_json_str = trace_json();
+  end
 `endif
 
 endmodule

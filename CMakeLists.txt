@@ -143,9 +143,18 @@ set(TRACE 0)
 endif()
 
 #-------------------------------------------------------------------------
+# VCD Dumping
+#-------------------------------------------------------------------------
+# Pass -DDUMP_VCD=1 to enable VCS VCD waveform dumping for ASIC targets.
+
+if(NOT DEFINED DUMP_VCD)
+set(DUMP_VCD 0)
+endif()
+
+#-------------------------------------------------------------------------
 # Coverage Reporting
 #-------------------------------------------------------------------------
-# Disable by default for speed
+# Pass -DCOVERAGE=1 to enable simulator coverage metrics collection
 
 if(NOT DEFINED COVERAGE)
 set(COVERAGE 0)
@@ -430,3 +439,11 @@ foreach(TOOL_FILE_REL_PATH ${TOOL_FILES})
   target_compile_options(${TOOL_BIN} PRIVATE -Wall -Wextra -Wpedantic -Werror)
   target_link_libraries(${TOOL_BIN} PRIVATE FL_PROC)
 endforeach(TOOL_FILE_REL_PATH)
+
+#------------------------------------------------------------------------
+# VCS dependency target
+#------------------------------------------------------------------------
+# Builds only the C++ libraries (FL_PROC, ASM) needed for running VCS
+# in the ASIC flow
+
+add_custom_target(vcs-deps DEPENDS FL_PROC ASM)

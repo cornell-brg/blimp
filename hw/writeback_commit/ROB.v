@@ -53,7 +53,9 @@ module ROB #(
 
   always_ff @( posedge clk ) begin
     if( rst )
-      entries <= '{default: '{msg: 'x, val: 1'b0}};
+      for( int i = 0; i < p_depth; i++ ) begin
+        entries[i] <= '{msg: '0, val: 1'b0};
+      end
     else begin
       if( ins_en & !bypass ) begin
         entries[ins_idx] <= '{
@@ -62,7 +64,7 @@ module ROB #(
         };
       end
       if( deq_en & deq_rdy ) begin
-        entries[deq_ptr] <= '{msg: 'x, val: 1'b0};
+        entries[deq_ptr] <= '{msg: '0, val: 1'b0};
       end
     end
   end

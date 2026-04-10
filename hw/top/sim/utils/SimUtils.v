@@ -18,6 +18,14 @@
 `define RESET  "\033[0m"
 
 //------------------------------------------------------------------------
+// Cycle Time
+//------------------------------------------------------------------------
+
+`ifndef CYCLE_TIME
+  `define CYCLE_TIME 10
+`endif
+
+//------------------------------------------------------------------------
 // SimUtils
 //------------------------------------------------------------------------
 
@@ -33,7 +41,7 @@ module SimUtils
   
   // verilator lint_off BLKSEQ
   initial clk = 1'b1;
-  always #5 clk = ~clk;
+  always #(`CYCLE_TIME/2) clk = ~clk;
   // verilator lint_on BLKSEQ
 
   // ---------------------------------------------------------------------
@@ -186,6 +194,24 @@ module SimUtils
       $fdisplay(fd, "");
     end
   endtask
+
+  //----------------------------------------------------------------------
+  // CPI Calculator
+  //----------------------------------------------------------------------
+
+  int num_committed = 0;
+
+  task commit_notify( input int num_insts );
+    num_committed = num_committed + num_insts;
+  endtask
+
+  final begin
+    if( num_committed > 0 ) begin
+      $display( "" );
+      $display( "Raw CPI = %0d / %0d = %f",
+        cycles, num_committed, real'(cycles) / real'(num_committed) );
+    end
+  end
 
 endmodule
 

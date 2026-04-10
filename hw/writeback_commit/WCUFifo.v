@@ -1,5 +1,5 @@
 //========================================================================
-// WritebackCommitUnitBypassFifo.v
+// WCUFifo.v
 //========================================================================
 // Wraps FifoBypass and presents a multi-lane FIFO for the writeback
 // pipeline registers.
@@ -7,17 +7,17 @@
 // Push side:  accepts t_msg array, packs all lanes into one FIFO entry.
 // Read side:  outputs per-lane t_msg from the FIFO head.
 
-`ifndef HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
-`define HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
+`ifndef HW_WRITEBACK_WCUBYPASSFIFO_V
+`define HW_WRITEBACK_WCUBYPASSFIFO_V
 
-`include "hw/common/FifoBypass.v"
+`include "hw/common/Fifo.v"
 
-module WritebackCommitUnitBypassFifo
+module WCUFifo
 #(
-  parameter type t_msg  = logic [31:0],
-  parameter p_depth     = 2,
-  parameter p_bypass    = 0,
-  parameter p_num_lanes = 2
+  parameter p_entry_bits = 32,
+  parameter p_depth      = 2,
+  parameter p_num_lanes  = 2,
+  parameter p_lane_bits  = p_entry_bits / p_num_lanes
 )(
   input  logic clk,
   input  logic rst,
@@ -27,7 +27,7 @@ module WritebackCommitUnitBypassFifo
   //----------------------------------------------------------------------
 
   input  logic push,
-  input  t_msg i_msg [p_num_lanes],
+  input  logic [p_lane_bits-1:0] i_msg [p_num_lanes],
   output logic full,
 
   //----------------------------------------------------------------------
@@ -36,15 +36,8 @@ module WritebackCommitUnitBypassFifo
 
   input  logic pop,
   output logic empty,
-  output t_msg o_msg [p_num_lanes]
+  output logic [p_lane_bits-1:0] o_msg [p_num_lanes]
 );
-
-  //----------------------------------------------------------------------
-  // Internal Types
-  //----------------------------------------------------------------------
-
-  localparam p_lane_bits  = $bits(t_msg);
-  localparam p_entry_bits = p_num_lanes * p_lane_bits;
 
   //----------------------------------------------------------------------
   // Pack Input Lanes
@@ -67,13 +60,13 @@ module WritebackCommitUnitBypassFifo
   logic                    fifo_full;
   logic [p_entry_bits-1:0] fifo_rdata;
 
-  FifoBypass #(
+  Fifo #(
     .p_entry_bits (p_entry_bits),
-    .p_depth      (p_depth),
-    .p_bypass     (p_bypass)
+    .p_depth      (p_depth)
   ) fifo (
     .clk   (clk),
     .rst   (rst),
+    .clear (1'b0),
     .push  (push),
     .pop   (pop),
     .empty (fifo_empty),
@@ -97,4 +90,4 @@ module WritebackCommitUnitBypassFifo
 
 endmodule
 
-`endif // HW_WRITEBACK_WRITEBACKCOMMITUNITBYPASSFIFO_V
+`endif // HW_WRITEBACK_WCUBYPASSFIFO_V

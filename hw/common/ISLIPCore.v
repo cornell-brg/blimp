@@ -30,8 +30,7 @@ module AgePE #(
   input  logic [p_num_input_lanes-1:0] req,
   input  logic [p_seq_num_bits-1:0]    age            [p_num_input_lanes],
   input  logic [p_seq_num_bits-1:0]    oldest_seq_num,
-  output logic [p_num_input_lanes-1:0] gnt,
-  output logic                         any_gnt
+  output logic [p_num_input_lanes-1:0] gnt
 );
 
   logic [p_num_input_lanes-1:0] is_oldest;
@@ -63,7 +62,6 @@ module AgePE #(
   end
 
   assign gnt     = is_oldest;
-  assign any_gnt = |req;
 
 endmodule
 
@@ -78,7 +76,7 @@ module SlotsPE #(
   parameter p_slot_bits = 4
 ) (
   input  logic [p_num_pipes-1:0] req,
-  input  logic [p_slot_bits:0]   slots [p_num_pipes],
+  input  logic [p_slot_bits:0]   slots   [p_num_pipes],
   output logic [p_num_pipes-1:0] gnt,
   output logic                   any_gnt
 );
@@ -117,8 +115,8 @@ module ISLIPCore #(
   parameter p_num_outputs  = 4,
   parameter p_seq_num_bits = 8,
   parameter p_num_iter     = 2,
-  parameter p_accept_lsb   = 0,   // 0 = SlotsPE, 1 = lowest-index
-  parameter p_slot_bits    = 4    // only used when p_accept_lsb = 0
+  parameter p_accept_mode  = 0,   // 0 = SlotsPE, 1 = lowest-index
+  parameter p_slot_bits    = 4    // only used when p_accept_mode = 0
 ) (
   // Compatibility matrix: compat[i][j] = input i can route to output j
   input  logic                      compat           [p_num_inputs][p_num_outputs],
@@ -130,7 +128,7 @@ module ISLIPCore #(
   // Initial output availability
   input  logic                      output_free_init [p_num_outputs],
 
-  // Slot counts for SlotsPE accept (unused when p_accept_lsb = 1)
+  // Slot counts for SlotsPE accept (unused when p_accept_mode = 1)
   input  logic [p_slot_bits:0]      slots            [p_num_outputs],
 
   // Output: match matrix
@@ -143,7 +141,6 @@ module ISLIPCore #(
 
   logic [p_num_inputs-1:0]  g_req    [p_num_iter][p_num_outputs];
   logic [p_num_inputs-1:0]  g_result [p_num_iter][p_num_outputs];
-  logic                     g_any    [p_num_iter][p_num_outputs];
 
   logic [p_num_outputs-1:0] a_req    [p_num_iter][p_num_inputs];
   logic [p_num_outputs-1:0] a_result [p_num_iter][p_num_inputs];
@@ -195,8 +192,7 @@ module ISLIPCore #(
           .req            (g_req[it][gj]),
           .age            (seq_num),
           .oldest_seq_num (oldest_seq_num),
-          .gnt            (g_result[it][gj]),
-          .any_gnt        (g_any[it][gj])
+          .gnt            (g_result[it][gj])
         );
       end
 
@@ -208,7 +204,7 @@ module ISLIPCore #(
           assign a_req[it][gi][jj] = g_result[it][jj][gi];
         end
 
-        if (p_accept_lsb) begin : gen_accept_lsb
+        if (p_accept_mode) begin : gen_accept_lsb
           // Lowest-index priority: isolate lowest set bit
           assign a_any[it][gi]    = |a_req[it][gi];
           assign a_result[it][gi] = a_req[it][gi] & (~a_req[it][gi] + 1);

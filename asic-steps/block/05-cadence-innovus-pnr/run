@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#=========================================================================
+# 05-cadence-innovus-pnr/end
+#=========================================================================
+
+# Stop on error and echo all commands
+
+set -e
+trap 'echo "CMD: $BASH_COMMAND"' DEBUG
+
+# Determine RUNDIR
+
+RUNDIR="$(dirname $(readlink -f "${BASH_SOURCE[0]}"))"
+cd $RUNDIR
+
+# Run using run.tcl script
+
+innovus -no_gui -files run.tcl | tee run.log
+
+# Check report files for verification errors
+for report in connectivity.rpt drc.rpt antenna.rpt; do
+  if ! grep -qi "verification complete *: *0 viol" "$report" 2>/dev/null; then
+    echo -e "\033[31mERROR: $report contains violations\033[0m" | tee -a run.log
+  fi
+done

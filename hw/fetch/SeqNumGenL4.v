@@ -55,8 +55,11 @@ module SeqNumGenL4 #(
   //----------------------------------------------------------------------
   // Need to keep track to know which to free on a squash
 
+  logic [p_seq_num_bits-1:0] oldest_seq_num;
+
   SSSeqAge #(
-    .p_num_be_lanes (p_num_be_lanes)
+    .p_num_be_lanes (p_num_be_lanes),
+    .p_seq_num_bits (p_seq_num_bits)
   ) seq_age (
     .*
   );

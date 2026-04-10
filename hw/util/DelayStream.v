@@ -40,6 +40,10 @@ module DelayStream #(
   //----------------------------------------------------------------------
 
 `else
+`ifndef CYCLE_TIME
+  `define CYCLE_TIME 10
+`endif
+
   t_msg msg_queue [$];
 
   always @( posedge clk ) begin
@@ -72,14 +76,22 @@ module DelayStream #(
   initial send_rdy = 1'b0;
 
   always @( posedge clk ) begin
+    `ifndef VCS_ASIC
     #1;
+    `else
+    #(`OUTPUT_DELAY);
+    `endif
     if( rst ) begin
       send_rdy <= 1'b0;
     end
     else begin
       if( send_intv_delay == 0 ) begin
         send_rdy <= 1'b1;
+        `ifndef VCS_ASIC
         #2;
+        `else
+        #(`CYCLE_TIME-`INPUT_DELAY-`OUTPUT_DELAY);
+        `endif
         if( send_val ) begin
           enqueue( send_msg );
           send_intv_delay <= p_send_intv_delay;
@@ -106,7 +118,11 @@ module DelayStream #(
   end
 
   always @( posedge clk ) begin
+    `ifndef VCS_ASIC
     #1;
+    `else
+    #(`OUTPUT_DELAY);
+    `endif
     if( rst ) begin
       recv_val <= 1'b0;
       recv_msg <= 'x;
@@ -115,7 +131,11 @@ module DelayStream #(
       if( (recv_intv_delay == 0) & (num_msgs() > 0) ) begin
         recv_val <= 1'b1;
         recv_msg <= msg_queue[0];
+        `ifndef VCS_ASIC
         #2;
+        `else
+        #(`CYCLE_TIME-`INPUT_DELAY-`OUTPUT_DELAY);
+        `endif
         if( recv_rdy ) begin
           msg_queue.pop_front();
           recv_intv_delay <= p_recv_intv_delay;

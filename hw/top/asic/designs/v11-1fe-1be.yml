@@ -1,0 +1,70 @@
+#=========================================================================
+# FetchUnitL5.yml
+#=========================================================================
+
+#-------------------------------------------------------------------------
+# steps
+#-------------------------------------------------------------------------
+
+steps:
+ - block/01-verilator-pickle
+ - block/02-synopsys-vcs-rtlsim
+ - block/03-synopsys-dc-synth
+ - block/04-synopsys-vcs-ffglsim
+ - block/05-cadence-innovus-pnr
+ - block/06-synopsys-pt-sta
+ - block/07-synopsys-vcs-baglsim
+ - block/08-synopsys-pt-pwr
+ - block/09-mentor-calibre-drc
+ - block/10-mentor-calibre-lvs
+ - block/11-summarize-results
+
+#-------------------------------------------------------------------------
+# variables
+#-------------------------------------------------------------------------
+
+design_name  : BlimpV11SynthWrap
+clock_period : 25.0
+dump_vcd     : false
+
+defines:
+  - P_NUM_FE_LANES:           1
+  - P_NUM_BE_LANES:           1
+  - P_NUM_PHYS_REGS:          36
+  - P_RECLAIM_WIDTH:          4
+  - P_MAX_IN_FLIGHT:          2
+  - P_F_INTF_FIFO_DEPTH:      1
+  - P_X_INTF_FIFO_DEPTH:      1
+  - P_ALU_D_INTF_FIFO_DEPTH:  1
+  - P_MUL_D_INTF_FIFO_DEPTH:  1
+  - P_MEM_D_INTF_FIFO_DEPTH:  1
+  - P_CTRL_D_INTF_FIFO_DEPTH: 1
+  - P_NUM_ALUS:               1
+  - P_NUM_MULS:               1
+  - P_NUM_LDSTRS:             1
+  - P_PIPE_BYPASS:            15 # bypasses IQ on all 4 pipes (1111b = 15d)
+
+#-------------------------------------------------------------------------
+# tests
+#-------------------------------------------------------------------------
+
+tests:
+  - BlimpV11_add_test
+  - BlimpV11_addi_test
+  - BlimpV11_bne_test
+  - BlimpV11_jal_test
+  - BlimpV11_jalr_test
+  - BlimpV11_lw_test
+  - BlimpV11_mixed_test
+  - BlimpV11_mul_test
+  - BlimpV11_sw_test
+
+#-------------------------------------------------------------------------
+# evals
+#-------------------------------------------------------------------------
+
+evals:
+  - BlimpV11_sim:
+      elf: app/vvadd
+  - BlimpV11_sim:
+      elf: app/bsearch

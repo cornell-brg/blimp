@@ -28,7 +28,7 @@ function(vdeps DEPENDENCIES)
     NO_CACHE
   )
   if(${FILE_PATH} STREQUAL "FILE_PATH-NOTFOUND")
-    message(FATAL_ERROR "Couldn't find file '${FILE_TO_CHECK}' (searched ${VDEP_INCLUDE_DIRS})")
+    message(FATAL_ERROR "Couldn't find file '${VDEP_SOURCE}' (searched ${VDEP_INCLUDE_DIRS})")
   endif()
   file(READ ${FILE_PATH} FILE_CONTENTS)
   string(REPLACE "\n" ";" FILE_CONTENTS ${FILE_CONTENTS})

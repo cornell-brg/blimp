@@ -38,8 +38,10 @@ module FLPeripherals #(
   //----------------------------------------------------------------------
 
   localparam CYCLE_COUNT_ADDR = 32'hFFFFFF00;
+  localparam INST_COUNT_ADDR  = 32'hFFFFFF04;
 
   logic [31:0] cycle_count;
+  logic [31:0] inst_count = '0;
 
   always_ff @( posedge clk ) begin
     if( rst )
@@ -47,6 +49,10 @@ module FLPeripherals #(
     else
       cycle_count <= cycle_count + 1;
   end
+
+  function void notify_commit( int num_insts );
+    inst_count = inst_count + num_insts;
+  endfunction
 
   //----------------------------------------------------------------------
   // Have queues for sending and receiving memory messages
@@ -104,8 +110,10 @@ module FLPeripherals #(
       case( curr_req.op )
         MEM_MSG_READ: begin
           if( try_fl_read(curr_req.addr, curr_resp.data) );
-          else if( curr_req.addr  == CYCLE_COUNT_ADDR )
+          else if( curr_req.addr == CYCLE_COUNT_ADDR )
             curr_resp.data = cycle_count;
+          else if( curr_req.addr == INST_COUNT_ADDR )
+            curr_resp.data = inst_count;
           else
             curr_resp.data = 'x;
           curr_resp.strb  = curr_req.strb;
@@ -115,6 +123,7 @@ module FLPeripherals #(
             // verilator lint_off IGNOREDRETURN
             try_fl_write(curr_req.addr, curr_req.data);
             // verilator lint_on IGNOREDRETURN
+            if( fl_exit_requested() ) $finish;
           end
 
           curr_resp.data = 'x;

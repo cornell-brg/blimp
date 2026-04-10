@@ -18,6 +18,7 @@ extern "C" {
 
 #include <stdint.h>
 uint32_t blimp_cycle_count();
+uint32_t blimp_inst_count();
 
 #ifdef __cplusplus
 }
@@ -29,8 +30,9 @@ uint32_t blimp_cycle_count();
 
 #else
 
-// No strict notion of cycles
+// No strict notion of cycles or instructions
 #define blimp_cycle_count() 0
+#define blimp_inst_count()  0
 
 #endif
 
