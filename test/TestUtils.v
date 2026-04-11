@@ -292,12 +292,12 @@ endmodule
     int match_found;                                                                \
     match_found = 0;                                                                \
     foreach ( __refs[i] ) begin                                                     \
-      if ( __refs_val[i] && __refs[i] === __dut ) begin \
+      if ( __refs_val[i] && __refs[i] === ( __refs[i] ^ __dut ^ __refs[i] ) ) begin \
         match_found = 1;                                                            \
         break;                                                                      \
       end                                                                           \
     end                                                                             \
-    if( match_found != 1 ) begin                                                    \
+    if( match_found == 0 ) begin                                                    \
       if ( t.verbose )                                                              \
         $display( "\n%sERROR%s (cycle=%0d): %s not in set %s (%h)",                 \
                   `RED, `RESET, t.cycles, `"__dut`",                                \

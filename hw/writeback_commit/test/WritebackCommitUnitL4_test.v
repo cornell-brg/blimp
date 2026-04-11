@@ -21,7 +21,7 @@ import TestEnv::*;
 module WritebackCommitUnitL4TestSuite #(
   parameter p_suite_num         = 0,
   parameter p_num_pipes         = 1,
-  parameter p_seq_num_bits      = 3,
+  parameter p_seq_num_bits      = 5,
   parameter p_phys_addr_bits    = 6,
   parameter p_X_send_intv_delay = 0,
   parameter p_num_be_lanes      = 2
