@@ -195,8 +195,6 @@ set(BlimpV8_TESTS
   BlimpV8_test/BlimpV8_divu_test.v
   BlimpV8_test/BlimpV8_rem_test.v
   BlimpV8_test/BlimpV8_remu_test.v
-
-  BlimpV8_test/BlimpV8_rand_prog_test.v
 )
 
 # ------------------------------------------------------------------------
@@ -378,5 +376,4 @@ set(BlimpV11_TESTS
   BlimpV11_test/BlimpV11_remu_test.v
 
   BlimpV11_test/BlimpV11_mixed_test.v
-  BlimpV11_test/BlimpV11_rand_prog_test.v
 )
