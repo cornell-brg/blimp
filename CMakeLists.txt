@@ -446,3 +446,54 @@ endforeach(TOOL_FILE_REL_PATH)
 # in the ASIC flow
 
 add_custom_target(vcs-deps DEPENDS FL_PROC ASM)
+
+#------------------------------------------------------------------------
+# Coverage target
+#------------------------------------------------------------------------
+# Splits coverage.dat into per-type (functional, line, toggle, branch) 
+# coverage .dat files and annotates each with verilator_coverage.
+#
+# The split logic is inlined below as a CMake script written into the build 
+# directory at configure time.
+
+file(WRITE ${CMAKE_BINARY_DIR}/split_verilator_coverage.cmake [=[
+  set(HEADER "# SystemC::Coverage-3\n")
+  set(LINE_DAT       "${HEADER}")
+  set(TOGGLE_DAT     "${HEADER}")
+  set(BRANCH_DAT     "${HEADER}")
+  set(FUNCTIONAL_DAT "${HEADER}")
+  file(READ "${BINARY_DIR}/coverage.dat" COVERAGE_DATA)
+  string(REPLACE "\n" ";" COVERAGE_LINES "${COVERAGE_DATA}")
+  foreach(LINE IN LISTS COVERAGE_LINES)
+    if(LINE MATCHES "v_line")
+      string(APPEND LINE_DAT       "${LINE}\n")
+    elseif(LINE MATCHES "v_toggle")
+      string(APPEND TOGGLE_DAT     "${LINE}\n")
+    elseif(LINE MATCHES "v_branch")
+      string(APPEND BRANCH_DAT     "${LINE}\n")
+    elseif(LINE MATCHES "v_user")
+      string(APPEND FUNCTIONAL_DAT "${LINE}\n")
+    endif()
+  endforeach()
+  file(WRITE "${BINARY_DIR}/line.dat"       "${LINE_DAT}")
+  file(WRITE "${BINARY_DIR}/toggle.dat"     "${TOGGLE_DAT}")
+  file(WRITE "${BINARY_DIR}/branch.dat"     "${BRANCH_DAT}")
+  file(WRITE "${BINARY_DIR}/functional.dat" "${FUNCTIONAL_DAT}")
+]=])
+
+add_custom_target(coverage
+  COMMAND ${CMAKE_COMMAND} -E make_directory coverage
+  COMMAND ${CMAKE_COMMAND} -DBINARY_DIR=${CMAKE_BINARY_DIR} -P ${CMAKE_BINARY_DIR}/split_verilator_coverage.cmake
+  COMMAND verilator_coverage --annotate coverage/total          coverage.dat
+  COMMAND verilator_coverage --annotate coverage/total_details  coverage.dat --annotate-points
+  COMMAND verilator_coverage --annotate coverage/line           line.dat
+  COMMAND verilator_coverage --annotate coverage/line_details   line.dat     --annotate-points
+  COMMAND verilator_coverage --annotate coverage/toggle         toggle.dat
+  COMMAND verilator_coverage --annotate coverage/toggle_details toggle.dat   --annotate-points
+  COMMAND verilator_coverage --annotate coverage/branch         branch.dat
+  COMMAND verilator_coverage --annotate coverage/branch_details branch.dat   --annotate-points
+  COMMAND verilator_coverage --annotate coverage/functional     functional.dat
+  COMMAND verilator_coverage --annotate coverage/functional_details functional.dat --annotate-points
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  COMMENT "Splitting and annotating Verilator coverage data"
+)

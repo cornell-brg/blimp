@@ -34,10 +34,6 @@ module TestMSource #(
 
   initial begin
     for( int i = 0; i < p_num_srcs; i++ ) begin
-      // for( int j = 0; j < p_seq_len; j++ ) begin
-      //   seq_val[i][j] = 1'b0;
-      // end
-
       seq_end_ptr[i] = '0;
       run_ptr[i] = '0;
     end
