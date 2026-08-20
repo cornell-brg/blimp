@@ -6,6 +6,11 @@
 Blimp Documentation
 ==========================================================================
 
+.. important::
+
+   Blimp has been superseded by `Zeppelin <https://github.com/cornell-brg/zeppelin>`_.
+   This project is no longer actively developed and is kept for reference.
+
 This is the home for Blimp's documentation, including installation, the
 overall framework, and how users can use and/or modify implementations.
 

@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> **Blimp has been superseded by [Zeppelin](https://github.com/cornell-brg/zeppelin).**
+> This repository is no longer actively developed and is kept for reference.
+
 # BLIMP
 BRG’s Luculently Interfaced Modular Processor
 
