@@ -1,0 +1,492 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modifying Blimp &mdash; Blimp  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/togglebutton.css?v=9c3e77be" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/logo.css?v=0320fe47" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/wavedrom.css?v=4f1d019f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/table.css?v=09be579f" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/image.css?v=c42c1b78" />
+
+  
+    <link rel="shortcut icon" href="../../_static/blimp_favicon.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=187304be"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="../../_static/togglebutton.js?v=b8b12719"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex/" />
+    <link rel="search" title="Search" href="../../search/" />
+    <link rel="next" title="Colossal Cave Demo" href="../quartus_demo/" />
+    <link rel="prev" title="Memory Network" href="../../fpga/network/" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../" class="icon icon-home">
+            Blimp
+              <img src="../../_static/blimp_no_border.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search/" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/motivation/">Design Motivation and Philosophy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/data_flow/">Data Flow in the Processor</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/versions/">Processor Versions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/repository_structure/">Repository Structure</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/build_system/">Build System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/dependencies/">Dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview/todo/">Further Work</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Microarchitectural Units</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../units/units/">Microarchitectural Units</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Microarchitectural Details</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../uarch/seq_nums/">Sequence Numbers</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Functional Level (FL) Utilities</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/assembler/">Assembler and Disassembler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fl/proc/">Functional-Level Processor</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FPGA Implementation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/peripherals/">Memory-Mapped Peripherals</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../fpga/network/">Memory Network</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Demonstrations</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Modifying Blimp</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#setup">Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#writing-a-benchmark">Writing a μBenchmark</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#cross-compiling-for-riscv">Cross-Compiling for RISCV</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#running-on-blimp">Running on Blimp</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#unrolling-vvmul">Unrolling <code class="docutils literal notranslate"><span class="pre">vvmul</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-a-multiplier-to-blimp">Adding a Multiplier to Blimp</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#change-the-p-num-pipes-parameter-to-support-another-execute-unit">1. Change the <code class="docutils literal notranslate"><span class="pre">p_num_pipes</span></code> parameter to support another execute unit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#modify-the-p-pipe-subsets-parameter-of-the-diu-to-support-the-new-execute-unit">2. Modify the <code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code> parameter of the DIU to support the new execute unit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#instantiate-a-new-16-cycle-iterative-multiplier-iterativemultiplierl2-and-connect-it-to-the-interfaces-indicated-by-p-pipe-subsets">3. Instantiate a new 16-cycle iterative Multiplier (<code class="docutils literal notranslate"><span class="pre">IterativeMultiplierL2</span></code>), and connect it to the interfaces indicated by <code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#add-the-new-muliplier-to-the-trace-function-to-view-the-linetrace-output">4. Add the new muliplier to the <code class="docutils literal notranslate"><span class="pre">trace</span></code> function to view the linetrace output</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../quartus_demo/">Colossal Cave Demo</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../">Blimp</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Modifying Blimp</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/cornell-brg/blimp/blob/main/docs/demos/sim_demo.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="modifying-blimp">
+<h1>Modifying Blimp<a class="headerlink" href="#modifying-blimp" title="Link to this heading"></a></h1>
+<p><em>This demo is adapted from a presentation given to the Batten Research
+Group in the Spring of 2025</em></p>
+<p>This demo should help you become familiar with Blimp. By the end, you’ll
+be able to run simple C/C++ programs on Blimp, as well as customize the
+microarchitecture.</p>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading"></a></h2>
+<p>First, make sure that you have the setup script sourced:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">source</span><span class="w"> </span>setup-brg.sh
+</pre></div>
+</div>
+<div class="note admonition">
+<p class="admonition-title">Setup script</p>
+<p>For users outside BRG’s servers, see the <a class="reference internal" href="../../overview/dependencies/"><span class="doc">prerequisites</span></a></p>
+</div>
+<p>You’ll also need to clone Blimp’s repository</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/deep-dives
+%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/deep-dives
+%<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>git@githum.com:cornell-brg/blimp.git
+%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>blimp
+%<span class="w"> </span><span class="nv">TOPDIR</span><span class="o">=</span><span class="nv">$PWD</span>
+</pre></div>
+</div>
+<div class="note admonition">
+<p class="admonition-title">Editing Files</p>
+<p>Throughout the tutorial, you’ll need to edit files; the tutorial
+indicates this with the command <code class="docutils literal notranslate"><span class="pre">code</span></code>, followed by the file
+path, as though you were using VSCode. If this is not the case,
+please use the command for your preferred code editor</p>
+</div>
+</section>
+<section id="writing-a-benchmark">
+<h2>Writing a μBenchmark<a class="headerlink" href="#writing-a-benchmark" title="Link to this heading"></a></h2>
+<p>To begin understanding Blimp, we’ll first need to write some code for it!
+All programs for Blimp are in the <code class="docutils literal notranslate"><span class="pre">app</span></code> directory; navigate to
+<code class="docutils literal notranslate"><span class="pre">app/demo</span></code>, where we’ll write our program:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/app/demo
+%<span class="w"> </span>ls
+</pre></div>
+</div>
+<p>We have two files; <code class="docutils literal notranslate"><span class="pre">demo.cpp</span></code> is the actual code we’ll write, and
+<code class="docutils literal notranslate"><span class="pre">CMakeLists.txt</span></code> provides some information about the source files for
+the build system. We’ll be editing the former:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>code<span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/app/demo/demo.cpp
+</pre></div>
+</div>
+<p>Here, we’ll be implementing <code class="docutils literal notranslate"><span class="pre">vvmul</span></code>, which performs element-wise
+multiplication of two arrays. Assuming that all arrays are size <code class="docutils literal notranslate"><span class="pre">len</span></code>,
+it should iterate over the source arrays <code class="docutils literal notranslate"><span class="pre">src1</span></code> and <code class="docutils literal notranslate"><span class="pre">src2</span></code>, and
+store the product of each element in <code class="docutils literal notranslate"><span class="pre">dest</span></code></p>
+<a class="bottompadding reference internal image-reference" href="../../_images/vvmul.png"><img alt="A visualization of the ``vvmul`` algorithm" class="align-center bottompadding" src="../../_images/vvmul.png" style="width: 50%;" />
+</a>
+<p>Take a minute to implement the <code class="docutils literal notranslate"><span class="pre">vvmul</span></code> function, using the solution
+below if needed</p>
+<div class="toggle highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">__attribute__</span><span class="p">(</span><span class="w"> </span><span class="p">(</span><span class="w"> </span><span class="n">noinline</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="n">vvmul</span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">dest</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">src1</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">src2</span><span class="p">,</span>
+<span class="w">                                          </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span><span class="w"> </span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">dest</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">src1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">src2</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Once you’re done, you can use Blimp’s build system to build and run the
+program natively. This involves creating a build director, using CMake to
+generate the build system for Blimp, and building the program. Here, the
+target is <code class="docutils literal notranslate"><span class="pre">app-demo-native</span></code> (building the <code class="docutils literal notranslate"><span class="pre">demo</span></code> program in the
+<code class="docutils literal notranslate"><span class="pre">app</span></code> directory natively), which will generate an executable as
+<code class="docutils literal notranslate"><span class="pre">app/demo-native</span></code></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>cmake<span class="w"> </span>..
+%<span class="w"> </span>make<span class="w"> </span>app-demo-native
+%<span class="w"> </span>./app/demo/native
+</pre></div>
+</div>
+<div class="note admonition">
+<p class="admonition-title">Cycle Count</p>
+<p>The program reports the cycles that <code class="docutils literal notranslate"><span class="pre">vvmul</span></code> takes; however, this is
+only applicable for the RTL processor, and will show 0 on other
+platforms</p>
+</div>
+<section id="cross-compiling-for-riscv">
+<h3>Cross-Compiling for RISCV<a class="headerlink" href="#cross-compiling-for-riscv" title="Link to this heading"></a></h3>
+<p>One of the goals of the build system is to make it easy to switch between
+compiling and cross-compiling. This build system has targets for both; to
+compile for RISCV, you just need to omit the <code class="docutils literal notranslate"><span class="pre">-native</span></code> in the target.
+This will build the RISCV executable as <code class="docutils literal notranslate"><span class="pre">app/demo</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>make<span class="w"> </span>app-demo
+%<span class="w"> </span>readelf<span class="w"> </span>-h<span class="w"> </span>app/demo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Machine&quot;</span>
+<span class="c1"># Machine: RISC-V</span>
+</pre></div>
+</div>
+<p>We can no longer run this executable natively; for this, Blimp has a
+functional-level RISCV simulator which can run RISCV binaries. Use the
+<code class="docutils literal notranslate"><span class="pre">fl-sim</span></code> target to build the simulator, then use it to run the
+RISCV binary:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>make<span class="w"> </span>-j8<span class="w"> </span>fl-sim
+%<span class="w"> </span>./fl-sim<span class="w"> </span>app/demo
+</pre></div>
+</div>
+<p>You should hopefull get the same output, verifying that our program works
+on both architectures. Lastly, take a look at the generated assembly for
+your <code class="docutils literal notranslate"><span class="pre">vvmul</span></code>; does this assembly match what you’d expect?</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>riscv64-unknown-elf-objdump<span class="w"> </span>-dC<span class="w"> </span>app/demo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">13</span><span class="w"> </span><span class="s2">&quot;vvmul.*:&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-on-blimp">
+<h2>Running on Blimp<a class="headerlink" href="#running-on-blimp" title="Link to this heading"></a></h2>
+<p>Next, we’ll be running out program on a demo implementation of Blimp.
+This implementation has the same high-level components as all Blimp
+processors:</p>
+<ul class="simple">
+<li><p>A Fetch Unit (FU)</p></li>
+<li><p>A Decode-Issue Unit (DIU)</p></li>
+<li><p>Many Execute Units (XUs)</p></li>
+<li><p>A Writeback-Commit Unit (WCU)</p></li>
+<li><p>A Squash Unit (SU), to arbitrate between different squash signals</p></li>
+</ul>
+<p>Specifically, this implementation has the following function units to
+support RV32IM:</p>
+<ul class="simple">
+<li><p>An ALU (for arithmetic operations)</p></li>
+<li><p>A 16-cycle iterative multiplier (<em>important</em>)</p></li>
+<li><p>An iterative <code class="docutils literal notranslate"><span class="pre">mulh</span></code> / <code class="docutils literal notranslate"><span class="pre">div</span></code> / <code class="docutils literal notranslate"><span class="pre">rem</span></code> unit, for supporting the
+other M-Extension instructions</p></li>
+<li><p>A control flow unit (for resolving branches)</p></li>
+<li><p>A 2-stage load-store unit (for memory operations)</p></li>
+</ul>
+<a class="bottompadding reference internal image-reference" href="../../_images/baseline.png"><img alt="A diagram of the baseline Blimp processor" class="align-center bottompadding" src="../../_images/baseline.png" style="width: 90%;" />
+</a>
+<p>This processor implementation is stored in
+<code class="docutils literal notranslate"><span class="pre">${TOPDIR}/hw/top/sim/BlimpVdemo.v</span></code>; we’ll circle back to that in a
+bit, but for right now, let’s build the simulator (<code class="docutils literal notranslate"><span class="pre">vdemo-sim</span></code>), and
+run out demo program on it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>make<span class="w"> </span>-j8<span class="w"> </span>vdemo-sim
+%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo
+</pre></div>
+</div>
+<p>You should hopefully get the same result as before, indicating that our
+processor successfully executed the program. Make sure to also note down
+the <em>number of cycles</em> this implementation took. Let’s also use the <code class="docutils literal notranslate"><span class="pre">+v</span></code>
+flag to dump a linetrace to a file named <code class="docutils literal notranslate"><span class="pre">trace.txt</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo<span class="w"> </span>+v<span class="w"> </span>&gt;<span class="w"> </span>trace.txt
+%<span class="w"> </span>code<span class="w"> </span>trace.txt
+</pre></div>
+</div>
+<a class="bottompadding reference internal image-reference" href="../../_images/trace.png"><img alt="The baseline Blimp processor's instruction trace" class="align-center bottompadding" src="../../_images/trace.png" style="width: 100%;" />
+</a>
+<p>See if you can identify where <code class="docutils literal notranslate"><span class="pre">vvmul</span></code> is called. What’s the biggest
+bottleneck to your throughput?</p>
+</section>
+<section id="unrolling-vvmul">
+<h2>Unrolling <code class="docutils literal notranslate"><span class="pre">vvmul</span></code><a class="headerlink" href="#unrolling-vvmul" title="Link to this heading"></a></h2>
+<p>One bottleneck that comes up is our inability to have <em>multiple multiplies
+in-flight at once</em>, as we need to store the result of one before looping
+and loading the values for the next. To try to avoid this, we can <em>unroll
+the loop</em>, where each iteration performs multiple operations. Below is a
+prospective implementation of <code class="docutils literal notranslate"><span class="pre">vvmul</span></code> that executes two multiplies per
+iteration (assuming that the array size is divisible by two):</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">__attribute__</span><span class="p">(</span><span class="w"> </span><span class="p">(</span><span class="w"> </span><span class="n">noinline</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="n">vvmul</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">dest</span><span class="p">,</span>
+<span class="w">  </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">src1</span><span class="p">,</span>
+<span class="w">  </span><span class="kt">int</span><span class="o">*</span><span class="w"> </span><span class="n">src2</span><span class="p">,</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">len</span>
+<span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">res1</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">src1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w">     </span><span class="o">*</span><span class="w"> </span><span class="n">src2</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">res2</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">src1</span><span class="p">[</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">src2</span><span class="p">[</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">];</span>
+<span class="w">    </span><span class="n">dest</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="n">res1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">dest</span><span class="p">[</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">res2</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To help understand the performance gains, you can use the implementation
+above, copying it into <code class="docutils literal notranslate"><span class="pre">app/demo/demo.cpp</span></code>, and re-compile the file
+to look at the binary:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>code<span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/app/demo/demo.cpp<span class="w"> </span><span class="c1"># Make your changes to `vvmul`</span>
+%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>make<span class="w"> </span>app-demo
+
+<span class="c1"># View the assembled `vvmul` function</span>
+%<span class="w"> </span>riscv64-unknown-elf-objdump<span class="w"> </span>-dC<span class="w"> </span>app/demo<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-A<span class="w"> </span><span class="m">20</span><span class="w"> </span><span class="s2">&quot;vvmul.*:&quot;</span>
+
+<span class="c1"># View the cycle cound</span>
+%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo
+
+<span class="c1"># View the simulated trace</span>
+%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo<span class="w"> </span>+v<span class="w"> </span>&gt;<span class="w"> </span>trace.txt
+%<span class="w"> </span>code<span class="w"> </span>trace.txt
+</pre></div>
+</div>
+<p>You should hopefully see a small improvement, but not as much as we
+might hope. Looking at the linetrace, there’s still one big bottleneck
+left; <em>our multiplier</em>. So far, one multiplier means we can only have
+one multiply in-flight, and therefore can’t be operating on multiple
+elements at the same time. If only we had another multiplier…</p>
+</section>
+<section id="adding-a-multiplier-to-blimp">
+<h2>Adding a Multiplier to Blimp<a class="headerlink" href="#adding-a-multiplier-to-blimp" title="Link to this heading"></a></h2>
+<p>In this section, we’ll be modifying the demo implementation of Blimp
+(in <code class="docutils literal notranslate"><span class="pre">hw/top/BlimpVdemo.v</span></code>) to have another multiplier:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span>code<span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/hw/top/BlimpVdemo.v
+</pre></div>
+</div>
+<a class="bottompadding reference internal image-reference" href="../../_images/alternative.png"><img alt="A diagram of the demo Blimp processor with another multiplier" class="align-center bottompadding" src="../../_images/alternative.png" style="width: 90%;" />
+</a>
+<p>Specifically, we’ll need to make the following changes (with the
+corresponding modified code segments provided if you need help, although
+try to use the hints in the source file to do it first!)</p>
+<section id="change-the-p-num-pipes-parameter-to-support-another-execute-unit">
+<h3>1. Change the <code class="docutils literal notranslate"><span class="pre">p_num_pipes</span></code> parameter to support another execute unit<a class="headerlink" href="#change-the-p-num-pipes-parameter-to-support-another-execute-unit" title="Link to this heading"></a></h3>
+<p>We’ll need 6 execution pipes, not 5</p>
+<div class="toggle highlight-systemverilog notranslate"><div class="highlight"><pre><span></span><span class="k">localparam</span><span class="w"> </span><span class="n">p_num_pipes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">6</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+<section id="modify-the-p-pipe-subsets-parameter-of-the-diu-to-support-the-new-execute-unit">
+<h3>2. Modify the <code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code> parameter of the DIU to support the new execute unit<a class="headerlink" href="#modify-the-p-pipe-subsets-parameter-of-the-diu-to-support-the-new-execute-unit" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code> tells the DIU which instructions it can send to each
+execute unit. For this demo, add a new instance of <code class="docutils literal notranslate"><span class="pre">p_mul_subset</span></code> at the
+end of the <code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code> array; this means we’ll need to connect our
+new multiplier to the last interface in the array</p>
+<div class="toggle highlight-systemverilog notranslate"><div class="highlight"><pre><span></span><span class="n">DecodeIssueUnitL5</span><span class="w"> </span><span class="p">#(</span>
+<span class="w">  </span><span class="p">.</span><span class="n">p_num_pipes</span><span class="w">     </span><span class="p">(</span><span class="n">p_num_pipes</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">p_num_phys_regs</span><span class="w"> </span><span class="p">(</span><span class="n">p_num_phys_regs</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">p_pipe_subsets</span><span class="w"> </span><span class="p">({</span>
+<span class="w">    </span><span class="n">p_alu_subset</span><span class="p">,</span><span class="w">  </span><span class="c1">// ALU</span>
+<span class="w">    </span><span class="n">p_mul_subset</span><span class="p">,</span><span class="w">  </span><span class="c1">// Multiplier</span>
+<span class="w">    </span><span class="n">p_mdr_subset</span><span class="p">,</span><span class="w">  </span><span class="c1">// MulhDivRem</span>
+<span class="w">    </span><span class="n">p_mem_subset</span><span class="p">,</span><span class="w">  </span><span class="c1">// Memory</span>
+<span class="w">    </span><span class="n">p_ctrl_subset</span><span class="p">,</span><span class="w"> </span><span class="c1">// Control Flow</span>
+<span class="hll"><span class="w">    </span><span class="n">p_mul_subset</span><span class="w">   </span><span class="c1">// Second Multiplier</span>
+</span><span class="w">  </span><span class="p">})</span>
+<span class="p">)</span><span class="w"> </span><span class="n">DIU</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="p">.</span><span class="n">F</span><span class="w">          </span><span class="p">(</span><span class="n">f__d_intf</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">Ex</span><span class="w">         </span><span class="p">(</span><span class="n">d__x_intfs</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">complete</span><span class="w">   </span><span class="p">(</span><span class="n">complete_notif</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">squash_pub</span><span class="w"> </span><span class="p">(</span><span class="n">squash_arb_notif</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">squash_sub</span><span class="w"> </span><span class="p">(</span><span class="n">squash_gnt_notif</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">commit</span><span class="w">     </span><span class="p">(</span><span class="n">commit_notif</span><span class="p">),</span>
+<span class="w">  </span><span class="p">.</span><span class="o">*</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="instantiate-a-new-16-cycle-iterative-multiplier-iterativemultiplierl2-and-connect-it-to-the-interfaces-indicated-by-p-pipe-subsets">
+<h3>3. Instantiate a new 16-cycle iterative Multiplier (<code class="docutils literal notranslate"><span class="pre">IterativeMultiplierL2</span></code>), and connect it to the interfaces indicated by <code class="docutils literal notranslate"><span class="pre">p_pipe_subsets</span></code><a class="headerlink" href="#instantiate-a-new-16-cycle-iterative-multiplier-iterativemultiplierl2-and-connect-it-to-the-interfaces-indicated-by-p-pipe-subsets" title="Link to this heading"></a></h3>
+<p>If you added <code class="docutils literal notranslate"><span class="pre">p_mul_subset</span></code> to the end of the array, you’ll want to use
+<code class="docutils literal notranslate"><span class="pre">d__x_intfs[5]</span></code> and <code class="docutils literal notranslate"><span class="pre">x__w_intfs[5]</span></code> as your interfaces. Use the
+existing multiplier as an example!</p>
+<div class="toggle highlight-systemverilog notranslate"><div class="highlight"><pre><span></span><span class="n">IterativeMultiplierL2</span><span class="w"> </span><span class="p">#(</span>
+<span class="w">  </span><span class="p">.</span><span class="n">p_num_cycles</span><span class="w"> </span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+<span class="p">)</span><span class="w"> </span><span class="n">SECOND_MUL_XU</span><span class="w"> </span><span class="p">(</span>
+<span class="w">  </span><span class="p">.</span><span class="n">D</span><span class="w"> </span><span class="p">(</span><span class="n">d__x_intfs</span><span class="p">[</span><span class="mi">5</span><span class="p">]),</span>
+<span class="w">  </span><span class="p">.</span><span class="n">W</span><span class="w"> </span><span class="p">(</span><span class="n">x__w_intfs</span><span class="p">[</span><span class="mi">5</span><span class="p">]),</span>
+<span class="w">  </span><span class="p">.</span><span class="o">*</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="add-the-new-muliplier-to-the-trace-function-to-view-the-linetrace-output">
+<h3>4. Add the new muliplier to the <code class="docutils literal notranslate"><span class="pre">trace</span></code> function to view the linetrace output<a class="headerlink" href="#add-the-new-muliplier-to-the-trace-function-to-view-the-linetrace-output" title="Link to this heading"></a></h3>
+<p>Use the already added modules as an example of how to do it! You’ll
+probably want to add the linetrace between the control flow Execute Unit
+and the Writeback-Commit Unit, or possibly right after the first
+multiplier - up to you</p>
+<div class="toggle highlight-systemverilog notranslate"><div class="highlight"><pre><span></span><span class="no">`ifndef</span><span class="w"> </span><span class="n">SYNTHESIS</span>
+<span class="w">  </span><span class="k">function</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">FU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">DIU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">ALU_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">MUL_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">MULH_DIV_REM_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">MEM_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">CTRL_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="hll"><span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+</span><span class="hll"><span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">SECOND_MUL_XU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+</span><span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="s">&quot; | &quot;</span><span class="p">};</span>
+<span class="w">    </span><span class="n">trace</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">trace</span><span class="p">,</span><span class="w"> </span><span class="n">WCU</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="w"> </span><span class="n">trace_level</span><span class="w"> </span><span class="p">)};</span>
+<span class="w">  </span><span class="k">endfunction</span>
+<span class="no">`endif</span>
+</pre></div>
+</div>
+<p>That’s all of the changes we have to make! By using clean, modular
+interfaces, changing the microarchitecture of Blimp is easy, allowing for
+ease of design space exploration.</p>
+<p>To make sure that our modifications are syntactically correct, we can
+lint our design with Verilator (the following will lint the entire
+directory, including our modified processor):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>
+%<span class="w"> </span>./lint
+</pre></div>
+</div>
+<p>Having hopefully gotten no errors, we can now re-build our processor
+and run the unrolled <code class="docutils literal notranslate"><span class="pre">vvmul</span></code> on it, as well as dumping the linetrace
+for viewing</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>%<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="si">${</span><span class="nv">TOPDIR</span><span class="si">}</span>/build
+%<span class="w"> </span>make<span class="w"> </span>-j8<span class="w"> </span>vdemo-sim
+
+<span class="c1"># View the cycle count</span>
+%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo
+
+<span class="c1"># Dump and view the linetrace</span>
+%<span class="w"> </span>./vdemo-sim<span class="w"> </span>+elf<span class="o">=</span>app/demo<span class="w"> </span>+v<span class="w"> </span>&gt;<span class="w"> </span>trace.txt
+%<span class="w"> </span>vode<span class="w"> </span>trace.txt
+</pre></div>
+</div>
+<p>You should hopefully see a significant improvement compared to before,
+due to being able to have two multiplier in-flight at the same time! See
+if you can find an example in the linetrace where this occurs</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../../fpga/network/" class="btn btn-neutral float-left" title="Memory Network" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../quartus_demo/" class="btn btn-neutral float-right" title="Colossal Cave Demo" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Aidan McNay.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
