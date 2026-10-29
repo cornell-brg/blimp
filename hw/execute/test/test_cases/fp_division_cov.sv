@@ -7,48 +7,48 @@ class fp_division_cov;
 
   covergroup cg @(posedge divCov.clk);
 
-  internal_ground : coverpoint divCov.internal_ground
+  internal_ground : coverpoint divCov.sign
   {
       bins zero = { 0 };
       bins one = { 1 };
   }
 
-  internal_sticky : coverpoint divCov.internal_sticky
+  internal_sticky : coverpoint divCov.exp
   {
       bins zero = { 0 };
       bins one = { 1 };
   }
 
-  internal_roundb : coverpoint divCov.internal_roundb
+  internal_roundb : coverpoint divCov.mant
   {
       bins zero = { 0 };
       bins one = { 1 };
   }
 
-  internal_last_bit_mantissa : coverpoint divCov.internal_last_bit_mantissa
+  internal_last_bit_mantissa : coverpoint divCov.gaurd
   {
       bins zero = { 0 };
       bins one = { 1 };
   }
 
-  internal_denorm_one : coverpoint divCov.internal_denorm_one
+  internal_denorm_one : coverpoint divCov.round
   {
       bins not_denorm = { 0 };
       bins is_denorm = { 1 };
   }
 
-  internal_denorm_two : coverpoint divCov.internal_denorm_two
+  internal_denorm_two : coverpoint divCov.sticky
   {
       bins not_denorm = { 0 };
       bins is_denorm = { 1 };
   }
 
-  internal_nan_one : coverpoint divCov.internal_nan_one
+  internal_nan_one : coverpoint divCov.round_result
   {
       bins not_nan = { 0 };
       bins is_nan = { 1 };
   }
-
+//FINISH INTERNAL SIGNALS
   internal_nan_two : coverpoint divCov.internal_nan_two
   {
       bins not_nan = { 0 };
