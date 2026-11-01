@@ -1,7 +1,7 @@
 //========================================================================
 // fp_test_cases.v
 //========================================================================
-// Author: Sumaia Jewena, Rohan Kalluraya
+// Author: Ritika Roy, Alina Lee
 //========================================================================
 
 `ifndef FP_TEST_CASES_V
@@ -10,7 +10,7 @@
 //----------------------------------------------------------------------
 // test_case_fp_basic
 //----------------------------------------------------------------------
-// Integer addition test cases
+// Float division test cases
 //----------------------------------------------------------------------
 task test_case_fp_basic();
   t.test_case_begin("test_case_fp_basic");
@@ -18,22 +18,20 @@ task test_case_fp_basic();
   fork
     begin
       //   pc  seq_num op1     op2     waddr uop
-      /*
-      send('0, 0,      32'h3f800000,  32'h40000000,  5'h1, OP_FADD_S); // 1.0 + 2.0 = 3.0
-      send('1, 1,      32'h40b00000,  32'h40100000,  5'h4, OP_FADD_S); // 5.5 + 2.25 = 7.75
-      send('0, 2,      32'h41200000,  32'h3f000000,  5'h4, OP_FADD_S); // 10.0 + 0.5 = 10.5
-      send('1, 3,      32'h42c80000,  32'h41a00000,  5'h2, OP_FADD_S); // 100.0 + 20.0 = 120.0
-      */
+      send('0, 0,      32'h40c00000,  32'h40000000,  5'h2, OP_FDIV_S); // 6.0 / 2.0 = 3.0
+      send('1, 1,      32'h40a00000,  32'h3f800000,  5'h4, OP_FDIV_S); // 5.0 + 1.0 = 5.0
+      send('0, 2,      32'h41200000,  32'h3f000000,  5'h4, OP_FDIV_S); // 10.0 / 0.5 = 2.0
+      send('1, 3,      32'h42c80000,  32'h41a00000,  5'h2, OP_FDIV_S); // 100.0 / 20.0 = 5.0
+      
     end
 
     begin
       //   pc  seq_num waddr wdata        wen
-      /*
-      recv('0, 0,      5'h1,  32'h40400000, 1); // 3.0
-      recv('1, 1,      5'h4,  32'h40f80000, 1); // 7.75
-      recv('0, 2,      5'h4,  32'h41280000, 1); // 10.5
-      recv('1, 3,      5'h2,  32'h42f00000, 1); // 120.0
-      */
+      recv('0, 0,      5'h2,  32'h40400000, 1); // 3.0
+      recv('1, 1,      5'h4,  32'h40a00000, 1); // 5.0
+      recv('0, 2,      5'h4,  32'h41a00000, 1); // 20.0
+      recv('1, 3,      5'h2,  32'h40a00000, 1); // 5.0
+      
     end
 
   join
@@ -51,27 +49,38 @@ task test_case_fp_rounding();
 
   fork
     begin
-      // Checks rounding down (small additions)
-      /*
-      send('1, 5, 32'h3f800000, 32'h33800000, 5'h2, OP_FADD_S); // 1.0 + 2^-24
-      send('1, 7, 32'h40000000, 32'h33800000, 5'h4, OP_FADD_S); // 2.0 + 2^-24
+      //   pc  seq_num op1     op2     waddr uop
+      //Round up
+      send('0, 0, 32'h3f800000, 32'h40400000, 5'h2, OP_FDIV_S); // 1.0  / 3.0
+      send('1, 1, 32'h40000000, 32'h40400000, 5'h2, OP_FDIV_S); // 2.0  / 3.0
+      send('0, 2, 32'h3f800000, 32'h41200000, 5'h3, OP_FDIV_S); // 1.0 / 10.0
+      send('1, 3, 32'h3f800000, 32'h40a00000, 5'h4, OP_FDIV_S); // 1.0 / 5.0
       
       // Checks rounding up
-      send('0, 6, 32'h3f800000, 32'h34000000, 5'h3, OP_FADD_S); // 1.0 + 2^-23
-      send('0, 0, 32'h3f800000, 32'h34a00000, 5'h1, OP_FADD_S); // 1.0 + 1.78813934e-7 = 1.000000178813934 (expected result but gets rounded up)
-     */
+      send('0, 6, 32'h42c800000, 32'h40400000, 5'h5, OP_FDIV_S); // 1.0 + 2^-23
+      send('1, 5, 32'h40a00000, 32'h40400000, 5'h6, OP_FDIV_S); // 5.0 / 3.0
+      send('0, 6, 32'h40e00000, 32'h40400000, 5'h7, OP_FDIV_S); // 7.0 / 3.0
+    
+      // Exact answer, NO rounding needed (should stay clean)
+      send('1, 7, 32'h3f800001, 32'h3f800000, 5'h8, OP_FDIV_S); // 1.0000001 / 1.0
+
     end
 
     begin 
-      // Checks rounding down (small additions)
-      /*
-      recv('1, 5, 5'h2, 32'h3f800000, 1); // 1.0
-      recv('1, 7, 5'h4, 32'h40000000, 1); // 2.0 
-      
-      // Checks rounding up
-      recv('0, 6, 5'h3, 32'h3f800001, 1); // 1.0000002384
-      recv('0, 0, 5'h1, 32'h3f800002, 1); // 1.000000238418579 
-      */
+      //   pc  seq_num waddr wdata          wen
+      // Round UP
+      recv('0, 0, 5'h1, 32'h3eaaaaab, 1); // 0.33333334
+      recv('1, 1, 5'h2, 32'h3f2aaaab, 1); // 0.6666667
+      recv('0, 2, 5'h3, 32'h3dcccccd, 1); // 0.1
+      recv('1, 3, 5'h4, 32'h3e4ccccd, 1); // 0.2
+
+      // Round DOWN
+      recv('0, 4, 5'h5, 32'h42055555, 1); // 33.333332
+      recv('1, 5, 5'h6, 32'h3fd55555, 1); // 1.6666666
+      recv('0, 6, 5'h7, 32'h40155555, 1); // 2.3333333
+
+      // Exact
+      recv('1, 7, 5'h8, 32'h3f800001, 1); // 1.0000001
     end
 
   join
@@ -85,35 +94,43 @@ task test_case_edge();
 
   fork
     begin
-        /*
-      // Almost subtracting equal numbers
-      send('0, 0, 32'h3f800000, 32'hbf7fffff, 5'h1, OP_FADD_S); // 1.0 + (-0.99999994)
+      //   pc  seq_num waddr wdata          wen
 
-      // One input dominates; tests right-shift alignment path
-      send('1, 1, 32'h42c80000, 32'h00000001, 5'h4, OP_FADD_S); // 100.0 + 1e-20 
+      // Number divided by itseof (100.0 / 100.0)
+      send('0, 0, 32'h42c80000, 32'h42c80000, 5'h1, OP_FDIV_S);
 
-      // Mantissa overflow; normalization after addition pushes result to next exponent
-      send('0, 2, 32'h3fc00000, 32'h3fc00000, 5'h4, OP_FADD_S); // 1.5 + 1.5
+      // Number divided by 1.0 (100.0 / 1.0)
+      send('1, 1, 32'h42c80000, 32'h3f800000, 5'h2, OP_FDIV_S);  
 
-      // Mantisa underflow; forces left-shift normalization
-      send('1, 3, 32'h00800000, 32'h00400000, 5'h2, OP_FADD_S); // smallest normals
-      */
+      // Number divided by smaller than dividsor NORMALIZE shift (1.5 / 3.0)
+      send('0, 2, 32'h3fc00000, 32'h40400000, 5'h3, OP_FDIV_S); 
+
+      // Divide by zero = infinity (ASK ABOUT BEHAVIOR NAN or Infinity) (5.0 / 0.0)
+      send('1, 3, 32'h40a00000, 32'h00000000, 5'h4, OP_FDIV_S); 
+
+      // Zero divided by a number = zero (0.0 / 5.0)
+      send('0, 4, 32'h00000000, 32'h40a00000, 5'h5, OP_FDIV_S); 
+
+      // Zero divided by zero = NaN (0.0 / 0.0)
+      send('1, 5, 32'h00000000, 32'h00000000, 5'h6, OP_FDIV_S); 
+
+      // Result too big = infinity overflow (2^31 - 2^23 - 1 / 0.5 = OVERFLOW)
+      send('0, 6, 32'h7f7fffff, 32'h3f000000, 5'h7, OP_FDIV_S); // biggest float / 0.5
+
+      // Result too small = zero underflow (smallest normal / 4.0)
+      send('1, 7, 32'h00800000, 32'h40800000, 5'h8, OP_FDIV_S); // smallest normal / 4.0
     end
 
     begin
-        /*
-      // // Almost subtracting equal numbers
-      recv('0, 0,      5'h1, 32'h33800000, 1); // ~2^-24
-
-      // One input dominates; tests right-shift alignment path
-      recv('1, 1,      5'h4, 32'h42c80000, 1); // 100.0 
-
-      // Mantissa overflow
-      recv('0, 2,      5'h4, 32'h40400000, 1); // 3.0
-
-      // Mantissa underflow
-      recv('1, 3,      5'h2, 32'h00c00000, 1);
-      */
+      //   pc  seq_num waddr wdata          wen
+      recv('0, 0, 5'h1, 32'h3f800000, 1); // 1.0
+      recv('1, 1, 5'h2, 32'h42c80000, 1); // 100.0
+      recv('0, 2, 5'h3, 32'h3f000000, 1); // 0.5
+      recv('1, 3, 5'h4, 32'h7f800000, 1); // +infinity (ASK)
+      recv('0, 4, 5'h5, 32'h00000000, 1); // 0.0
+      recv('1, 5, 5'h6, 32'h7fc00000, 1); // NaN
+      recv('0, 6, 5'h7, 32'h7f800000, 1); // +infinity (ASK)
+      recv('1, 7, 5'h8, 32'h00000000, 1); // 0.0
 
     end
 
@@ -122,54 +139,44 @@ task test_case_edge();
 t.test_case_end();
 endtask
 
-task test_case_subtraction();
-  t.test_case_begin("test_case_subtraction");
-  if (!t.run_test) return;
-
-  fork
-    begin
-      //send('0, 0, 32'h40F00000, 32'h40100000, 5'h1, OP_FSUB_S); // 7.5 - 2.25 = 5.25
-    end
-
-    begin
-      //recv('0, 0, 5'h1, 32'h40A80000, 1); // 5.25
-    end
-  join
-
-t.test_case_end();
-endtask
 
 task test_case_fp_subnormal();
   t.test_case_begin("test_fp_subnormal");
   if(!t.run_test) return;
 
+
   fork
     begin
-     
-      //   pc        seq_num  op1(hex)       op2(hex)  waddr  uop
-      // normal positive + normal negative = subnormal
-      // 1.00000000e−38 − 0.99999994e−38 = 6e−46  (subnormal)
-      // send('h0000_0010, 0, 32'h0C2CF0C0, 32'h8C2CF0BC, 5'h1, OP_FADD_S);
-      // //subnormal + subnormal = subnormal
-      // // 3e-45 + 2e-45 = 5e-45
-      // send('h0000_0014, 1, 32'h00000003, 32'h00000002, 5'h2, OP_FADD_S);
-      // //subnomral + subnormal = normal
-      // // 1.0e-38 (large subnormal) + 1.0e-38 = 2.0e-38 (normal)
-      // send('h0000_0018, 2, 32'h007FFFFF, 32'h007FFFFF, 5'h3, OP_FADD_S);
-      //   pc  seq_num op1     op2     waddr uop
-      //send('0, 0,      32'h00700000,  32'h00700000,  5'h1, OP_FADD_S); // 0.875 + 0.875 * (2^-126)
-      //send('1, 1,      32'h80700000,  32'h80700000,  5'h2, OP_FADD_S); // -0.875 - 0.875 * (2^-126)
-      // send('0, 0,      32'h00000000,  32'h00009000,  5'h2, OP_FADD_S); // 0.875 - 0.75 * (2^-126)
+      //   pc  seq_num op1           op2           waddr uop
 
+      // Group 1: normal inputs, result is too small (should already pass)
+      send('0, 0, 32'h00800000, 32'h40000000, 5'h1, OP_FDIV_S); // 2^-126 / 2
+      send('1, 1, 32'h00800000, 32'h40800000, 5'h2, OP_FDIV_S); // 2^-126 / 4
+      send('0, 2, 32'h80800000, 32'h40000000, 5'h3, OP_FDIV_S); // -2^-126 / 2 (keeps the minus sign)
+      send('1, 3, 32'h00800000, 32'h7f000000, 5'h4, OP_FDIV_S); // 2^-126 / 2^127, far too small
+
+      // Group 2: subnormal inputs (will fail until the RTL fix below)
+      send('0, 4, 32'h00400000, 32'h40000000, 5'h5, OP_FDIV_S); // subnormal / 2
+      send('1, 5, 32'h007fffff, 32'h3f800000, 5'h6, OP_FDIV_S); // largest subnormal / 1
+      send('0, 6, 32'h3f800000, 32'h00400000, 5'h7, OP_FDIV_S); // 1 / subnormal
+      send('1, 7, 32'h00000003, 32'h00000002, 5'h8, OP_FDIV_S); // subnormal / subnormal
+      send('0, 8, 32'h80400000, 32'h40000000, 5'h9, OP_FDIV_S); // -subnormal / 2
     end
 
     begin
-        //Merge conflict testing comment
-      // recv('h0000_0010, 0, 5'h1, 32'h80000000, 1); // subnormal ≈ 6e−46
-      // recv('h0000_0014, 1, 5'h2, 32'h80000000, 1); // 5e−45 subnormal
-      //recv('0, 0, 5'h1, 32'h00e00000, 1); // 1.75 * (2^-126)
-      //recv('1, 1, 5'h2, 32'h80e00000, 1); // -1.75 * (2^-126)
-      // recv('0, 0, 5'h2, 32'h00000000, 1); // underflow
+      //   pc  seq_num waddr wdata          wen
+      // Group 1
+      recv('0, 0, 5'h1, 32'h00000000, 1); // flushed to +0
+      recv('1, 1, 5'h2, 32'h00000000, 1); // flushed to +0
+      recv('0, 2, 5'h3, 32'h80000000, 1); // flushed to -0
+      recv('1, 3, 5'h4, 32'h00000000, 1); // +0
+
+      // Group 2 (subnormal inputs treated as zero)
+      recv('0, 4, 5'h5, 32'h00000000, 1); // 0 / 2 = 0
+      recv('1, 5, 5'h6, 32'h00000000, 1); // 0 / 1 = 0
+      recv('0, 6, 5'h7, 32'h7f800000, 1); // 1 / 0 = +inf
+      recv('1, 7, 5'h8, 32'h7fc00000, 1); // 0 / 0 = NaN
+      recv('0, 8, 5'h9, 32'h80000000, 1); // -0 / 2 = -0
     end
   join
   t.test_case_end();
@@ -474,9 +481,9 @@ endtask
 task run_fp_test_cases();
   test_case_fp_basic();
   test_case_fp_rounding();
-  test_case_edge();
-  test_case_subtraction();
-  test_case_fp_subnormal();
+  // test_case_edge();
+  // test_case_subtraction();
+  // test_case_fp_subnormal();
   // test_case_fp_extremes();
   // test_case_fp_normal();
 endtask
