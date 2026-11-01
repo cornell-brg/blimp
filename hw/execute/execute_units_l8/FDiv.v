@@ -349,11 +349,11 @@ module FDiv (
   
   always_comb begin 
     next_quotient_normalized = quotient;
-    next_exp_normalized = exp_calc;
+    next_exp_normalized = exp_reg;
     if(cur_state == NORMALIZE) begin
       if(quotient[25] == 1'b0) begin
         next_quotient_normalized = quotient << 1;
-        next_exp_normalized = exp_calc - 1;
+        next_exp_normalized = exp_reg - 1;
       end
     end
   end
@@ -378,8 +378,8 @@ module FDiv (
   // Outputs
   //----------------------------------------------------------------------
 
-  assign D.rdy = W.rdy | !D_reg.val;
-  assign W.val = D_reg.val;
+  assign D.rdy = W_xfer  || !D_reg.val;
+  assign W.val = D_reg.val && (cur_state == DONE);
 
   assign W.pc      = D_reg.pc;
   assign W.seq_num = D_reg.seq_num;

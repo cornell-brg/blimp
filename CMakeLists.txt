@@ -52,6 +52,7 @@ set(V_TEST_FILES
   hw/writeback_commit/test/WritebackCommitUnitL2_test.v
   hw/writeback_commit/test/WritebackCommitUnitL3_test.v
   hw/writeback_commit/test/ROB_test.v
+  hw/execute/test/l8/FDiv_test.v
 )
 
 set(ASM_FILES
