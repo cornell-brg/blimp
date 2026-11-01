@@ -7,6 +7,7 @@ class fp_division_cov;
 
   covergroup cg @(posedge divCov.clk);
 
+  // Rounding
   internal_ground : coverpoint divCov.internal_ground
   {
       bins zero = { 0 };
@@ -31,6 +32,7 @@ class fp_division_cov;
       bins one = { 1 };
   }
 
+  // Special types of inputs: Denormal, Underflow, NaN, Inf, Zero
   internal_denorm_one : coverpoint divCov.internal_denorm_one
   {
       bins not_denorm = { 0 };
@@ -41,6 +43,12 @@ class fp_division_cov;
   {
       bins not_denorm = { 0 };
       bins is_denorm = { 1 };
+  }
+
+  underflow : coverpoint divCov.underflow
+  {
+    bins zero = {0}; //no underflow
+    bins one = {1}; //underflow
   }
 
   internal_nan_one : coverpoint divCov.internal_nan_one
@@ -55,30 +63,6 @@ class fp_division_cov;
       bins is_nan = { 1 };
   }
 
-  internal_signed_exponent_one : coverpoint divCov.signed_exponent_one
-  {
-      bins zero        = {9'b0};                 // all zeros
-      bins pos_small   = {[9'b000000001:9'b000001111]}; // magnitude 1–15
-      bins pos_medium  = {[9'b000010000:9'b011111111]}; // magnitude 16–255
-      bins neg_small   = {[9'b100000001:9'b100001111]}; // magnitude 1–15
-      bins neg_medium  = {[9'b100010000:9'b111111111]}; // magnitude 16–255
-  }
-
-  internal_signed_exponent_two : coverpoint divCov.signed_exponent_two
-  {
-      bins zero        = {9'b0};                 // all zeros
-      bins pos_small   = {[9'b000000001:9'b000001111]}; // magnitude 1–15
-      bins pos_medium  = {[9'b000010000:9'b011111111]}; // magnitude 16–255
-      bins neg_small   = {[9'b100000001:9'b100001111]}; // magnitude 1–15
-      bins neg_medium  = {[9'b100010000:9'b111111111]}; // magnitude 16–255
-  }
-
-  underflow : coverpoint divCov.underflow
-  {
-    bins zero = {0}; //no underflow
-    bins one = {1}; //underflow
-  }
-
   is_inf1_cp : coverpoint divCov.is_inf_one {
     bins no_inf = {0};
     bins inf    = {1};
@@ -89,6 +73,57 @@ class fp_division_cov;
       bins inf    = {1};
   }
 
+  zero1_cp : coverpoint divCov.zero_one {
+      bins not_zero = {0};
+      bins is_zero = {1};
+  }
+
+  zero2_cp : coverpoint divCov.zero_two {
+      bins not_zero = {0};
+      bins is_zero = {1};
+  }
+
+  // Exponent ranges (bias of 127)
+  internal_biased_exponent_one : coverpoint divCov.signed_exponent_one
+  {
+      bins zero        = {8'b0};                 // all zeros, denorm
+      bins neg_large   = {[8'b00000001:8'b00111111]}; // magnitude 1–191 (-126 to -64)
+      bins neg_small  = {[8'b01000000:8'b01111111]}; // magnitude 16–127 (-63 to 0)
+      bins pos_small   = {[8'b10000001:8'b10001111]}; // magnitude 128-191 (1-64)
+      bins pos_large  = {[8'b10010000:8'b11111110]}; // magnitude 192-254 (65-127)
+      bins one =       = {8'hFF}; // all ones, inf/nan
+  }
+
+  internal_biased_exponent_two : coverpoint divCov.signed_exponent_two
+  {
+      bins zero        = {8'b0};                 // all zeros, denorm
+      bins neg_large   = {[8'b00000001:8'b00111111]}; // magnitude 1–191 (-126 to -64)
+      bins neg_small  = {[8'b01000000:8'b01111111]}; // magnitude 16–127 (-63 to 0)
+      bins pos_small   = {[8'b10000001:8'b10001111]}; // magnitude 128-191 (1-64)
+      bins pos_large  = {[8'b10010000:8'b11111110]}; // magnitude 192-254 (65-127)
+      bins one =       = {8'hFF}; // all ones, inf/nan
+  }
+
+  //Mantissa ranges
+  internal_mantissa_one : coverpoint divCov.mantissa_one
+  {
+      bins zero        = {23'b0};                 // all zeros
+      bins mag_low   = {[23'h000001:23'h2AAAAA]}; // magnitude 1st third
+      bins mag_medium  = {[23'h2AAAAB:23'h555554]}; // magnitude 2nd third
+      bins mag_high   = {[23'h555555:23'h7FFFFE]}; // magnitude 3rd third
+      bins one  = {23'h7FFFFF}; // all ones
+  }
+
+  internal_mantissa_two : coverpoint divCov.mantissa_two
+  {
+      bins zero        = {23'b0};                 // all zeros
+      bins mag_low   = {[23'h000001:23'h2AAAAA]}; // magnitude 1st third
+      bins mag_medium  = {[23'h2AAAAB:23'h555554]}; // magnitude 2nd third
+      bins mag_high   = {[23'h555555:23'h7FFFFE]}; // magnitude 3rd third
+      bins one  = {23'h7FFFFF}; // all ones
+  }
+
+  //Positive and negative signs
   sign1_cp : coverpoint divCov.sign_one {
       bins pos = {0};
       bins neg = {1};
@@ -98,8 +133,6 @@ class fp_division_cov;
       bins pos = {0};
       bins neg = {1};
   }
-
-  //TODO mantissa bits, zero.
 
   // Crosses must match coverpoint labels and end with semicolon
   mantissa_rounding : cross internal_last_bit_mantissa, internal_ground; // for rounding
