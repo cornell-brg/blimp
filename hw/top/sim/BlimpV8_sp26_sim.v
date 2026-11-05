@@ -4,6 +4,18 @@
 // A module for simulating BlimpV8
 
 `include "asm/assemble.v"
+<<<<<<< HEAD
+=======
+`include "intf/mem_intf.sv"
+`include "intf/mem_net_req.sv"
+`include "intf/mem_net_resp.sv"
+`include "top/sp26/rtl/tapein1/mem_xbar.sv"
+
+`include "sram/SRAMMem.v"
+
+`include "fpga/net/MemNetReq.v"
+`include "fpga/net/MemNetResp.v"
+>>>>>>> origin/blimp-v9-infra/rtl
 `include "hw/top/BlimpV8_sp26.v"
 `include "hw/top/sim/utils/SimUtils.v"
 `include "intf/MemIntf.v"

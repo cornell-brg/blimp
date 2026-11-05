@@ -25,6 +25,7 @@ interface CommitNotif
   logic [31:0] wdata;
   logic        wen;
   logic        val;
+  logic        is_fp;
 
   // verilator lint_off UNUSEDSIGNAL
 
@@ -48,6 +49,8 @@ interface CommitNotif
     output wdata,
     output wen,
     output val,
+    output is_fp,
+
 
     // v2
     output seq_num,
@@ -63,6 +66,7 @@ interface CommitNotif
     input wdata,
     input wen,
     input val,
+    input is_fp,
 
     // v2
     input seq_num,

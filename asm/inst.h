@@ -26,8 +26,6 @@ enum inst_name_t {
   SRA,
   SRL,
   SLL,
-  FADD_S,
-  FSUB_S,
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // Register-Immediate Arithmetic
@@ -98,6 +96,20 @@ enum inst_name_t {
   CSRRW,
   CSRRS,
   CSRRC,
+
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  // Floating Point
+  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  FADD_S,
+  FSUB_S,
+  FMUL_S,
+  FLW,
+  FSW,
+  FSGNJ_S,
+  FCVT_W_S,
+  FMV_X_W,
+  FMV_W_X
+  
 };
 
 typedef struct {
@@ -197,7 +209,29 @@ const inst_spec_t inst_specs[] = {
     { CSRRW,  "csrrw   rd, csr, rs1",  0x00001073, 0x0000707F }, 
     { CSRRS,  "csrrs   rd, csr, rs1",  0x00002073, 0x0000707F }, 
     { CSRRC,  "csrrc   rd, csr, rs1",  0x00003073, 0x0000707F }, 
-};
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Floating Point
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    { FADD_S,   "fadd.s   frd, frs1, frs2", 0x00000053, 0xFE00007F },
+    { FSUB_S,   "fsub.s   frd, frs1, frs2", 0x08000053, 0xFE00007F },
+    { FMUL_S,   "fmul.s   frd, frs1, frs2", 0x10000053, 0xFE00007F },
+
+    // flw: FP destination, INT base register
+    { FLW,      "flw      frd, imm_i(rs1)", 0x00002007, 0x0000707F },
+
+    // fsw: FP source, INT base register
+    { FSW,      "fsw      frs2, imm_s(rs1)", 0x00002027, 0x0000707F },
+
+    { FSGNJ_S,  "fsgnj.s  frd, frs1, frs2", 0x20000053, 0xFE00707F },
+
+    // fcvt.w.s: INT destination, FP source
+    { FCVT_W_S, "fcvt.w.s rd,  frs1",       0xC0000053, 0xFE00007F },
+
+    // moves:
+    { FMV_X_W,  "fmv.x.w  rd,  frs1",       0xE0000053, 0xFFF0707F },
+    { FMV_W_X,  "fmv.w.x  frd, rs1",        0xF0000053, 0xFFF0707F },
+  };
 
 //------------------------------------------------------------------------
 // Parse a given assembly into tokens

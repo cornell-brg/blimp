@@ -1,10 +1,10 @@
 # ========================================================================
 # CMakeLists.txt
 # ========================================================================
-# Specifying the files to build "hello"
+# Specifying the files to build "fp"
 
 set(APP_FILES
-  fp.cpp
+  fp.s
   PARENT_SCOPE
 )
 

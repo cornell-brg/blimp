@@ -1,5 +1,5 @@
 //========================================================================
-// BlimpV9_sim.v
+// BlimpV9_sim.v 
 //========================================================================
 // A module for simulating BlimpV9
 
@@ -49,6 +49,7 @@ module BlimpV9_sim;
     .inst_mem   (mem_intf[0]),
     .data_mem   (mem_intf[1]),
     .inst_trace (inst_trace_notif),
+    .debug_stall  (1'b0),
     .*
   );
 

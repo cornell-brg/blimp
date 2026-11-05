@@ -1,5 +1,5 @@
 //========================================================================
-// FLProc.h
+// FLProc.cpp
 //========================================================================
 // Definitions for our functional-level processor
 
@@ -7,8 +7,11 @@
 #include "asm/inst.h"
 #include "fl/FLProc.h"
 #include "fl/parse_elf.h"
+#include "fl/fl_fp_helpers.h"
 #include <format>
+#include <limits>
 #include <iostream>
+#include <cmath>
 #include <stdexcept>
 
 //------------------------------------------------------------------------
@@ -387,7 +390,7 @@ FLTrace FLProc::step()
       // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       // bne
       // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
+ 
     case BNE:
       if ( regs[inst.rs1()] != regs[inst.rs2()] ) {
         pc = pc + inst.imm_b();
@@ -466,8 +469,13 @@ FLTrace FLProc::step()
       // NOP
 
     case ECALL:
-      throw std::invalid_argument(
-          "No surrounding instruction environment" );
+      // Handle exit syscall (a7 = 93)
+      if (regs[17] == 93) {  // a7 is x17
+        // Exit with code in a0 (x10)
+        std::exit(regs[10]);
+      }
+      pc = pc + 4;
+      return FLTrace(inst_pc, 0, 0, 0);
 
       // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
       // ebreak
@@ -601,6 +609,155 @@ FLTrace FLProc::step()
       pc = pc + 4;
       return FLTrace( inst_pc, inst.rd(), regs[inst.rd()],
                       inst.rd() != 0 );
+
+      // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+      // floating point
+      // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    case FADD_S:
+      {
+        uint32_t rs1_val = fp_regs[inst.rs1()];
+        uint32_t rs2_val = fp_regs[inst.rs2()];
+        uint32_t result  = fadd_s_bits( rs1_val, rs2_val );
+
+        fp_regs[inst.rd()] = result;
+
+        fprintf( stderr,
+                "[FADD.S] f%d (0x%08x) + f%d (0x%08x) = f%d (0x%08x)\n",
+                inst.rs1(), rs1_val,
+                inst.rs2(), rs2_val,
+                inst.rd(),  result );
+
+        pc += 4;
+        // NOTE: FLTrace is “integer-reg oriented” in your sim, but ok if you're
+        // just using it as a generic “something wrote rd”.
+        return FLTrace( inst_pc, inst.rd(), result, inst.rd() != 0 );
+      }
+
+    case FSUB_S:
+      {
+        uint32_t rs1_val = fp_regs[inst.rs1()];
+        uint32_t rs2_val = fp_regs[inst.rs2()];
+        uint32_t result  = fsub_s_bits( rs1_val, rs2_val );
+
+        fp_regs[inst.rd()] = result;
+
+        fprintf( stderr,
+                "[FSUB.S] f%d (0x%08x) - f%d (0x%08x) = f%d (0x%08x)\n",
+                inst.rs1(), rs1_val,
+                inst.rs2(), rs2_val,
+                inst.rd(),  result );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), result, inst.rd() != 0 );
+      }
+
+    case FLW:
+      {
+        uint32_t addr  = regs[inst.rs1()] + inst.imm_i();   // I-type imm
+        uint32_t value = mem.loadw( addr );
+
+        fp_regs[inst.rd()] = value;
+
+        fprintf( stderr, "[FLW] f%d = mem[0x%08x] = 0x%08x\n",
+                inst.rd(), addr, value );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), value, inst.rd() != 0 );
+      }
+
+    case FSW:
+      {
+        uint32_t addr  = regs[inst.rs1()] + inst.imm_s();   // S-type imm
+        uint32_t value = fp_regs[inst.rs2()];               // rs2 is FP source
+
+        mem.storew( addr, value );
+
+        fprintf( stderr, "[FSW] f%d (0x%08x) -> mem[0x%08x]\n",
+                inst.rs2(), value, addr );
+
+        pc += 4;
+        return FLTrace( inst_pc, 0, 0, 0 );
+      }
+
+    case FSGNJ_S:
+      {
+        // rd = { sign(rs2), magnitude(rs1) }
+        uint32_t rs1_val = fp_regs[inst.rs1()];
+        uint32_t rs2_val = fp_regs[inst.rs2()];
+
+        uint32_t sign_bit  = rs2_val & 0x80000000;
+        uint32_t magnitude = rs1_val & 0x7FFFFFFF;
+        uint32_t result    = sign_bit | magnitude;
+
+        fp_regs[inst.rd()] = result;
+
+        fprintf( stderr,
+                "[FSGNJ.S] f%d (0x%08x), f%d (0x%08x) -> f%d (0x%08x)\n",
+                inst.rs1(), rs1_val,
+                inst.rs2(), rs2_val,
+                inst.rd(),  result );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), result, inst.rd() != 0 );
+      }
+
+    case FCVT_W_S:
+      {
+        uint32_t a_bits = fp_regs[inst.rs1()];
+        float    a      = bits_to_float( a_bits );
+
+        int32_t result;
+
+        // RISC-V says invalid/out-of-range -> "integer indefinite" (0x80000000)
+        if ( std::isnan(a) || std::isinf(a) ||
+            a > (float)std::numeric_limits<int32_t>::max() ||
+            a < (float)std::numeric_limits<int32_t>::min() )
+        {
+          result = (int32_t)0x80000000;
+        }
+        else
+        {
+          // RTZ (round toward zero) for FCVT.W.S if rm=rtz
+          result = (int32_t)a;
+        }
+
+        regs[inst.rd()] = (uint32_t)result;
+
+        fprintf( stderr,
+                "[FCVT.W.S] f%d (0x%08x -> %f) -> x%d (0x%08x)\n",
+                inst.rs1(), a_bits, a,
+                inst.rd(),  regs[inst.rd()] );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), regs[inst.rd()], inst.rd() != 0 );
+      }
+
+    case FMV_X_W:
+      {
+        // Move raw 32b bits from fp reg to int reg (no conversion)
+        uint32_t bits = fp_regs[inst.rs1()];
+        regs[inst.rd()] = bits;
+
+        fprintf( stderr, "[FMV.X.W] f%d (0x%08x) -> x%d (0x%08x)\n",
+                inst.rs1(), bits, inst.rd(), regs[inst.rd()] );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), regs[inst.rd()], inst.rd() != 0 );
+      }
+
+    case FMV_W_X:
+      {
+        // Move raw 32b bits from int reg to fp reg (no conversion)
+        uint32_t bits = regs[inst.rs1()];
+        fp_regs[inst.rd()] = bits;
+
+        fprintf( stderr, "[FMV.W.X] x%d (0x%08x) -> f%d (0x%08x)\n",
+                inst.rs1(), bits, inst.rd(), fp_regs[inst.rd()] );
+
+        pc += 4;
+        return FLTrace( inst_pc, inst.rd(), fp_regs[inst.rd()], inst.rd() != 0 );
+      }
 
     default:
       std::string excp =

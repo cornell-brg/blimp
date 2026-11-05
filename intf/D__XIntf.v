@@ -36,6 +36,7 @@ interface D__XIntf
   rv_uop        uop;
   logic         val;
   logic         rdy;
+  logic         is_fp;
 
   // verilator lint_off UNUSEDSIGNAL
 
@@ -62,6 +63,7 @@ interface D__XIntf
     output uop,
     output waddr,
     output val,
+    output is_fp,
     input  rdy,
 
     // v2
@@ -82,6 +84,7 @@ interface D__XIntf
     input  uop,
     input  waddr,
     input  val,
+    input  is_fp,
     output rdy,
 
     // v2

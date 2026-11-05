@@ -38,6 +38,7 @@ class FLProc {
  protected:
   uint32_t  pc;
   FLRegfile regs;
+  FLRegfile fp_regs;
   FLMem     mem;
 
   // Peripherals

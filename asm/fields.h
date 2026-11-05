@@ -25,6 +25,15 @@ std::string get_rs1_id( uint32_t binary );
 std::string get_rs2_id( uint32_t binary );
 std::string get_rd_id( uint32_t binary );
 
+// Floating-point Register Specifiers
+uint32_t frs1_mask( const std::string& reg_name );
+uint32_t frs2_mask( const std::string& reg_name );
+uint32_t frd_mask ( const std::string& reg_name );
+
+std::string get_frs1_id( uint32_t binary );
+std::string get_frs2_id( uint32_t binary );
+std::string get_frd_id ( uint32_t binary );
+
 //------------------------------------------------------------------------
 // Immediate Specifiers
 //------------------------------------------------------------------------
@@ -73,4 +82,4 @@ uint32_t succ_mask( const std::string& mem_spec );
 std::string get_pred_id( uint32_t binary );
 std::string get_succ_id( uint32_t binary );
 
-#endif  // FIELDSS_H
+#endif  // FIELDS_H

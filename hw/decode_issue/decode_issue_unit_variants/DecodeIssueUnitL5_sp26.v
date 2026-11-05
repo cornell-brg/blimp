@@ -1,13 +1,15 @@
 //========================================================================
-// DecodeIssueUnitL5.v
+// DecodeIssueUnitL5.v 
 //========================================================================
 // An in-order, single-issue decoder with register renaming
 
 `ifndef HW_DECODEISSUE_DECODEISSUEUNITVARIANTS_DECODEISSUEUNITL5_V
 `define HW_DECODEISSUE_DECODEISSUEUNITVARIANTS_DECODEISSUEUNITL5_V
 
+/* verilator lint_off UNOPTFLAT */
+
 `ifndef SYNTHESIS
-`include "asm/disassemble.v"
+`include "asm/disassemble.v" 
 `endif
 
 `include "defs/ISA.v"
@@ -15,6 +17,7 @@
 `include "hw/decode_issue/ImmGen.v"
 `include "hw/decode_issue/InstRouter.v"
 `include "hw/decode_issue/Regfile.v"
+`include "hw/decode_issue/RegfileFPU.v"
 `include "hw/decode_issue/RenameTable.v"
 `include "hw/util/SeqAge.v"
 `include "intf/F__DIntf.v"
@@ -105,8 +108,9 @@ module DecodeIssueUnitL5_sp26 #(
       F_reg_next = F_reg;
   end
 
+
   //----------------------------------------------------------------------
-  // Instantiate Decoder, Regfile, ImmGen
+  // Decoder signals 
   //----------------------------------------------------------------------
 
   logic       decoder_val;
@@ -119,6 +123,41 @@ module DecodeIssueUnitL5_sp26 #(
   logic       decoder_op2_sel;
   logic [1:0] decoder_jal;
   logic       decoder_op3_sel;
+
+  //----------------------------------------------------------------------
+  // Detect if instruction uses FP registers
+  // RISC-V FP instructions have opcode =  (0x53)
+  //----------------------------------------------------------------------
+
+  // Identify FP instruction types (including mixed-register FMV)
+  logic is_fp_alu, is_flw, is_fsw, is_fmv_x_w, is_fmv_w_x, is_fsgnj;
+  logic need_int_rs1, need_int_rs2, need_fp_rs1, need_fp_rs2;
+  logic fp_writes_rd;
+
+  assign is_fp_alu   = (decoder_uop == OP_FADD_S) ||
+                        (decoder_uop == OP_FSUB_S) ||
+                        (decoder_uop == OP_FMUL_S);
+  assign is_fsgnj    = (decoder_uop == OP_FSGNJ_S);
+  assign is_flw      = (decoder_uop == OP_FLW);
+  assign is_fsw      = (decoder_uop == OP_FSW);
+  assign is_fmv_x_w  = (decoder_uop == OP_FMV_X_W);  // FP→INT
+  assign is_fmv_w_x  = (decoder_uop == OP_FMV_W_X);  // INT→FP
+  
+  // Which register file supplies each architectural operand
+  assign need_fp_rs1  = is_fp_alu || is_fsgnj || is_fmv_x_w ||
+                      (decoder_uop == OP_FCVT_W_S);  
+
+  assign need_fp_rs2  = is_fp_alu || is_fsgnj || is_fsw; 
+
+  assign need_int_rs1 = !(need_fp_rs1); 
+  assign need_int_rs2 = !(is_fp_alu || is_fsgnj || is_fsw || is_fmv_x_w || is_fmv_w_x);
+
+  // FP destination register for: FP ALU, FSGNJ, FLW, FMV.W.X
+  assign fp_writes_rd = is_fp_alu || is_fsgnj || is_flw || is_fmv_w_x;
+
+  //----------------------------------------------------------------------
+  // Instantiate Decoder, Regfile, ImmGen
+  //----------------------------------------------------------------------
   
   InstDecoder decoder (
     .val     (decoder_val),
@@ -136,11 +175,17 @@ module DecodeIssueUnitL5_sp26 #(
 
   logic [31:0] rdata0, rdata1;
 
-  logic [p_phys_addr_bits-1:0] alloc_preg, alloc_ppreg;
-  logic                        alloc_rdy;
-  logic [p_phys_addr_bits-1:0] lookup_preg    [2];
-  logic                        lookup_pending [2];
+  //----------------------------------------------------------------------
+  // Integer Register File Infra
+  //----------------------------------------------------------------------
 
+  logic [31:0] rdata0_int, rdata1_int; 
+  logic [p_phys_addr_bits-1:0] alloc_preg_int, alloc_ppreg_int; 
+  logic                        alloc_rdy_int; 
+  logic [p_phys_addr_bits-1:0] lookup_preg_int    [2];
+  logic                        lookup_pending_int [2]; 
+
+  // Integer Rename Table
   RenameTable #(
     .p_num_phys_regs (p_num_phys_regs)
   ) rename_table (
@@ -148,15 +193,16 @@ module DecodeIssueUnitL5_sp26 #(
     .rst            (rst),
 
     .alloc_areg     (decoder_waddr),
-    .alloc_preg     (alloc_preg),
-    .alloc_ppreg    (alloc_ppreg),
-    .alloc_en       (alloc_rdy & decoder_wen & X_xfer & !should_squash),
-    .alloc_rdy      (alloc_rdy),
+    .alloc_preg     (alloc_preg_int),
+    .alloc_ppreg    (alloc_ppreg_int),
+    .alloc_en       (alloc_rdy_int & decoder_wen & X_xfer & !should_squash
+                    & !fp_writes_rd),
+    .alloc_rdy      (alloc_rdy_int),
 
     .lookup_areg    ({decoder_raddr1, decoder_raddr0}),
-    .lookup_preg    (lookup_preg),
-    .lookup_pending (lookup_pending),
-    .lookup_en      ({1'b1, 1'b1}),
+    .lookup_preg    (lookup_preg_int),
+    .lookup_pending (lookup_pending_int),
+    .lookup_en      ({need_int_rs2, need_int_rs1}),
 
     .complete       (complete),
     .commit         (commit)
@@ -168,15 +214,100 @@ module DecodeIssueUnitL5_sp26 #(
   ) regfile (
     .clk                (clk),
     .rst                (rst),
-    .raddr              (lookup_preg),
-    .rdata              ({rdata1, rdata0}),
+    .raddr              (lookup_preg_int),
+    .rdata              ({rdata1_int, rdata0_int}),
     .waddr              (complete.preg),
     .wdata              (complete.wdata),
-    .wen                (complete.wen & complete.val)
+    // Changed: domain-select via complete.is_fp
+    .wen                (complete.wen & complete.val & ~complete.is_fp)
   );
 
+  //----------------------------------------------------------------------
+  // Floating-point Register File Infra
+  //----------------------------------------------------------------------
+
+  logic [31:0] rdata0_fp, rdata1_fp;
+  logic [p_phys_addr_bits-1:0] alloc_preg_fp, alloc_ppreg_fp;
+  logic                        alloc_rdy_fp;
+  logic [p_phys_addr_bits-1:0] lookup_preg_fp    [2];
+  logic                        lookup_pending_fp [2];
+
+  // Floating Rename Table
+  RenameTable #( 
+    .p_num_phys_regs (p_num_phys_regs),
+    .p_is_fp_domain  (1)
+  ) rename_table_fp (
+    .clk            (clk),
+    .rst            (rst),
+
+    .alloc_areg     (decoder_waddr),
+    .alloc_preg     (alloc_preg_fp),
+    .alloc_ppreg    (alloc_ppreg_fp),
+    .alloc_en       (alloc_rdy_fp & decoder_wen & X_xfer & !should_squash & fp_writes_rd),
+    .alloc_rdy      (alloc_rdy_fp),
+
+    .lookup_areg    ({decoder_raddr1, decoder_raddr0}),
+    .lookup_preg    (lookup_preg_fp),
+    .lookup_pending (lookup_pending_fp),
+    .lookup_en      ({need_fp_rs2, need_fp_rs1}),
+
+    .complete       (complete),
+    .commit         (commit)
+  );
+
+  RegfileFPU #(
+    .p_entry_bits (32),
+    .p_num_regs   (p_num_phys_regs)
+  ) regfile_fpu (
+    .clk   (clk),
+    .rst   (rst),
+    .raddr (lookup_preg_fp),
+    .rdata ({rdata1_fp, rdata0_fp}),
+    .waddr (complete.preg),
+    .wdata (complete.wdata),
+    // Changed: domain-select via complete.is_fp
+    .wen   (complete.wen & complete.val & complete.is_fp)
+  );
+
+  //----------------------------------------------------------------------
+  // Multiplexer to select between integer and FP register data
+  //----------------------------------------------------------------------
+
+  logic [p_phys_addr_bits-1:0] final_alloc_preg, final_alloc_ppreg;
+  logic                        final_stall_pending;
+
+  // Mixed-reg selection (FLW/FSW use int rs1 + fp rs2)
+  logic [31:0] rs1_val, rs2_val;
+
+  always_comb begin
+    // Operand values (rs1 is port0, rs2 is port1)
+    rs1_val = need_fp_rs1 ? rdata0_fp : rdata0_int;
+    rs2_val = need_fp_rs2 ? rdata1_fp : rdata1_int;
+
+    rdata0 = rs1_val;
+    rdata1 = rs2_val;
+
+    // Destination physical register allocation depends on who writes rd
+    if ( fp_writes_rd ) begin
+      final_alloc_preg  = alloc_preg_fp;
+      final_alloc_ppreg = alloc_ppreg_fp;
+    end else begin
+      final_alloc_preg  = alloc_preg_int;
+      final_alloc_ppreg = alloc_ppreg_int;
+    end
+
+    // Stall only on the lookups you actually enabled + required allocation
+    final_stall_pending =
+        (need_int_rs1 & lookup_pending_int[0]) |
+        (need_int_rs2 & lookup_pending_int[1]) |
+        (need_fp_rs1  & lookup_pending_fp [0]) |
+        (need_fp_rs2  & lookup_pending_fp [1]) |
+        (decoder_wen  & X_xfer &
+         (fp_writes_rd ? !alloc_rdy_fp : !alloc_rdy_int));
+  end
+
   logic stall_pending;
-  assign stall_pending = !alloc_rdy | lookup_pending[0] | lookup_pending[1];
+  assign stall_pending = final_stall_pending;
 
   logic [31:0] imm;
 
@@ -185,6 +316,7 @@ module DecodeIssueUnitL5_sp26 #(
     .imm_sel (decoder_imm_sel),
     .imm     (imm)
   );
+
 
   //----------------------------------------------------------------------
   // Squashing
@@ -263,14 +395,15 @@ module DecodeIssueUnitL5_sp26 #(
       assign Ex[k].uop          = decoder_uop;
       assign Ex[k].waddr        = decoder_waddr;
       assign Ex[k].seq_num      = F_reg.seq_num;
-      assign Ex[k].preg         = alloc_preg;
-      assign Ex[k].ppreg        = alloc_ppreg;
+      assign Ex[k].preg         = final_alloc_preg;
+      assign Ex[k].ppreg        = final_alloc_ppreg;
+      assign Ex[k].is_fp        = fp_writes_rd;
 
       always_comb begin
         if( decoder_op3_sel ) // Branch - need immediate
           Ex[k].op3.branch_imm = imm;
         else // Memory needs register data
-          Ex[k].op3.mem_data = rdata1;
+          Ex[k].op3.mem_data = rs2_val;
       end
     end
   endgenerate

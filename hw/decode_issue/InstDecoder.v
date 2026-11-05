@@ -96,6 +96,7 @@ module InstDecoder (
   generate
     always_comb begin
       casez ( inst ) //          uop        jal     raddr0 raddr1 waddr wen imm_sel op2_sel  op3_sel
+<<<<<<< HEAD
         `RVI_INST_ADD:    cs( y, OP_ADD,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVI_INST_FADD_S: cs( y, OP_FADD_S, j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVI_INST_FSUB_S: cs( y, OP_FSUB_S, j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
@@ -108,6 +109,18 @@ module InstDecoder (
         `RVI_INST_SRA:    cs( y, OP_SRA,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVI_INST_SRL:    cs( y, OP_SRL,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVI_INST_SLL:    cs( y, OP_SLL,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
+=======
+        `RVI_INST_ADD:    cs( y, OP_ADD,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SUB:    cs( y, OP_SUB,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_AND:    cs( y, OP_AND,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_OR:     cs( y, OP_OR,     j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_XOR:    cs( y, OP_XOR,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SLT:    cs( y, OP_SLT,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SLTU:   cs( y, OP_SLTU,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SRA:    cs( y, OP_SRA,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SRL:    cs( y, OP_SRL,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_SLL:    cs( y, OP_SLL,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+>>>>>>> origin/blimp-v9-infra/rtl
 
         `RVI_INST_ADDI:   cs( y, OP_ADD,    j_n,    rs1,   rx,    rd,   y,  IMM_I,  op2_imm, op3_x   );
         `RVI_INST_ANDI:   cs( y, OP_AND,    j_n,    rs1,   rx,    rd,   y,  IMM_I,  op2_imm, op3_x   );
@@ -140,6 +153,7 @@ module InstDecoder (
         `RVI_INST_BLTU:   cs( y, OP_BLTU,   j_n,    rs1,   rs2,   rx,   n,  IMM_B,  op2_rf,  op3_br  );
         `RVI_INST_BGEU:   cs( y, OP_BGEU,   j_n,    rs1,   rs2,   rx,   n,  IMM_B,  op2_rf,  op3_br  );
 
+<<<<<<< HEAD
         `RVM_INST_MUL:    cs( y, OP_MUL,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVM_INST_MULH:   cs( y, OP_MULH,   j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVM_INST_MULHU:  cs( y, OP_MULHU,  j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
@@ -148,6 +162,27 @@ module InstDecoder (
         `RVM_INST_DIVU:   cs( y, OP_DIVU,   j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVM_INST_REM:    cs( y, OP_REM,    j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
         `RVM_INST_REMU:   cs( y, OP_REMU,   j_n,    rs1,   rs2,   rd,   y,  '0,     op2_rf,  op3_x   );
+=======
+        `RVM_INST_MUL:    cs( y, OP_MUL,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_MULH:   cs( y, OP_MULH,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_MULHU:  cs( y, OP_MULHU,  j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_MULHSU: cs( y, OP_MULHSU, j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_DIV:    cs( y, OP_DIV,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_DIVU:   cs( y, OP_DIVU,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_REM:    cs( y, OP_REM,    j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVM_INST_REMU:   cs( y, OP_REMU,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        
+        `RVI_INST_FADD_S:   cs( y, OP_FADD_S,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FSUB_S:   cs( y, OP_FSUB_S,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FMUL_S:   cs( y, OP_FMUL_S,   j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FLW:      cs( y, OP_FLW,      j_n,    rs1,   rx,    rd,   y,  IMM_I,  op2_imm, op3_mem );
+        `RVI_INST_FSW:      cs( y, OP_FSW,      j_n,    rs1,   rs2,   rx,   n,  IMM_S,  op2_imm, op3_mem );
+        `RVI_INST_FSGNJ_S:  cs( y, OP_FSGNJ_S,  j_n,    rs1,   rs2,   rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FCVT_W_S: cs( y, OP_FCVT_W_S, j_n,    rs1,   rx,    rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FMV_X_W:  cs( y, OP_FMV_X_W,  j_n,    rs1,   rx,    rd,   y,  'x,     op2_rf,  op3_x   );
+        `RVI_INST_FMV_W_X:  cs( y, OP_FMV_W_X,  j_n,    rs1,   rx,    rd,   y,  'x,     op2_rf,  op3_x   );
+
+>>>>>>> origin/blimp-v9-infra/rtl
         default:          cs( n, 'x,        j_n,    'x,    'x,    'x,   n,  'x,     'x,      'x      );
       endcase
     end

@@ -55,6 +55,7 @@ module ControlFlowUnitL6 (
     rv_uop                       uop;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
+    logic                        is_fp;
   } D_input;
 
   D_input D_reg;
@@ -86,7 +87,8 @@ module ControlFlowUnitL6 (
         waddr:   D.waddr,
         uop:     D.uop,
         preg:    D.preg,
-        ppreg:   D.ppreg
+        ppreg:   D.ppreg,
+        is_fp:   D.is_fp
       };
     else if ( W_xfer )
       D_reg_next = '0;
@@ -155,6 +157,7 @@ module ControlFlowUnitL6 (
   assign W.seq_num = D_reg.seq_num;
   assign W.preg    = D_reg.preg;
   assign W.ppreg   = D_reg.ppreg;
+  assign W.is_fp   = D_reg.is_fp;
 
   //----------------------------------------------------------------------
   // Assign remaining signals

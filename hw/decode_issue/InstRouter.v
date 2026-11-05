@@ -74,8 +74,15 @@ module InstRouterUnit #(
       if( in_subset(p_isa_subset, OP_REM_VEC    ) ) val_uop |= ( uop == OP_REM    );
       if( in_subset(p_isa_subset, OP_REMU_VEC    ) ) val_uop |= ( uop == OP_REMU    );
 
-      if( in_subset(p_isa_subset, OP_FADD_VEC   ) ) val_uop |= ( uop == OP_FADD_S  );
-      if( in_subset(p_isa_subset, OP_FSUB_VEC   ) ) val_uop |= ( uop == OP_FSUB_S  );
+      if( in_subset(p_isa_subset, OP_FADD_VEC     ) ) val_uop |= ( uop == OP_FADD_S   );
+      if( in_subset(p_isa_subset, OP_FSUB_VEC     ) ) val_uop |= ( uop == OP_FSUB_S   );
+      if( in_subset(p_isa_subset, OP_FMUL_VEC     ) ) val_uop |= ( uop == OP_FMUL_S   );
+      if( in_subset(p_isa_subset, OP_FLW_VEC      ) ) val_uop |= ( uop == OP_FLW      );
+      if( in_subset(p_isa_subset, OP_FSW_VEC      ) ) val_uop |= ( uop == OP_FSW      );
+      if( in_subset(p_isa_subset, OP_FSGNJ_VEC    ) ) val_uop |= ( uop == OP_FSGNJ_S  );
+      if( in_subset(p_isa_subset, OP_FCVT_W_S_VEC ) ) val_uop |= ( uop == OP_FCVT_W_S );
+      if( in_subset(p_isa_subset, OP_FMV_X_W_VEC  ) ) val_uop |= ( uop == OP_FMV_X_W  );
+      if( in_subset(p_isa_subset, OP_FMV_W_X_VEC  ) ) val_uop |= ( uop == OP_FMV_W_X  );
     end
   endgenerate
 

@@ -21,12 +21,25 @@
 // Map fields to instructions to call for the corresponding token
 
 std::map<std::string, std::function<uint32_t( const std::string& )>>
-    asm_field_map = { { "rs1", rs1_mask },       { "rs2", rs2_mask },
-                      { "rd", rd_mask },         { "imm_i", imm_i_mask },
-                      { "imm_s", imm_s_mask },   { "imm_b", imm_b_mask },
-                      { "imm_u", imm_u_mask },   { "imm_j", imm_j_mask },
-                      { "imm_is", imm_is_mask }, { "pred", pred_mask },
-                      { "succ", succ_mask } };
+    asm_field_map = {
+      { "rs1", rs1_mask },
+      { "rs2", rs2_mask },
+      { "rd",  rd_mask  },
+
+      // FP register fields
+      { "frs1", frs1_mask },
+      { "frs2", frs2_mask },
+      { "frd",  frd_mask  },
+
+      { "imm_i", imm_i_mask },
+      { "imm_s", imm_s_mask },
+      { "imm_b", imm_b_mask },
+      { "imm_u", imm_u_mask },
+      { "imm_j", imm_j_mask },
+      { "imm_is", imm_is_mask },
+      { "pred", pred_mask },
+      { "succ", succ_mask }
+    };
 
 std::map<std::string,
          std::function<uint32_t( const std::string&, uint32_t )>>
@@ -85,9 +98,10 @@ uint32_t assemble( const char* vassembly, uint32_t* vpc )
       else {
         encoding |= asm_field_map[spec_token]( inst_token );
       }
-    } catch ( std::exception& e ) {
-      std::cout << e.what() << std::endl;
-      std::cout << "Unrecognized spec token: " << spec_token << std::endl;
+    } catch ( const std::exception& e ) {
+      throw std::invalid_argument(
+        std::format("Error assembling '{}': token '{}' for spec '{}' failed: {}",
+                    assembly, inst_token, spec_token, e.what() ) );
     }
   }
 
