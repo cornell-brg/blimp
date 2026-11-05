@@ -1,18 +1,24 @@
 //========================================================================
-// FDiv_test.v
+// FDIV_test.v
 //========================================================================
-// Smoke testbench for the floating-point divider (FDIV.S)
+// A testbench for our floating point division operation
 //========================================================================
 
 `include "defs/UArch.v"
-`include "hw/execute/execute_units_l8/FDiv.v"
+`include "hw/execute/execute_units_l8/FDIV.v"   // TODO: adjust path/name if different
+`include "hw/execute/test/test_cases/fdiv_intf.sv"
+`include "hw/execute/test/test_cases/fp_division_cov.sv"
 `include "test/fl/TestIstream.v"
 `include "test/fl/TestOstream.v"
 
 import UArch::*;
 import TestEnv::*;
 
-module FDivTestSuite #(
+//========================================================================
+// FDIVTestSuite
+//========================================================================
+
+module FDIVTestSuite #(
   parameter p_suite_num    = 0,
   parameter p_seq_num_bits = 5,
 
@@ -21,22 +27,69 @@ module FDivTestSuite #(
 );
 
   //verilator lint_off UNUSEDSIGNAL
-  string suite_name = $sformatf("%0d: FDivTestSuite_%0d_%0d_%0d",
+  string suite_name = $sformatf("%0d: FDIVTestSuite_%0d_%0d_%0d",
                                 p_suite_num, p_seq_num_bits,
                                 p_D_send_intv_delay, p_W_recv_intv_delay);
   //verilator lint_on UNUSEDSIGNAL
 
+  //----------------------------------------------------------------------
+  // Setup
+  //----------------------------------------------------------------------
+
   logic clk, rst;
   TestUtils t( .* );
 
-  D__XIntf #( .p_seq_num_bits (p_seq_num_bits) ) D__X_intf();
-  X__WIntf #( .p_seq_num_bits (p_seq_num_bits) ) X__W_intf();
+  //----------------------------------------------------------------------
+  // Instantiate design under test
+  //----------------------------------------------------------------------
 
-  FDiv dut (
+  D__XIntf #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) D__X_intf();
+
+  X__WIntf #(
+    .p_seq_num_bits (p_seq_num_bits)
+  ) X__W_intf();
+
+  fdiv_intf fdiv_intf_inst(clk);
+
+  FDIV dut
+  (
     .D (D__X_intf),
     .W (X__W_intf),
     .*
   );
+
+  // Coverage probes.
+  // TODO: replace each dut.<name> with the real internal signal in FDIV.v
+  assign fdiv_intf_inst.reset                      = rst;
+
+  assign fdiv_intf_inst.internal_ground            = dut.guard;
+  assign fdiv_intf_inst.internal_roundb            = dut.roundb;
+  assign fdiv_intf_inst.internal_sticky            = dut.sticky;
+  assign fdiv_intf_inst.internal_last_bit_mantissa = dut.lsb;
+
+  assign fdiv_intf_inst.internal_denorm_one        = dut.is_denorm1;
+  assign fdiv_intf_inst.internal_denorm_two        = dut.is_denorm2;
+  assign fdiv_intf_inst.internal_nan_one           = dut.is_nan1;
+  assign fdiv_intf_inst.internal_nan_two           = dut.is_nan2;
+  assign fdiv_intf_inst.is_inf_one                 = dut.is_inf1;
+  assign fdiv_intf_inst.is_inf_two                 = dut.is_inf2;
+  assign fdiv_intf_inst.zero_one                   = dut.is_zero1;
+  assign fdiv_intf_inst.zero_two                   = dut.is_zero2;
+  assign fdiv_intf_inst.underflow                  = dut.underflow;
+  assign fdiv_intf_inst.overflow                   = dut.overflow;
+
+  assign fdiv_intf_inst.sign_one                   = dut.s1;
+  assign fdiv_intf_inst.sign_two                   = dut.s2;
+  assign fdiv_intf_inst.biased_exponent_one        = dut.e1;
+  assign fdiv_intf_inst.biased_exponent_two        = dut.e2;
+  assign fdiv_intf_inst.mantissa_one               = dut.m1;
+  assign fdiv_intf_inst.mantissa_two               = dut.m2;
+
+  `ifndef VERILATOR
+  fp_division_cov cvg = new(fdiv_intf_inst);
+  `endif
 
   //----------------------------------------------------------------------
   // FL D Interface
@@ -145,11 +198,13 @@ module FDivTestSuite #(
   always @( posedge clk ) begin
     #2;
     trace = "";
+
     trace = {trace, D_Istream.trace( t.trace_level )};
     trace = {trace, " | "};
     trace = {trace, dut.trace( t.trace_level )};
     trace = {trace, " | "};
     trace = {trace, W_Ostream.trace( t.trace_level )};
+
     t.trace( trace );
   end
   // verilator lint_on BLKSEQ
@@ -158,23 +213,31 @@ module FDivTestSuite #(
   // Include test cases
   //----------------------------------------------------------------------
 
-  `include "hw/execute/test/test_cases/fp_div_test_cases.sv"
+  `include "hw/execute/test/test_cases/fdiv_test_cases.sv"
+
+  //----------------------------------------------------------------------
+  // run_test_suite
+  //----------------------------------------------------------------------
 
   task run_test_suite();
     t.test_suite_begin( suite_name );
-    run_fp_div_test_cases();
+
+    run_fdiv_test_cases();
   endtask
 
 endmodule
 
 //========================================================================
-// FDiv_test
+// FDIV_test
 //========================================================================
 
-module FDiv_test;
-  FDivTestSuite #(1)          suite_1();
-  FDivTestSuite #(2, 6, 0, 0) suite_2();
-  FDivTestSuite #(3, 3, 0, 0) suite_3();
+module FDIV_test;
+  FDIVTestSuite #(1)          suite_1();
+  FDIVTestSuite #(2, 6, 0, 0) suite_2();
+  FDIVTestSuite #(3, 3, 0, 0) suite_3();
+  FDIVTestSuite #(4, 4, 3, 0) suite_4();
+  FDIVTestSuite #(5, 9, 0, 3) suite_5();
+  FDIVTestSuite #(6, 5, 3, 3) suite_6();
 
   int s;
 
@@ -185,6 +248,9 @@ module FDiv_test;
     if ((s <= 0) || (s == 1)) suite_1.run_test_suite();
     if ((s <= 0) || (s == 2)) suite_2.run_test_suite();
     if ((s <= 0) || (s == 3)) suite_3.run_test_suite();
+    if ((s <= 0) || (s == 4)) suite_4.run_test_suite();
+    if ((s <= 0) || (s == 5)) suite_5.run_test_suite();
+    if ((s <= 0) || (s == 6)) suite_6.run_test_suite();
 
     test_bench_end();
   end

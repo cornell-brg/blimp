@@ -54,6 +54,62 @@ set(V_TEST_FILES
   hw/writeback_commit/test/ROB_test.v
   hw/execute/test/l8/FDiv_test.v
 )
+# ========================================================================
+# CMakeLists.txt
+# ========================================================================
+# A build system for Blimp
+
+SET(CMAKE_CXX_STANDARD_LIBRARIES "")
+
+#-------------------------------------------------------------------------
+# Get all of the source files
+#-------------------------------------------------------------------------
+
+set(V_TEST_FILES
+  fpga/test/CharBuf_test.v
+  fpga/test/CharLUT_test.v
+  hw/common/test/Fifo_test.v
+  hw/common/test/PriorityEncoder_test.v
+  hw/common/test/RRArb_test.v
+  hw/decode_issue/test/DecodeIssueUnitL1_test.v
+  hw/decode_issue/test/DecodeIssueUnitL2_test.v
+  hw/decode_issue/test/DecodeIssueUnitL3_test.v
+  hw/decode_issue/test/DecodeIssueUnitL4_test.v
+  hw/decode_issue/test/DecodeIssueUnitL5_test.v
+  hw/decode_issue/test/ImmGen_test.v
+  hw/decode_issue/test/RegfilePending_test.v
+  hw/decode_issue/test/RenameTable_test.v
+  hw/execute/test/ExQueue_test.v
+  hw/execute/test/l1/ALUL1_test.v
+  hw/execute/test/l1/MultiplierL1_test.v
+  hw/execute/test/l2/PipelinedMultiplierL2_test.v
+  hw/execute/test/l2/IterativeMultiplierL2_test.v
+  hw/execute/test/l3/LoadStoreUnitL3_test.v
+  hw/execute/test/l4/ControlFlowUnitL4_test.v
+  hw/execute/test/l5/ControlFlowUnitL5_test.v
+  hw/execute/test/l6/ALUL6_test.v
+  hw/execute/test/l6/ControlFlowUnitL6_test.v
+  hw/execute/test/l7/IterativeMulDivRemL7_test.v
+  hw/execute/test/l7/LoadStoreUnitL7_test.v
+  hw/execute/test/l8/CSRL8_test.v
+  hw/execute/test/l8/ALUF_test.v
+  hw/execute/test/l8/FPInstUnit_test.v
+  hw/execute/test/l9/FPUMult_test.v
+  hw/fetch/test/FetchUnitL1_test.v
+  hw/fetch/test/FetchUnitL2_test.v
+  hw/fetch/test/FetchUnitL3_test.v
+  hw/fetch/test/SeqNumGenL2_test.v
+  hw/fetch/test/SeqNumGenL3_test.v
+  hw/squash/test/SquashUnitL1_test.v
+  hw/squash/test/SquashUnitL1Chain_test.v
+  hw/util/test/SeqAge_test.v
+  hw/util/test/SeqArb_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL1_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL2_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL3_test.v
+  hw/writeback_commit/test/ROB_test.v
+  hw/execute/test/l8/FDiv_test.v
+)
 
 set(ASM_FILES
   asm/assemble.cpp
@@ -260,20 +316,17 @@ foreach(V_TEST_FILE_REL_PATH ${V_TEST_FILES})
   remove_extension(V_TEST_BIN ${V_TEST_FILE})
 
   add_executable(${V_TEST_BIN} ${V_TEST_FILE_PATH})
-<<<<<<< HEAD
-  target_include_directories(${V_TEST_BIN} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../ ${CMAKE_Verilog_DPI_INCLUDES})
-=======
 
   # Add the C++ wrapper separately to avoid Verilator flag inheritance
-  target_sources(${V_TEST_BIN} PRIVATE 
-      "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
+  target_sources(${V_TEST_BIN} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
   )
-  target_include_directories(${V_TEST_BIN} PRIVATE 
-  ${CMAKE_CURRENT_SOURCE_DIR} 
-  ${CMAKE_Verilog_DPI_INCLUDES}
-  "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include"   # Added headers
+  target_include_directories(${V_TEST_BIN} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_Verilog_DPI_INCLUDES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include"   # Added headers
   )
->>>>>>> origin/blimp-v9-infra/rtl
 
   if(CMAKE_Verilog_COMPILER_ID STREQUAL "Verilator")
     set(V_FLAGS "--timing --quiet-stats --CFLAGS \"-std=c++20 -fcoroutines\"")
@@ -416,23 +469,22 @@ foreach(V_SIM_FILE_REL_PATH ${BLIMP_SIMS})
   string(REGEX REPLACE "\\.v$" "" TOP_MODULE ${V_SIM_FILE})
   set(EXTRA_VERILATOR_FLAGS --top-module ${TOP_MODULE})
 
-<<<<<<< HEAD
-  add_executable(${V_SIM_BIN} ${V_SIM_FILE_PATH} "hw/top/sim/utils/load_elf.cpp")
-  target_include_directories(${V_SIM_BIN} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_Verilog_DPI_INCLUDES})
-=======
   add_executable(${V_SIM_BIN} ${V_SIM_FILE_PATH})
 
   # Add the C++ utility and wrapper files separately
   target_sources(${V_SIM_BIN} PRIVATE 
-      "${CMAKE_CURRENT_SOURCE_DIR}/hw/top/sim/utils/load_elf.cpp" 
-      "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/hw/top/sim/utils/load_elf.cpp" 
+    "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
   )
-  target_include_directories(${V_SIM_BIN} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_Verilog_DPI_INCLUDES} 
-  "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include")
+  target_include_directories(${V_SIM_BIN} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_Verilog_DPI_INCLUDES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include"
+  )
   target_link_libraries(${V_SIM_BIN} PRIVATE 
     "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/build/Linux-x86_64-GCC/softfloat.a"
   )
->>>>>>> origin/blimp-v9-infra/rtl
 
   if(CMAKE_Verilog_COMPILER_ID STREQUAL "Verilator")
     set(V_COMPILE_FLAGS "--timing --quiet-stats -I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/../ --CFLAGS \"-std=c++20 -fcoroutines\"")
