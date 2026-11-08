@@ -25,12 +25,27 @@ module BlimpV8TestSuite_bne #(
     .p_mem_recv_intv_delay (p_mem_recv_intv_delay)
   ) h();
 
+  integer seed = 32'hDEADBEEF;
+
   `include "hw/top/test/test_cases/directed/bne_test_cases.v"
+  `include "hw/top/test/test_cases/randomized/bne_test_cases.v"
   `include "hw/top/test/test_cases/golden/bne_test_cases.v"
-  task run_test_suite();
+  task automatic run_test_suite();
+    // declare locals before any statements (required by many SV tools)
+    int _run_rand;
+
     h.t.test_suite_begin( suite_name );
     run_directed_bne_tests();
     run_golden_bne_tests();
+
+    // Control randomized tests via plusarg: +run_randomized=0 or +run_randomized=1
+    _run_rand = 1; // default: run randomized
+    if ($value$plusargs("run_randomized=%d", _run_rand)) begin
+      // plusarg provided; _run_rand now holds it
+    end
+    if (_run_rand != 0) begin
+      run_randomized_bne_tests();
+    end
   endtask
 endmodule
 

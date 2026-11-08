@@ -60,20 +60,27 @@ module IterativeMulDivRemStepL7 (
       OP_REMU:   next_a = (     a >= b ) ? a - b     : a;
       default:   next_a = 'x;
     endcase
+  end
 
+  always_comb begin
     case( uop )
       OP_MUL:    next_b = b >> 1;
       OP_MULH:   next_b = b >> 1;
       OP_MULHU:  next_b = b >> 1;
       OP_MULHSU: next_b = b >> 1;
-      OP_DIV:    next_b = $signed(b) >>> 1;
+      OP_DIV:    next_b = b >> 1;
       OP_DIVU:   next_b = b >> 1;
-      OP_REM:    next_b = $signed(b) >>> 1;
+      OP_REM:    next_b = b >> 1;
       OP_REMU:   next_b = b >> 1;
       default:   next_b = 'x;
     endcase
-    next_b_shift = b_shift >> 1;
+  end
 
+  always_comb begin
+    next_b_shift = b_shift >> 1;
+  end
+
+  always_comb begin
     case( uop )
       OP_MUL:    next_result = ( b[0] ) ? result + a : result;
       OP_MULH:   next_result = ( b[0] ) ? result + a : result;
@@ -86,6 +93,28 @@ module IterativeMulDivRemStepL7 (
       default:   next_result = 'x;
     endcase
 
+    // Handling divide-by-zero
+    if( b == '0 ) begin
+      case( uop )
+        OP_DIV:  next_result = {64{1'b1}};
+        OP_DIVU: next_result = {64{1'b1}};
+        OP_REM:  next_result = a;
+        OP_REMU: next_result = a;
+        default: begin end // Don't change
+      endcase
+    end
+
+    // // Handling overflow
+    // if( ( b[63:32] == 'hffffffff ) & ( a[31:0] == 'h80000000) ) begin
+    //   case( uop )
+    //     OP_DIV: next_result = {32'b0, 'h80000000};
+    //     OP_REM: next_result = '0;
+    //     default: begin end // Don't change
+    //   endcase
+    // end
+  end
+
+  always_comb begin
     case( uop )
       OP_MUL:    done = ( next_b == '0 );
       OP_MULH:   done = ( next_b == '0 );
@@ -101,40 +130,22 @@ module IterativeMulDivRemStepL7 (
     // Handling divide-by-zero
     if( b == '0 ) begin
       case( uop )
-        OP_DIV: begin
-          next_result = {64{1'b1}};
-          done        = 1'b1;
-        end
-        OP_DIVU: begin
-          next_result = {64{1'b1}};
-          done        = 1'b1;
-        end
-        OP_REM: begin
-          next_result = a;
-          done        = 1'b1;
-        end
-        OP_REMU: begin
-          next_result = a;
-          done        = 1'b1;
-        end
+        OP_DIV:  done = 1'b1;
+        OP_DIVU: done = 1'b1;
+        OP_REM:  done = 1'b1;
+        OP_REMU: done = 1'b1;
         default: begin end // Don't change
       endcase
     end
 
-    // Handling overflow
-    if( ( b[63:32] == 'hffffffff ) & ( a[31:0] == 'h80000000) ) begin
-      case( uop )
-        OP_DIV: begin
-          next_result = {32'b0, 'h80000000};
-          done        = 1'b1;
-        end
-        OP_REM: begin
-          next_result = '0;
-          done        = 1'b1;
-        end
-        default: begin end // Don't change
-      endcase
-    end
+    // // Handling overflow
+    // if( ( b[63:32] == 'hffffffff ) & ( a[31:0] == 'h80000000) ) begin
+    //   case( uop )
+    //     OP_DIV: done = 1'b1;
+    //     OP_REM: done = 1'b1;
+    //     default: begin end // Don't change
+    //   endcase
+    // end
   end
 endmodule
 
@@ -174,6 +185,7 @@ module IterativeMulDivRemL7 (
     rv_uop                       uop;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
+    logic                        is_fp;
   } D_input;
 
   typedef struct packed {
@@ -194,16 +206,27 @@ module IterativeMulDivRemL7 (
 
   // verilator lint_off ENUMVALUE
 
+  //synopsys sync_set_reset "rst"
   always_ff @( posedge clk ) begin
     if ( rst )
       D_reg <= '{ 
         val:     1'b0, 
+<<<<<<< HEAD
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        uop:     rv_uop'('0),
+        preg:    '0,
+        ppreg:   '0
+=======
         pc:      'x,
         seq_num: 'x,
         waddr:   'x,
         uop:     'x,
         preg:    'x,
-        ppreg:   'x
+        ppreg:   'x,
+        is_fp:   1'b0
+>>>>>>> origin/blimp-v9-infra/rtl
       };
     else
       D_reg <= D_reg_next;
@@ -221,17 +244,28 @@ module IterativeMulDivRemL7 (
         waddr:   D.waddr,
         uop:     D.uop,
         preg:    D.preg,
-        ppreg:   D.ppreg
+        ppreg:   D.ppreg,
+        is_fp:   D.is_fp
       };
     else if ( W_xfer )
       D_reg_next = '{ 
         val:     1'b0, 
+<<<<<<< HEAD
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        uop:     rv_uop'('0),
+        preg:    '0,
+        ppreg:   '0
+=======
         pc:      'x,
         seq_num: 'x,
         waddr:   'x,
         uop:     'x,
         preg:    'x,
-        ppreg:   'x
+        ppreg:   'x,
+        is_fp:   1'b0
+>>>>>>> origin/blimp-v9-infra/rtl
       };
     else
       D_reg_next = D_reg;
@@ -254,6 +288,7 @@ module IterativeMulDivRemL7 (
   mul_state_t curr_state;
   mul_state_t next_state;
 
+  //synopsys sync_set_reset "rst"
   always_ff @( posedge clk ) begin
     if( rst )
       curr_state <= IDLE;
@@ -320,7 +355,9 @@ module IterativeMulDivRemL7 (
       OP_REMU:   init_opa = { 32'b0,           D.op1 };
       default:   init_opa = 'x;
     endcase
+  end
 
+  always_comb begin
     case( D.uop )
       OP_MUL:    init_opb = { 32'b0,           D.op2 };
       OP_MULH:   init_opb = { {32{D.op2[31]}}, D.op2 };
@@ -347,29 +384,92 @@ module IterativeMulDivRemL7 (
   end
 
   logic [63:0] opa,      opb;
-  logic [63:0] next_opa, next_opb;
+  logic [63:0] next_opa, next_opb;       // per-step results from the step block
   logic [32:0] b_shift,  next_b_shift;
   logic [63:0] result,   next_result;
 
-  always_ff @( posedge clk ) begin
+  // Selected flop-input (next value) for each datapath register, computed by the
+  // always_comb blocks below. Distinct from next_opa/next_opb/... which are only
+  // the CALC-state candidate coming out of IterativeMulDivRemStepL7.
+  logic [63:0] opa_next, opb_next;
+  logic [32:0] b_shift_next;
+  logic [63:0] result_next;
+
+  // opa next-value logic
+  always_comb begin
     if( curr_state == CALC ) begin
-      opa     <= next_opa;
-      opb     <= next_opb;
-      b_shift <= next_b_shift;
-      result  <= next_result;
+      opa_next = next_opa;
     end else if( curr_state == SWAP_SIGN ) begin
       // Need to make sure that opb is positive
-      opa     <= ~opa + 1;
-      opb     <= ~opb + 1;
+      opa_next = ~opa + 1;
+    end else if( initialize ) begin
+      opa_next = init_opa;
+    end else begin
+      opa_next = opa;
+    end
+  end
+
+  //synopsys sync_set_reset "rst"
+  always_ff @( posedge clk ) begin
+    if( rst ) opa <= '0;
+    else      opa <= opa_next;
+  end
+
+  // opb next-value logic
+  always_comb begin
+    if( curr_state == CALC ) begin
+      opb_next = next_opb;
+    end else if( curr_state == SWAP_SIGN ) begin
+      // Need to make sure that opb is positive
+      opb_next = ~opb + 1;
+    end else if( initialize ) begin
+      opb_next = init_opb;
+    end else begin
+      opb_next = opb;
+    end
+  end
+
+  //synopsys sync_set_reset "rst"
+  always_ff @( posedge clk ) begin
+    if( rst ) opb <= '0;
+    else      opb <= opb_next;
+  end
+
+  // b_shift next-value logic
+  always_comb begin
+    if( curr_state == CALC ) begin
+      b_shift_next = next_b_shift;
+    end else if( initialize ) begin
+      b_shift_next = { 1'b1, 32'b0 };
+    end else begin
+      b_shift_next = b_shift;
+    end
+  end
+
+  //synopsys sync_set_reset "rst"
+  always_ff @( posedge clk ) begin
+    if( rst ) b_shift <= '0;
+    else      b_shift <= b_shift_next;
+  end
+
+  // result next-value logic
+  always_comb begin
+    if( curr_state == CALC ) begin
+      result_next = next_result;
     end else if( curr_state == RESTORE_SIGN ) begin
       // Need to fix sign for remainder
-      result  <= ~result + 1;
+      result_next = ~result + 1;
     end else if( initialize ) begin
-      opa     <= init_opa;
-      opb     <= init_opb;
-      b_shift <= { 1'b1, 32'b0 };
-      result  <= 64'b0;
+      result_next = 64'b0;
+    end else begin
+      result_next = result;
     end
+  end
+
+  //synopsys sync_set_reset "rst"
+  always_ff @( posedge clk ) begin
+    if( rst ) result <= '0;
+    else      result <= result_next;
   end
 
   IterativeMulDivRemStepL7 mul_div_rem_step (
@@ -399,6 +499,7 @@ module IterativeMulDivRemL7 (
   assign W.preg    = D_reg.preg;
   assign W.ppreg   = D_reg.ppreg;
   assign W.wen     = 1'b1;
+  assign W.is_fp   = D_reg.is_fp;
 
   always_comb begin
     case( D_reg.uop )

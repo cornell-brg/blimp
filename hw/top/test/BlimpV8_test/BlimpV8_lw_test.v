@@ -25,12 +25,16 @@ module BlimpV8TestSuite_lw #(
     .p_mem_recv_intv_delay (p_mem_recv_intv_delay)
   ) h();
 
+  integer seed = 32'hDEADBEEF;
+
   `include "hw/top/test/test_cases/directed/lw_test_cases.v"
   `include "hw/top/test/test_cases/golden/lw_test_cases.v"
+  `include "hw/top/test/test_cases/randomized/lw_test_cases.v"
   task run_test_suite();
     h.t.test_suite_begin( suite_name );
     run_directed_lw_tests();
     run_golden_lw_tests();
+    run_randomized_lw_tests();
   endtask
 endmodule
 

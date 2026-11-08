@@ -51,7 +51,7 @@ module FetchUnitL3
   // Local Parameters
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-  localparam p_rst_addr     = 32'h200;
+  localparam p_rst_addr     = 32'h000;
   localparam p_seq_num_bits = D.p_seq_num_bits;
   
   localparam p_flight_bits   = $clog2(p_max_in_flight) + 1;
@@ -161,11 +161,11 @@ module FetchUnitL3
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
   always_comb begin
-    mem.req_val        = (num_in_flight + num_to_squash < p_max_in_flight);
+    mem.req_val        = (num_in_flight + num_to_squash < p_max_in_flight) & !rst;
     mem.req_msg.op     = MEM_MSG_READ;
-    mem.req_msg.opaque = 'x;
+    mem.req_msg.opaque = '0;
     mem.req_msg.strb   = '0;
-    mem.req_msg.data   = 'x;
+    mem.req_msg.data   = '0;
   end
 
   //----------------------------------------------------------------------

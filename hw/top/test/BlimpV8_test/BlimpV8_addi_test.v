@@ -25,21 +25,30 @@ module BlimpV8TestSuite_addi #(
     .p_mem_recv_intv_delay (p_mem_recv_intv_delay)
   ) h();
 
+  integer seed = 32'hDEADBEEF;
+
   `include "hw/top/test/test_cases/directed/addi_test_cases.v"
   `include "hw/top/test/test_cases/golden/addi_test_cases.v"
-  task run_test_suite();
+  `include "hw/top/test/test_cases/randomized/addi_test_cases.v"
+  task automatic run_test_suite();
     h.t.test_suite_begin( suite_name );
     run_directed_addi_tests();
     run_golden_addi_tests();
+    run_randomized_addi_tests();
   endtask
 endmodule
 
 module BlimpV8_addi_test;
   BlimpV8TestSuite_addi #(1)                 suite_1();
+  // verilog_lint: waive module-parameter -- project prefers positional params here
   BlimpV8TestSuite_addi #(2, 8, 5, 36, 1, 1) suite_2();
+  // verilog_lint: waive module-parameter -- project prefers positional params here
   BlimpV8TestSuite_addi #(3, 4, 3, 33, 1, 1) suite_3();
+  // verilog_lint: waive module-parameter -- project prefers positional params here
   BlimpV8TestSuite_addi #(4,32, 4, 50, 3, 1) suite_4();
+  // verilog_lint: waive module-parameter -- project prefers positional params here
   BlimpV8TestSuite_addi #(5, 2, 2, 48, 1, 3) suite_5();
+  // verilog_lint: waive module-parameter -- project prefers positional params here
   BlimpV8TestSuite_addi #(6, 4, 6, 42, 3, 3) suite_6();
   int s;
 

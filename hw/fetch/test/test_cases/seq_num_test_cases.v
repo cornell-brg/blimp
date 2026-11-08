@@ -13,12 +13,12 @@ task test_case_seq_num_1_basic();
 
   for( int i = 0; i < 8; i = i + 1 ) begin
     //               addr             data
-    fl_mem.init_mem( 'h200 + (4 * i), i * 2 );
+    fl_mem.init_mem( 'h000 + (4 * i), i * 2 );
   end
 
   for( int i = 0; i < 8; i = i + 1 ) begin
     //    inst   pc               seq_num
-    recv( i * 2, 'h200 + (4 * i), p_seq_num_bits'(i) );
+    recv( i * 2, 'h000 + (4 * i), p_seq_num_bits'(i) );
   end
 
   t.test_case_end();
@@ -34,12 +34,12 @@ task test_case_seq_num_2_capacity();
 
   for( int i = 0; i < 2 * p_num_seq_nums; i = i + 1 ) begin
     //               addr             data
-    fl_mem.init_mem( 'h200 + (4 * i), i * 2 );
+    fl_mem.init_mem( 'h000 + (4 * i), i * 2 );
   end
 
   for( int i = 0; i < p_num_seq_nums - 1; i = i + 1 ) begin
     //    inst   pc               seq_num
-    recv( i * 2, 'h200 + (4 * i), p_seq_num_bits'(i) );
+    recv( i * 2, 'h000 + (4 * i), p_seq_num_bits'(i) );
   end
 
   // Commit instructions so we can issue more
@@ -47,7 +47,7 @@ task test_case_seq_num_2_capacity();
     commit( p_seq_num_bits'(i - (p_num_seq_nums - 1)) );
 
     //    inst   pc               seq_num
-    recv( i * 2, 'h200 + (4 * i), p_seq_num_bits'(i) );
+    recv( i * 2, 'h000 + (4 * i), p_seq_num_bits'(i) );
   end
 
   t.test_case_end();
@@ -63,12 +63,12 @@ task test_case_seq_num_3_ooo_commit();
 
   for( int i = 0; i < 2 * p_num_seq_nums; i = i + 1 ) begin
     //               addr             data
-    fl_mem.init_mem( 'h200 + (4 * i), i * 3 );
+    fl_mem.init_mem( 'h000 + (4 * i), i * 3 );
   end
 
   for( int i = 0; i < p_num_seq_nums - 1; i = i + 1 ) begin
     //    inst   pc               seq_num
-    recv( i * 3, 'h200 + (4 * i), p_seq_num_bits'(i) );
+    recv( i * 3, 'h000 + (4 * i), p_seq_num_bits'(i) );
   end
 
   // Commit outstanding instructions out-of-order
@@ -80,7 +80,7 @@ task test_case_seq_num_3_ooo_commit();
   for( int i = p_num_seq_nums - 1; i < ( 2 * p_num_seq_nums ) - 2; i = i + 1 ) begin
 
     //    inst   pc               seq_num
-    recv( i * 3, 'h200 + (4 * i), p_seq_num_bits'(i) );
+    recv( i * 3, 'h000 + (4 * i), p_seq_num_bits'(i) );
   end
 
   t.test_case_end();

@@ -14,7 +14,7 @@ package UArch;
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // A linearization of opcodes to indicate a specific instruction type
 
-  parameter num_ops = 36;
+  parameter num_ops = 48;
 
   typedef enum logic [$clog2(num_ops)-1:0] {
     // Arithmetic
@@ -59,7 +59,24 @@ package UArch;
     OP_DIV,
     OP_DIVU,
     OP_REM,
-    OP_REMU
+    OP_REMU,
+
+    // CSR
+    OP_CSRRW,
+    OP_CSRRS,
+    OP_CSRRC,
+
+    // FP
+    OP_FADD_S,
+    OP_FSUB_S,
+    OP_FMUL_S,
+    OP_FLW,
+    OP_FSW,
+    OP_FSGNJ_S,
+    OP_FCVT_W_S,
+    OP_FMV_X_W,
+    OP_FMV_W_X
+    
   } rv_uop;
 
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -108,6 +125,15 @@ package UArch;
   parameter OP_DIVU_VEC   = num_ops'(1 << OP_DIVU   );
   parameter OP_REM_VEC    = num_ops'(1 << OP_REM    );
   parameter OP_REMU_VEC   = num_ops'(1 << OP_REMU   );
+  parameter OP_FADD_VEC   = num_ops'(1 << OP_FADD_S );
+  parameter OP_FSUB_VEC   = num_ops'(1 << OP_FSUB_S );
+  parameter OP_FMUL_VEC   = num_ops'(1 << OP_FMUL_S );
+  parameter OP_FLW_VEC    = num_ops'(1 << OP_FLW    );
+  parameter OP_FSW_VEC    = num_ops'(1 << OP_FSW    );
+  parameter OP_FSGNJ_VEC  = num_ops'(1 << OP_FSGNJ_S);
+  parameter OP_FCVT_W_S_VEC = num_ops'(1 << OP_FCVT_W_S);
+  parameter OP_FMV_X_W_VEC = num_ops'(1 << OP_FMV_X_W);
+  parameter OP_FMV_W_X_VEC = num_ops'(1 << OP_FMV_W_X);
 
   parameter p_tinyrv1 = OP_ADD_VEC
                       | OP_MUL_VEC
@@ -115,10 +141,14 @@ package UArch;
                       | OP_SW_VEC
                       | OP_JAL_VEC
                       | OP_JALR_VEC
-                      | OP_BNE_VEC;
+                      | OP_BNE_VEC
+                      | OP_FADD_VEC
+                      | OP_FSUB_VEC
+                      | OP_FLW_VEC
+                      | OP_FSW_VEC;
   // verilator lint_on UNUSEDPARAM
 
-  function logic in_subset( 
+  function automatic logic in_subset( 
     logic [num_ops-1:0] subset, 
     logic [num_ops-1:0] op_vec
   );

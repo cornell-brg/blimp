@@ -12,7 +12,7 @@
 
 module RenameTable #(
   parameter p_num_phys_regs  = 36,
-
+  parameter p_is_fp_domain   = 0,
   parameter p_phys_addr_bits = $clog2(p_num_phys_regs)
 ) (
   input  logic clk,
@@ -59,10 +59,12 @@ module RenameTable #(
     logic [p_phys_addr_bits-1:0] preg;
   } rt_entry_t;
 
-  rt_entry_t rename_table      [31:1]; // No x0
-  rt_entry_t rename_table_next [31:1];
-  logic      free_list         [p_num_phys_regs-1:1];
-  logic      free_list_next    [p_num_phys_regs-1:1];
+  // Integer domain: architectural reg 0 is special
+  // FP domain: architectural reg 0 is a normal register
+  rt_entry_t rename_table      [31:0];
+  rt_entry_t rename_table_next [31:0];
+  logic      free_list         [p_num_phys_regs-1:0];
+  logic      free_list_next    [p_num_phys_regs-1:0];
 
   // ---------------------------------------------------------------------
   // Update Logic
@@ -78,10 +80,13 @@ module RenameTable #(
 
   genvar i;
   generate
-    for( i = 1; i < 32; i = i + 1 ) begin: RENAME_UPDATE
+    for( i = 0; i < 32; i = i + 1 ) begin: RENAME_UPDATE
       always_ff @( posedge clk ) begin
         if( rst ) begin
-          rename_table[i] <= '{pending: 1'b0, preg: p_phys_addr_bits'(i)};
+          if ( !p_is_fp_domain && (i == 0) )
+            rename_table[i] <= '{pending: 1'b0, preg: '0};
+          else
+            rename_table[i] <= '{pending: 1'b0, preg: p_phys_addr_bits'(i)};
         end else begin
           rename_table[i] <= rename_table_next[i];
         end
@@ -91,7 +96,7 @@ module RenameTable #(
         rename_table_next[i] = rename_table[i];
         if( complete_val & ( complete_preg == rename_table[i].preg ) )
           rename_table_next[i].pending = 1'b0;
-        if( alloc_xfer & ( alloc_areg == i )) begin
+        if( alloc_xfer & ( alloc_areg == i ) ) begin
           rename_table_next[i].pending = 1'b1;
           rename_table_next[i].preg    = alloc_preg;
         end
@@ -100,10 +105,12 @@ module RenameTable #(
   endgenerate
 
   generate
-    for( i = 1; i < p_num_phys_regs; i = i + 1 ) begin: FREE_UPDATE
+    for( i = 0; i < p_num_phys_regs; i = i + 1 ) begin: FREE_UPDATE
       always_ff @( posedge clk ) begin
         if( rst ) begin
-          if( i < 32 )
+          if ( !p_is_fp_domain && (i == 0) )
+            free_list[i] <= 1'b0;
+          else if( i < 32 )
             free_list[i] <= 1'b0;
           else
             free_list[i] <= 1'b1;
@@ -130,34 +137,58 @@ module RenameTable #(
   assign alloc_xfer = alloc_en & alloc_rdy;
 
   // Use priority encoder to get first free physical address
-  logic [p_num_phys_regs-1:1] preg_alloc_sel_in, preg_alloc_sel_out;
+  logic [p_num_phys_regs-1:0] preg_alloc_sel_in, preg_alloc_sel_out;
 
   generate
-    for( i = 1; i < p_num_phys_regs; i = i + 1 ) begin: PACK_FREE
-      assign preg_alloc_sel_in[i] = free_list[i];
+    for( i = 0; i < p_num_phys_regs; i = i + 1 ) begin: PACK_FREE
+      assign preg_alloc_sel_in[i] = ( !p_is_fp_domain && (i == 0) ) ? 1'b0
+                                                                    : free_list[i];
     end
   endgenerate
 
   PriorityEncoder #( 
-    .p_width (p_num_phys_regs - 1)
+    .p_width (p_num_phys_regs)
   ) preg_sel (
     .in  (preg_alloc_sel_in),
     .out (preg_alloc_sel_out)
   );
 
-  logic [p_phys_addr_bits-1:0] preg_alloc_mask [p_num_phys_regs-1:1];
+  logic [p_phys_addr_bits-1:0] preg_alloc_mask [p_num_phys_regs-1:0];
 
   generate
-    for( i = 1; i < p_num_phys_regs; i = i + 1 ) begin: SELECT_PHYS
+    for( i = 0; i < p_num_phys_regs; i = i + 1 ) begin: SELECT_PHYS
       assign preg_alloc_mask[i] = ( preg_alloc_sel_out[i] ) ? p_phys_addr_bits'(i)
                                                             : '0;
     end
   endgenerate
 
+<<<<<<< HEAD
+`ifndef SYNTHESIS
   assign alloc_preg  = ( alloc_areg != 0 ) ? preg_alloc_mask.or()
                                            : 0;
+`else
+  logic [p_phys_addr_bits-1:0] alloc_preg_or;
+  
+  always_comb begin
+    alloc_preg_or = '0;
+    for (int k = 1; k < p_num_phys_regs; k = k + 1) begin
+      alloc_preg_or = alloc_preg_or | preg_alloc_mask[k];
+    end
+  end
+  
+  assign alloc_preg  = ( alloc_areg != 0 ) ? alloc_preg_or
+                                           : 0;
+`endif // SYNTHESIS
+
   assign alloc_ppreg = ( alloc_areg != 0 ) ? rename_table[alloc_areg].preg
                                            : 0;
+=======
+  assign alloc_preg  = ( !p_is_fp_domain && (alloc_areg == 0) ) ? '0
+                                                                : preg_alloc_mask.or();
+
+  assign alloc_ppreg = ( !p_is_fp_domain && (alloc_areg == 0) ) ? '0
+                                                                : rename_table[alloc_areg].preg;
+>>>>>>> origin/blimp-v9-infra/rtl
   
   // Only allocate when we have an entry to give
   assign alloc_rdy = |preg_alloc_sel_in;
@@ -171,23 +202,23 @@ module RenameTable #(
   assign unused_lookup_en[1] = lookup_en[1];
 
   always_comb begin
-    if( lookup_areg[0] == '0 ) begin
+    if( !p_is_fp_domain && (lookup_areg[0] == '0) ) begin
       lookup_preg[0]    = '0;
       lookup_pending[0] = 0;
     end else begin
       lookup_preg[0]    = rename_table[lookup_areg[0]].preg;
-      if( complete_preg == lookup_preg[0] )
+      if( complete_val && ( complete_preg == lookup_preg[0] ) )
         lookup_pending[0] = 1'b0; // Bypass
       else
         lookup_pending[0] = rename_table[lookup_areg[0]].pending;
     end
 
-    if( lookup_areg[1] == '0 ) begin
+    if( !p_is_fp_domain && (lookup_areg[1] == '0) ) begin
       lookup_preg[1]    = '0;
       lookup_pending[1] = 0;
     end else begin
       lookup_preg[1]    = rename_table[lookup_areg[1]].preg;
-      if( complete_preg == lookup_preg[1] )
+      if( complete_val && ( complete_preg == lookup_preg[1] ) )
         lookup_pending[1] = 1'b0; // Bypass
       else
         lookup_pending[1] = rename_table[lookup_areg[1]].pending;
@@ -198,14 +229,14 @@ module RenameTable #(
   // Not pending on complete
   // ---------------------------------------------------------------------
 
-  assign complete_val  = complete.val;
+  assign complete_val  = complete.val & (complete.is_fp == p_is_fp_domain);
   assign complete_preg = complete.preg;
 
   // ---------------------------------------------------------------------
   // Free on commit
   // ---------------------------------------------------------------------
 
-  assign free_val   = commit.val;
+  assign free_val   = commit.val & (commit.is_fp == p_is_fp_domain);
   assign free_ppreg = commit.ppreg;
 
   // ---------------------------------------------------------------------

@@ -142,10 +142,10 @@ module WritebackCommitUnitL2 #(
     if ( rst )
       X_reg <= '{ 
         val: 1'b0, 
-        pc: 'x,
-        seq_num: 'x, 
-        waddr: 'x, 
-        wdata: 'x, 
+        pc: '0,
+        seq_num: '0, 
+        waddr: '0, 
+        wdata: '0, 
         wen: 1'b0
       };
     else
@@ -165,10 +165,10 @@ module WritebackCommitUnitL2 #(
     else
       X_reg_next = '{ 
         val: 1'b0, 
-        pc: 'x,
-        seq_num: 'x, 
-        waddr: 'x, 
-        wdata: 'x, 
+        pc: '0,
+        seq_num: '0, 
+        waddr: '0, 
+        wdata: '0, 
         wen: 1'b0
       };
   end
@@ -219,10 +219,12 @@ module WritebackCommitUnitL2 #(
   assign commit.wdata = rob_output.wdata;
   assign commit.wen   = rob_output.wen;
 
-  assign arb_commit.pc    = rob_output.pc;
-  assign arb_commit.waddr = rob_output.waddr;
-  assign arb_commit.wdata = rob_output.wdata;
-  assign arb_commit.wen   = rob_output.wen;
+  assign arb_commit.val     = commit.val;
+  assign arb_commit.pc      = commit.pc;
+  assign arb_commit.seq_num = commit.seq_num;
+  assign arb_commit.waddr   = commit.waddr;
+  assign arb_commit.wdata   = commit.wdata;
+  assign arb_commit.wen     = commit.wen;
 
   //----------------------------------------------------------------------
   // Linetracing

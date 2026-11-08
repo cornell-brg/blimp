@@ -67,7 +67,7 @@ module SeqNumGenL2 #(
   //----------------------------------------------------------------------
 
   // Can only allocate if we're not about to wrap around
-  assign alloc_val = !( curr_head_ptr + 1 == curr_tail_ptr );
+  assign alloc_val = ( (curr_tail_ptr == 0) ? !(curr_head_ptr == '1) : !(curr_head_ptr + 1 == curr_tail_ptr) );
 
   assign is_alloc = alloc_val & alloc_rdy;
   assign alloc_seq_num = curr_head_ptr;

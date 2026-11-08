@@ -27,7 +27,7 @@ function(vlint TARGET)
     VLINT
     ""
     "TARGET_NAME"
-    "SOURCES;INCLUDE_DIRS;DEPENDS"
+    "VERILATOR_FLAGS;SOURCES;INCLUDE_DIRS;DEPENDS"
     ${ARGN}
   )
 
@@ -39,6 +39,7 @@ function(vlint TARGET)
     ${VERILATOR_BIN}
     --lint-only
     ${VLINT_FLAGS}
+    ${VLINT_VERILATOR_FLAGS}
     ${INCLUDE_FLAGS}
     ${VLINT_SOURCES}
   )

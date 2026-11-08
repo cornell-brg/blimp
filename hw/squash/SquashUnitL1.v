@@ -150,8 +150,8 @@ module SquashUnitL1 #(
           assign intermediate_target[i]  = arb[i].target;
           assign intermediate_val[i]     = arb[i].val;
         end else begin
-          assign intermediate_seq_num[i] = 'x;
-          assign intermediate_target[i]  = 'x;
+          assign intermediate_seq_num[i] = '0;
+          assign intermediate_target[i]  = '0;
           assign intermediate_val[i]     = 1'b0;
         end
       end

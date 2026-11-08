@@ -21,12 +21,24 @@
 
 std::map<std::string, std::function<std::string( uint32_t )>>
     disasm_field_map = {
-        { "rs1", get_rs1_id },       { "rs2", get_rs2_id },
-        { "rd", get_rd_id },         { "imm_i", get_imm_i_id },
-        { "imm_s", get_imm_s_id },   { "imm_b", get_imm_b_id },
-        { "imm_u", get_imm_u_id },   { "imm_j", get_imm_j_id },
-        { "imm_is", get_imm_is_id }, { "pred", get_pred_id },
-        { "succ", get_succ_id } };
+        { "rs1", get_rs1_id },
+        { "rs2", get_rs2_id },
+        { "rd",  get_rd_id  },
+
+        // FP register fields
+        { "frs1", get_frs1_id },
+        { "frs2", get_frs2_id },
+        { "frd",  get_frd_id  },
+
+        { "imm_i", get_imm_i_id },
+        { "imm_s", get_imm_s_id },
+        { "imm_b", get_imm_b_id },
+        { "imm_u", get_imm_u_id },
+        { "imm_j", get_imm_j_id },
+        { "imm_is", get_imm_is_id },
+        { "pred", get_pred_id },
+        { "succ", get_succ_id }
+    };
 
 std::map<std::string, std::function<std::string( uint32_t, uint32_t )>>
     disasm_pc_field_map = { { "addr_b", get_addr_b_id },

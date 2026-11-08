@@ -12,17 +12,17 @@ task test_case_squash_basic();
   if( !t.run_test ) return;
 
   //               addr  data
-  fl_mem.init_mem( 'h200, 32'hdeadbeef );
-  fl_mem.init_mem( 'h204, 32'hcafef00d );
-  fl_mem.init_mem( 'h208, 32'hbaadb0ba );
+  fl_mem.init_mem( 'h000, 32'hdeadbeef );
+  fl_mem.init_mem( 'h004, 32'hcafef00d );
+  fl_mem.init_mem( 'h008, 32'hbaadb0ba );
 
   //    inst          pc     seq_num
-  recv( 32'hdeadbeef, 'h200, 0 );
+  recv( 32'hdeadbeef, 'h000, 0 );
 
   //      seq_num target
-  squash( 0,      'h208 );
+  squash( 0,      'h008 );
 
-  recv( 32'hbaadb0ba, 'h208, 1 );
+  recv( 32'hbaadb0ba, 'h008, 1 );
 
   t.test_case_end();
 endtask
@@ -36,21 +36,21 @@ task test_case_squash_forward();
   if( !t.run_test ) return;
 
   //               addr  data
-  fl_mem.init_mem( 'h200, 32'h10101010 );
-  fl_mem.init_mem( 'h204, 32'h20202020 );
-  fl_mem.init_mem( 'h208, 32'h30303030 );
-  fl_mem.init_mem( 'h20c, 32'h40404040 );
-  fl_mem.init_mem( 'h210, 32'h50505050 );
+  fl_mem.init_mem( 'h000, 32'h10101010 );
+  fl_mem.init_mem( 'h004, 32'h20202020 );
+  fl_mem.init_mem( 'h008, 32'h30303030 );
+  fl_mem.init_mem( 'h00c, 32'h40404040 );
+  fl_mem.init_mem( 'h010, 32'h50505050 );
 
   //    inst          pc     seq_num
-  recv( 32'h10101010, 'h200, 0 );
-  recv( 32'h20202020, 'h204, 1 );
+  recv( 32'h10101010, 'h000, 0 );
+  recv( 32'h20202020, 'h004, 1 );
 
   //      seq_num target
-  squash( 0,      'h20c );
+  squash( 0,      'h00c );
 
-  recv( 32'h40404040, 'h20c, 1 );
-  recv( 32'h50505050, 'h210, 2 );
+  recv( 32'h40404040, 'h00c, 1 );
+  recv( 32'h50505050, 'h010, 2 );
 
   t.test_case_end();
 endtask
@@ -64,20 +64,20 @@ task test_case_squash_backward();
   if( !t.run_test ) return;
 
   //               addr  data
-  fl_mem.init_mem( 'h200, 32'hf0f0f0f0 );
-  fl_mem.init_mem( 'h204, 32'he0e0e0e0 );
-  fl_mem.init_mem( 'h208, 32'hd0d0d0d0 );
-  fl_mem.init_mem( 'h20c, 32'hc0c0c0c0 );
+  fl_mem.init_mem( 'h000, 32'hf0f0f0f0 );
+  fl_mem.init_mem( 'h004, 32'he0e0e0e0 );
+  fl_mem.init_mem( 'h008, 32'hd0d0d0d0 );
+  fl_mem.init_mem( 'h00c, 32'hc0c0c0c0 );
 
   //    inst          pc     seq_num
-  recv( 32'hf0f0f0f0, 'h200, 0 );
-  recv( 32'he0e0e0e0, 'h204, 1 );
-  recv( 32'hd0d0d0d0, 'h208, 2 );
+  recv( 32'hf0f0f0f0, 'h000, 0 );
+  recv( 32'he0e0e0e0, 'h004, 1 );
+  recv( 32'hd0d0d0d0, 'h008, 2 );
 
   //      seq_num target
-  squash( 1,      'h200 );
+  squash( 1,      'h000 );
 
-  recv( 32'hf0f0f0f0, 'h200, 2 );
+  recv( 32'hf0f0f0f0, 'h000, 2 );
 
   t.test_case_end();
 endtask
@@ -91,13 +91,13 @@ task test_case_squash_many();
   if( !t.run_test ) return;
 
   //               addr  data
-  fl_mem.init_mem( 'h200, 32'hf0f0f0f0 );
-  fl_mem.init_mem( 'h204, 32'he0e0e0e0 );
-  fl_mem.init_mem( 'h208, 32'hd0d0d0d0 );
-  fl_mem.init_mem( 'h20c, 32'hc0c0c0c0 );
+  fl_mem.init_mem( 'h000, 32'hf0f0f0f0 );
+  fl_mem.init_mem( 'h004, 32'he0e0e0e0 );
+  fl_mem.init_mem( 'h008, 32'hd0d0d0d0 );
+  fl_mem.init_mem( 'h00c, 32'hc0c0c0c0 );
 
   //    inst          pc     seq_num
-  recv( 32'hf0f0f0f0, 'h200, 0 );
+  recv( 32'hf0f0f0f0, 'h000, 0 );
 
   // Delay to build up in-flight requests
   for( int i = 0; i < 5; i = i + 1 ) begin
@@ -106,9 +106,9 @@ task test_case_squash_many();
   end
 
   //      seq_num target
-  squash( 0,      'h200 );
+  squash( 0,      'h000 );
 
-  recv( 32'hf0f0f0f0, 'h200, 1 );
+  recv( 32'hf0f0f0f0, 'h000, 1 );
 
   for( int i = 0; i < 5; i = i + 1 ) begin
     @( posedge clk );
@@ -116,9 +116,9 @@ task test_case_squash_many();
   end
 
   //      seq_num target
-  squash( 1,      'h200 );
+  squash( 1,      'h000 );
 
-  recv( 32'hf0f0f0f0, 'h200, 2 );
+  recv( 32'hf0f0f0f0, 'h000, 2 );
 
   t.test_case_end();
 endtask
@@ -132,13 +132,13 @@ task test_case_squash_multi();
   if( !t.run_test ) return;
 
   //               addr  data
-  fl_mem.init_mem( 'h200, 32'hf0f0f0f0 );
-  fl_mem.init_mem( 'h204, 32'he0e0e0e0 );
-  fl_mem.init_mem( 'h208, 32'hd0d0d0d0 );
-  fl_mem.init_mem( 'h20c, 32'hc0c0c0c0 );
+  fl_mem.init_mem( 'h000, 32'hf0f0f0f0 );
+  fl_mem.init_mem( 'h004, 32'he0e0e0e0 );
+  fl_mem.init_mem( 'h008, 32'hd0d0d0d0 );
+  fl_mem.init_mem( 'h00c, 32'hc0c0c0c0 );
 
   //    inst          pc     seq_num
-  recv( 32'hf0f0f0f0, 'h200, 0 );
+  recv( 32'hf0f0f0f0, 'h000, 0 );
 
   for( int j = 1; j < 4; j = j + 1 ) begin
     // Delay to build up in-flight requests
@@ -148,9 +148,9 @@ task test_case_squash_multi();
     end
 
     //      seq_num                 target
-    squash( p_seq_num_bits'(j - 1), 'h200 );
+    squash( p_seq_num_bits'(j - 1), 'h000 );
 
-    recv( 32'hf0f0f0f0, 'h200, p_seq_num_bits'(j) );
+    recv( 32'hf0f0f0f0, 'h000, p_seq_num_bits'(j) );
   end
 
   t.test_case_end();
@@ -166,7 +166,7 @@ task test_case_squash_max_in_flight();
 
   for( int i = 0; i < 3 * p_max_in_flight + 4; i = i + 1 ) begin
     //               addr                data
-    fl_mem.init_mem( 'h200 + 32'(4 * i), 32'(i) );
+    fl_mem.init_mem( 'h000 + 32'(4 * i), 32'(i) );
   end
 
   // Wait a while, then squash multiple times
@@ -175,13 +175,13 @@ task test_case_squash_max_in_flight();
       @( posedge clk ); // Request is sent out
       #1;
     end
-    squash( 0, 'h200 );
+    squash( 0, 'h000 );
   end
 
   // Check that we still receive the correct messages
   for( int i = 0; i < 2 * p_max_in_flight; i = i + 1 ) begin
     //    inst    pc              seq_num
-    recv( 32'(i), 'h200 + 32'(4 * i), p_seq_num_bits'(i + 1) );
+    recv( 32'(i), 'h000 + 32'(4 * i), p_seq_num_bits'(i + 1) );
     commit( p_seq_num_bits'(i + 1) );
   end
 

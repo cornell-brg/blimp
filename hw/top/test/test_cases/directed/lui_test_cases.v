@@ -14,11 +14,11 @@ task test_case_directed_lui_1_basic();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "lui  x1, 0x001"  );
+  h.asm( 'h000, "lui  x1, 0x001"  );
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h0000_1000, 1 ); // lui  x1, 0x001
+  h.check_trace( 'h000, 1, 'h0000_1000, 1 ); // lui  x1, 0x001
 
   h.t.test_case_end();
 endtask
@@ -34,21 +34,21 @@ task test_case_directed_lui_2_extreme();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "lui  x0, 0x12345" );
+  h.asm( 'h000, "lui  x0, 0x12345" );
 
-  h.asm( 'h204, "lui  x1, 0x00000" );
-  h.asm( 'h208, "lui  x2, 0xfffff" );
-  h.asm( 'h20c, "lui  x3, 0x7ffff" );
-  h.asm( 'h210, "lui  x4, 0x80000" );
+  h.asm( 'h004, "lui  x1, 0x00000" );
+  h.asm( 'h008, "lui  x2, 0xfffff" );
+  h.asm( 'h00c, "lui  x3, 0x7ffff" );
+  h.asm( 'h010, "lui  x4, 0x80000" );
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 'x, 'x,   0 ); // lui  x0, 0x12345
+  h.check_trace( 'h000, 'x, 'x,   0 ); // lui  x0, 0x12345
   
-  h.check_trace( 'h204, 1, 'h0000_0000, 1 ); // lui  x1, 0x00000
-  h.check_trace( 'h208, 2, 'hffff_f000, 1 ); // lui  x2, 0xfffff
-  h.check_trace( 'h20c, 3, 'h7fff_f000, 1 ); // lui  x3, 0x7ffff
-  h.check_trace( 'h210, 4, 'h8000_0000, 1 ); // lui  x4, 0x80000
+  h.check_trace( 'h004, 1, 'h0000_0000, 1 ); // lui  x1, 0x00000
+  h.check_trace( 'h008, 2, 'hffff_f000, 1 ); // lui  x2, 0xfffff
+  h.check_trace( 'h00c, 3, 'h7fff_f000, 1 ); // lui  x3, 0x7ffff
+  h.check_trace( 'h010, 4, 'h8000_0000, 1 ); // lui  x4, 0x80000
 
   h.t.test_case_end();
 endtask

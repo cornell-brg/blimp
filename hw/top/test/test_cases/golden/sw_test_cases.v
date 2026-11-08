@@ -14,50 +14,50 @@ task test_case_golden_sw_1_regs();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x100" );
-  h.asm( 'h204, "addi x2,  x0, 0x104" );
-  h.asm( 'h208, "addi x3,  x0, 0x108" );
-  h.asm( 'h20c, "addi x4,  x0, 0x10c" );
+  h.asm( 'h000, "addi x1,  x0, 0x100" );
+  h.asm( 'h004, "addi x2,  x0, 0x104" );
+  h.asm( 'h008, "addi x3,  x0, 0x108" );
+  h.asm( 'h00c, "addi x4,  x0, 0x10c" );
 
-  h.asm( 'h210, "addi x5,  x0, 10" );
-  h.asm( 'h214, "addi x6,  x0, 11" );
-  h.asm( 'h218, "addi x7,  x0, 12" );
-  h.asm( 'h21c, "addi x8,  x0, 13" );
+  h.asm( 'h010, "addi x5,  x0, 10" );
+  h.asm( 'h014, "addi x6,  x0, 11" );
+  h.asm( 'h018, "addi x7,  x0, 12" );
+  h.asm( 'h01c, "addi x8,  x0, 13" );
 
-  h.asm( 'h220, "sw   x5, 0(x1)"     );
-  h.asm( 'h224, "sw   x6, 0(x2)"     );
-  h.asm( 'h228, "sw   x7, 0(x3)"     );
-  h.asm( 'h22c, "sw   x8, 0(x4)"     );
+  h.asm( 'h020, "sw   x5, 0(x1)"     );
+  h.asm( 'h024, "sw   x6, 0(x2)"     );
+  h.asm( 'h028, "sw   x7, 0(x3)"     );
+  h.asm( 'h02c, "sw   x8, 0(x4)"     );
 
-  h.asm( 'h230, "lw   x5, 0(x1)"     );
-  h.asm( 'h234, "lw   x6, 0(x2)"     );
-  h.asm( 'h238, "lw   x7, 0(x3)"     );
-  h.asm( 'h23c, "lw   x8, 0(x4)"     );
+  h.asm( 'h030, "lw   x5, 0(x1)"     );
+  h.asm( 'h034, "lw   x6, 0(x2)"     );
+  h.asm( 'h038, "lw   x7, 0(x3)"     );
+  h.asm( 'h03c, "lw   x8, 0(x4)"     );
 
-  h.asm( 'h240, "addi x28, x0, 0x110" );
-  h.asm( 'h244, "addi x29, x0, 0x114" );
-  h.asm( 'h248, "addi x30, x0, 0x118" );
-  h.asm( 'h24c, "addi x31, x0, 0x11c" );
+  h.asm( 'h040, "addi x28, x0, 0x110" );
+  h.asm( 'h044, "addi x29, x0, 0x114" );
+  h.asm( 'h048, "addi x30, x0, 0x118" );
+  h.asm( 'h04c, "addi x31, x0, 0x11c" );
 
-  h.asm( 'h250, "addi x5,  x0, 14" );
-  h.asm( 'h254, "addi x6,  x0, 15" );
-  h.asm( 'h258, "addi x7,  x0, 16" );
-  h.asm( 'h25c, "addi x8,  x0, 17" );
+  h.asm( 'h050, "addi x5,  x0, 14" );
+  h.asm( 'h054, "addi x6,  x0, 15" );
+  h.asm( 'h058, "addi x7,  x0, 16" );
+  h.asm( 'h05c, "addi x8,  x0, 17" );
 
-  h.asm( 'h260, "sw   x5, 0(x28)"    );
-  h.asm( 'h264, "sw   x6, 0(x29)"    );
-  h.asm( 'h268, "sw   x7, 0(x30)"    );
-  h.asm( 'h26c, "sw   x8, 0(x31)"    );
+  h.asm( 'h060, "sw   x5, 0(x28)"    );
+  h.asm( 'h064, "sw   x6, 0(x29)"    );
+  h.asm( 'h068, "sw   x7, 0(x30)"    );
+  h.asm( 'h06c, "sw   x8, 0(x31)"    );
 
-  h.asm( 'h270, "lw   x5, 0(x28)"    );
-  h.asm( 'h274, "lw   x6, 0(x29)"    );
-  h.asm( 'h278, "lw   x7, 0(x30)"    );
-  h.asm( 'h27c, "lw   x8, 0(x31)"    );
+  h.asm( 'h070, "lw   x5, 0(x28)"    );
+  h.asm( 'h074, "lw   x6, 0(x29)"    );
+  h.asm( 'h078, "lw   x7, 0(x30)"    );
+  h.asm( 'h07c, "lw   x8, 0(x31)"    );
 
   // Write h.data into memory
 
   h.data( 'h100, 'h0101_0101 );
-  h.data( 'h104, 'h0202_0202 );
+  h.data( 'h104, 'h0202_0002 );
   h.data( 'h108, 'h0303_0303 );
   h.data( 'h10c, 'h0404_0404 );
 
@@ -82,42 +82,42 @@ task test_case_golden_sw_2_mix();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x100" );
-  h.asm( 'h204, "addi x2,  x0, 0x110" );
-  h.asm( 'h208, "addi x3,  x0, 0x120" );
-  h.asm( 'h20c, "addi x4,  x0, 0"     );
+  h.asm( 'h000, "addi x1,  x0, 0x100" );
+  h.asm( 'h004, "addi x2,  x0, 0x110" );
+  h.asm( 'h008, "addi x3,  x0, 0x120" );
+  h.asm( 'h00c, "addi x4,  x0, 0"     );
 
-  h.asm( 'h210, "lw   x5,  0(x1)"     );
-  h.asm( 'h214, "lw   x6,  0(x2)"     );
-  h.asm( 'h218, "mul  x7,  x5, x6"    );
-  h.asm( 'h21c, "add  x4,  x4, x7"    );
-  h.asm( 'h220, "sw   x4,  0(x3)"     );
-  h.asm( 'h224, "addi x1,  x1, 4"     );
-  h.asm( 'h228, "addi x2,  x2, 4"     );
-  h.asm( 'h22c, "addi x3,  x3, 4"     );
+  h.asm( 'h010, "lw   x5,  0(x1)"     );
+  h.asm( 'h014, "lw   x6,  0(x2)"     );
+  h.asm( 'h018, "mul  x7,  x5, x6"    );
+  h.asm( 'h01c, "add  x4,  x4, x7"    );
+  h.asm( 'h020, "sw   x4,  0(x3)"     );
+  h.asm( 'h024, "addi x1,  x1, 4"     );
+  h.asm( 'h028, "addi x2,  x2, 4"     );
+  h.asm( 'h02c, "addi x3,  x3, 4"     );
 
-  h.asm( 'h230, "lw   x5,  0(x1)"     );
-  h.asm( 'h234, "lw   x6,  0(x2)"     );
-  h.asm( 'h238, "mul  x7,  x5, x6"    );
-  h.asm( 'h23c, "add  x4,  x4, x7"    );
-  h.asm( 'h240, "sw   x4,  0(x3)"     );
-  h.asm( 'h244, "addi x1,  x1, 4"     );
-  h.asm( 'h248, "addi x2,  x2, 4"     );
-  h.asm( 'h24c, "addi x3,  x3, 4"     );
+  h.asm( 'h030, "lw   x5,  0(x1)"     );
+  h.asm( 'h034, "lw   x6,  0(x2)"     );
+  h.asm( 'h038, "mul  x7,  x5, x6"    );
+  h.asm( 'h03c, "add  x4,  x4, x7"    );
+  h.asm( 'h040, "sw   x4,  0(x3)"     );
+  h.asm( 'h044, "addi x1,  x1, 4"     );
+  h.asm( 'h048, "addi x2,  x2, 4"     );
+  h.asm( 'h04c, "addi x3,  x3, 4"     );
 
-  h.asm( 'h250, "lw   x5,  0(x1)"     );
-  h.asm( 'h254, "lw   x6,  0(x2)"     );
-  h.asm( 'h258, "mul  x7,  x5, x6"    );
-  h.asm( 'h25c, "add  x4,  x4, x7"    );
-  h.asm( 'h260, "sw   x4,  0(x3)"     );
-  h.asm( 'h264, "addi x1,  x1, 4"     );
-  h.asm( 'h268, "addi x2,  x2, 4"     );
-  h.asm( 'h26c, "addi x3,  x3, 4"     );
+  h.asm( 'h050, "lw   x5,  0(x1)"     );
+  h.asm( 'h054, "lw   x6,  0(x2)"     );
+  h.asm( 'h058, "mul  x7,  x5, x6"    );
+  h.asm( 'h05c, "add  x4,  x4, x7"    );
+  h.asm( 'h060, "sw   x4,  0(x3)"     );
+  h.asm( 'h064, "addi x1,  x1, 4"     );
+  h.asm( 'h068, "addi x2,  x2, 4"     );
+  h.asm( 'h06c, "addi x3,  x3, 4"     );
 
-  h.asm( 'h270, "addi x1,  x0, 0x120" );
-  h.asm( 'h274, "lw   x2,  0(x1)"     );
-  h.asm( 'h278, "lw   x3,  4(x1)"     );
-  h.asm( 'h27c, "lw   x4,  8(x1)"     );
+  h.asm( 'h070, "addi x1,  x0, 0x120" );
+  h.asm( 'h074, "lw   x2,  0(x1)"     );
+  h.asm( 'h078, "lw   x3,  4(x1)"     );
+  h.asm( 'h07c, "lw   x4,  8(x1)"     );
 
   // Write h.data into memory
 

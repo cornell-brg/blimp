@@ -91,7 +91,7 @@ _start:
   addi  x30, x0, 0
   addi  x31, x0, 0
 
-  # initialize stack pointer to 0xff000
+  # initialize stack pointer to the top of linker-defined RAM
 
   lui   sp, 0x000ff
 

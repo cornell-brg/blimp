@@ -56,12 +56,12 @@ module MultiplierL1 (
     if ( rst )
       D_reg <= '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        op1:     'x, 
-        op2:     'x,
-        waddr:   'x,
-        uop:     'x
+        pc:      '0,
+        seq_num: '0,
+        op1:     '0, 
+        op2:     '0,
+        waddr:   '0,
+        uop:     '0
       };
     else
       D_reg <= D_reg_next;
@@ -84,12 +84,12 @@ module MultiplierL1 (
     else if ( W_xfer )
       D_reg_next = '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        op1:     'x, 
-        op2:     'x,
-        waddr:   'x,
-        uop:     'x
+        pc:      '0,
+        seq_num: '0,
+        op1:     '0, 
+        op2:     '0,
+        waddr:   '0,
+        uop:     '0
       };
     else
       D_reg_next = D_reg;

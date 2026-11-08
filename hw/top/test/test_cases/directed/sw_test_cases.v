@@ -14,17 +14,17 @@ task test_case_directed_sw_1_basic();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1, x0, 0x100" );
-  h.asm( 'h204, "addi x2, x0, 0x42"  );
-  h.asm( 'h208, "sw   x2, 0(x1)"     );
-  h.asm( 'h20c, "lw   x3, 0(x1)"     );
+  h.asm( 'h000, "addi x1, x0, 0x100" );
+  h.asm( 'h004, "addi x2, x0, 0x42"  );
+  h.asm( 'h008, "sw   x2, 0(x1)"     );
+  h.asm( 'h00c, "lw   x3, 0(x1)"     );
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 2,  'h0000_0042, 1 ); // addi x2, x0, 0x42
-  h.check_trace( 'h208, 'x, 'x,          0 ); // sw   x2, 0(x1)
-  h.check_trace( 'h20c, 3,  'h0000_0042, 1 ); // lw   x3, 0(x1)
+  h.check_trace( 'h000, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 2,  'h0000_0042, 1 ); // addi x2, x0, 0x42
+  h.check_trace( 'h008, 'x, 'x,          0 ); // sw   x2, 0(x1)
+  h.check_trace( 'h00c, 3,  'h0000_0042, 1 ); // lw   x3, 0(x1)
 
   h.t.test_case_end();
 endtask
@@ -40,9 +40,9 @@ task test_case_directed_sw_2_x0();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1, x0, 0x100" );
-  h.asm( 'h204, "sw   x0, 0(x1)"     );
-  h.asm( 'h208, "lw   x2, 0(x1)"     );
+  h.asm( 'h000, "addi x1, x0, 0x100" );
+  h.asm( 'h004, "sw   x0, 0(x1)"     );
+  h.asm( 'h008, "lw   x2, 0(x1)"     );
 
   // Write h.data into memory
 
@@ -50,9 +50,9 @@ task test_case_directed_sw_2_x0();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 'x, 'x,          0 ); // sw   x0, 0(x1)
-  h.check_trace( 'h208, 2,  'h0000_0000, 1 ); // lw   x2, 0(x1)
+  h.check_trace( 'h000, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 'x, 'x,          0 ); // sw   x0, 0(x1)
+  h.check_trace( 'h008, 2,  'h0000_0000, 1 ); // lw   x2, 0(x1)
 
   h.t.test_case_end();
 endtask
@@ -68,22 +68,22 @@ task test_case_directed_sw_3_offset_pos();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x100" );
+  h.asm( 'h000, "addi x1,  x0, 0x100" );
 
-  h.asm( 'h204, "addi x2,  x0, 20"    );
-  h.asm( 'h208, "addi x3,  x0, 21"    );
-  h.asm( 'h20c, "addi x4,  x0, 22"    );
-  h.asm( 'h210, "addi x5,  x0, 23"    );
+  h.asm( 'h004, "addi x2,  x0, 20"    );
+  h.asm( 'h008, "addi x3,  x0, 21"    );
+  h.asm( 'h00c, "addi x4,  x0, 22"    );
+  h.asm( 'h010, "addi x5,  x0, 23"    );
 
-  h.asm( 'h214, "sw   x2,  0(x1)"     );
-  h.asm( 'h218, "sw   x3,  4(x1)"     );
-  h.asm( 'h21c, "sw   x4,  8(x1)"     );
-  h.asm( 'h220, "sw   x5,  12(x1)"    );
+  h.asm( 'h014, "sw   x2,  0(x1)"     );
+  h.asm( 'h018, "sw   x3,  4(x1)"     );
+  h.asm( 'h01c, "sw   x4,  8(x1)"     );
+  h.asm( 'h020, "sw   x5,  12(x1)"    );
 
-  h.asm( 'h224, "lw   x7,  0(x1)"     );
-  h.asm( 'h228, "lw   x8,  4(x1)"     );
-  h.asm( 'h22c, "lw   x9,  8(x1)"     );
-  h.asm( 'h230, "lw   x10, 12(x1)"    );
+  h.asm( 'h024, "lw   x7,  0(x1)"     );
+  h.asm( 'h028, "lw   x8,  4(x1)"     );
+  h.asm( 'h02c, "lw   x9,  8(x1)"     );
+  h.asm( 'h030, "lw   x10, 12(x1)"    );
 
   // Write h.data into memory
 
@@ -94,22 +94,22 @@ task test_case_directed_sw_3_offset_pos();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h100, 1 ); // addi x1,  x0, 0x100
+  h.check_trace( 'h000, 1, 'h100, 1 ); // addi x1,  x0, 0x100
 
-  h.check_trace( 'h204, 2,    20, 1 ); // addi x2,  x0, 20
-  h.check_trace( 'h208, 3,    21, 1 ); // addi x3,  x0, 21
-  h.check_trace( 'h20c, 4,    22, 1 ); // addi x4,  x0, 22
-  h.check_trace( 'h210, 5,    23, 1 ); // addi x5,  x0, 23
+  h.check_trace( 'h004, 2,    20, 1 ); // addi x2,  x0, 20
+  h.check_trace( 'h008, 3,    21, 1 ); // addi x3,  x0, 21
+  h.check_trace( 'h00c, 4,    22, 1 ); // addi x4,  x0, 22
+  h.check_trace( 'h010, 5,    23, 1 ); // addi x5,  x0, 23
 
-  h.check_trace( 'h214, 'x,   'x, 0 ); // sw   x2,  0(x1)
-  h.check_trace( 'h218, 'x,   'x, 0 ); // sw   x3,  4(x1)
-  h.check_trace( 'h21c, 'x,   'x, 0 ); // sw   x4,  8(x1)
-  h.check_trace( 'h220, 'x,   'x, 0 ); // sw   x5,  12(x1)
+  h.check_trace( 'h014, 'x,   'x, 0 ); // sw   x2,  0(x1)
+  h.check_trace( 'h018, 'x,   'x, 0 ); // sw   x3,  4(x1)
+  h.check_trace( 'h01c, 'x,   'x, 0 ); // sw   x4,  8(x1)
+  h.check_trace( 'h020, 'x,   'x, 0 ); // sw   x5,  12(x1)
 
-  h.check_trace( 'h224, 7,    20, 1 ); // lw   x7,  0(x1)
-  h.check_trace( 'h228, 8,    21, 1 ); // lw   x8,  4(x1)
-  h.check_trace( 'h22c, 9,    22, 1 ); // lw   x9,  8(x1)
-  h.check_trace( 'h230, 10,   23, 1 ); // lw   x10, 12(x1)
+  h.check_trace( 'h024, 7,    20, 1 ); // lw   x7,  0(x1)
+  h.check_trace( 'h028, 8,    21, 1 ); // lw   x8,  4(x1)
+  h.check_trace( 'h02c, 9,    22, 1 ); // lw   x9,  8(x1)
+  h.check_trace( 'h030, 10,   23, 1 ); // lw   x10, 12(x1)
 
   h.t.test_case_end();
 endtask
@@ -125,24 +125,24 @@ task test_case_directed_sw_4_offset_neg();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x10c" );
+  h.asm( 'h000, "addi x1,  x0, 0x10c" );
 
-  h.asm( 'h204, "addi x2,  x0, 20"    );
-  h.asm( 'h208, "addi x3,  x0, 21"    );
-  h.asm( 'h20c, "addi x4,  x0, 22"    );
-  h.asm( 'h210, "addi x5,  x0, 23"    );
+  h.asm( 'h004, "addi x2,  x0, 20"    );
+  h.asm( 'h008, "addi x3,  x0, 21"    );
+  h.asm( 'h00c, "addi x4,  x0, 22"    );
+  h.asm( 'h010, "addi x5,  x0, 23"    );
 
-  h.asm( 'h214, "sw   x2,  0(x1)"     );
-  h.asm( 'h218, "sw   x3,  -4(x1)"     );
-  h.asm( 'h21c, "sw   x4,  -8(x1)"     );
-  h.asm( 'h220, "sw   x5,  -12(x1)"    );
+  h.asm( 'h014, "sw   x2,  0(x1)"     );
+  h.asm( 'h018, "sw   x3,  -4(x1)"     );
+  h.asm( 'h01c, "sw   x4,  -8(x1)"     );
+  h.asm( 'h020, "sw   x5,  -12(x1)"    );
 
-  h.asm( 'h224, "addi x1,  x0, 0x100" );
+  h.asm( 'h024, "addi x1,  x0, 0x100" );
 
-  h.asm( 'h228, "lw   x7,  0(x1)"     );
-  h.asm( 'h22c, "lw   x8,  4(x1)"     );
-  h.asm( 'h230, "lw   x9,  8(x1)"     );
-  h.asm( 'h234, "lw   x10, 12(x1)"    );
+  h.asm( 'h028, "lw   x7,  0(x1)"     );
+  h.asm( 'h02c, "lw   x8,  4(x1)"     );
+  h.asm( 'h030, "lw   x9,  8(x1)"     );
+  h.asm( 'h034, "lw   x10, 12(x1)"    );
 
   // Write h.data into memory
 
@@ -153,24 +153,24 @@ task test_case_directed_sw_4_offset_neg();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h10c, 1 ); // addi x1,  x0, 0x10c
+  h.check_trace( 'h000, 1, 'h10c, 1 ); // addi x1,  x0, 0x10c
 
-  h.check_trace( 'h204, 2,    20, 1 ); // addi x2,  x0, 20
-  h.check_trace( 'h208, 3,    21, 1 ); // addi x3,  x0, 21
-  h.check_trace( 'h20c, 4,    22, 1 ); // addi x4,  x0, 22
-  h.check_trace( 'h210, 5,    23, 1 ); // addi x5,  x0, 23
+  h.check_trace( 'h004, 2,    20, 1 ); // addi x2,  x0, 20
+  h.check_trace( 'h008, 3,    21, 1 ); // addi x3,  x0, 21
+  h.check_trace( 'h00c, 4,    22, 1 ); // addi x4,  x0, 22
+  h.check_trace( 'h010, 5,    23, 1 ); // addi x5,  x0, 23
 
-  h.check_trace( 'h214, 'x,   'x, 0 ); // sw   x2,  0(x1)
-  h.check_trace( 'h218, 'x,   'x, 0 ); // sw   x3,  -4(x1)
-  h.check_trace( 'h21c, 'x,   'x, 0 ); // sw   x4,  -8(x1)
-  h.check_trace( 'h220, 'x,   'x, 0 ); // sw   x5,  -12(x1)
+  h.check_trace( 'h014, 'x,   'x, 0 ); // sw   x2,  0(x1)
+  h.check_trace( 'h018, 'x,   'x, 0 ); // sw   x3,  -4(x1)
+  h.check_trace( 'h01c, 'x,   'x, 0 ); // sw   x4,  -8(x1)
+  h.check_trace( 'h020, 'x,   'x, 0 ); // sw   x5,  -12(x1)
 
-  h.check_trace( 'h224, 1, 'h100, 1 ); // addi x1,  x0, 0x100
+  h.check_trace( 'h024, 1, 'h100, 1 ); // addi x1,  x0, 0x100
 
-  h.check_trace( 'h228, 7,    23, 1 ); // lw   x7,  0(x1)
-  h.check_trace( 'h22c, 8,    22, 1 ); // lw   x8,  4(x1)
-  h.check_trace( 'h230, 9,    21, 1 ); // lw   x9,  8(x1)
-  h.check_trace( 'h234, 10,   20, 1 ); // lw   x10, 12(x1)
+  h.check_trace( 'h028, 7,    23, 1 ); // lw   x7,  0(x1)
+  h.check_trace( 'h02c, 8,    22, 1 ); // lw   x8,  4(x1)
+  h.check_trace( 'h030, 9,    21, 1 ); // lw   x9,  8(x1)
+  h.check_trace( 'h034, 10,   20, 1 ); // lw   x10, 12(x1)
 
   h.t.test_case_end();
 endtask

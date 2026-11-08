@@ -95,8 +95,8 @@ void parse_elf( std::string                               elf_path,
   }
 
   // Verify that our entry point is as expected
-  if ( elf_header->e_entry != 0x200 ) {
-    std::string excp = "Error: Entry point isn't 0x200";
+  if ( elf_header->e_entry != 0x000 ) {
+    std::string excp = "Error: Entry point isn't 0x000";
     throw std::invalid_argument( excp );
   }
 

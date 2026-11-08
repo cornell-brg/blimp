@@ -26,6 +26,7 @@ interface X__WIntf
   logic        wen;
   logic        val;
   logic        rdy;
+  logic        is_fp;
 
   // verilator lint_off UNUSEDSIGNAL
 
@@ -48,6 +49,7 @@ interface X__WIntf
     output wdata,
     output wen,
     output val,
+    output is_fp,
     input  rdy,
 
     // v2
@@ -64,6 +66,7 @@ interface X__WIntf
     input  wdata,
     input  wen,
     input  val,
+    input  is_fp,
     output rdy,
 
     // v2

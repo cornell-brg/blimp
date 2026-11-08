@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
+#include <sstream>
 
 //------------------------------------------------------------------------
 // Internal helper functions
@@ -140,6 +141,40 @@ const std::map<std::string, uint32_t> reg_masks = {
     { "t6", 31 },
 };
 
+//------------------------------------------------------------------------
+// Floating-Point Register Names
+//------------------------------------------------------------------------
+
+const std::map<std::string, uint32_t> freg_masks = {
+
+  // Numeric names
+  { "f0", 0 },  { "f1", 1 },  { "f2", 2 },  { "f3", 3 },
+  { "f4", 4 },  { "f5", 5 },  { "f6", 6 },  { "f7", 7 },
+  { "f8", 8 },  { "f9", 9 },  { "f10", 10 },{ "f11", 11 },
+  { "f12", 12 },{ "f13", 13 },{ "f14", 14 },{ "f15", 15 },
+  { "f16", 16 },{ "f17", 17 },{ "f18", 18 },{ "f19", 19 },
+  { "f20", 20 },{ "f21", 21 },{ "f22", 22 },{ "f23", 23 },
+  { "f24", 24 },{ "f25", 25 },{ "f26", 26 },{ "f27", 27 },
+  { "f28", 28 },{ "f29", 29 },{ "f30", 30 },{ "f31", 31 },
+
+  // ABI names
+  { "ft0", 0 }, { "ft1", 1 }, { "ft2", 2 }, { "ft3", 3 },
+  { "ft4", 4 }, { "ft5", 5 }, { "ft6", 6 }, { "ft7", 7 },
+
+  { "fs0", 8 }, { "fs1", 9 },
+
+  { "fa0", 10 },{ "fa1", 11 },
+
+  { "fa2", 12 },{ "fa3", 13 },{ "fa4", 14 },{ "fa5", 15 },
+  { "fa6", 16 },{ "fa7", 17 },
+
+  { "fs2", 18 },{ "fs3", 19 },{ "fs4", 20 },{ "fs5", 21 },
+  { "fs6", 22 },{ "fs7", 23 },{ "fs8", 24 },{ "fs9", 25 },
+  { "fs10", 26 },{ "fs11", 27 },
+
+  { "ft8", 28 },{ "ft9", 29 },{ "ft10", 30 },{ "ft11", 31 },
+};
+
 uint32_t rs1_mask( const std::string& reg_name )
 {
   return reg_masks.at( reg_name ) << 15;
@@ -153,6 +188,21 @@ uint32_t rs2_mask( const std::string& reg_name )
 uint32_t rd_mask( const std::string& reg_name )
 {
   return reg_masks.at( reg_name ) << 7;
+}
+
+uint32_t frs1_mask( const std::string& reg_name )
+{
+  return freg_masks.at( reg_name ) << 15;
+}
+
+uint32_t frs2_mask( const std::string& reg_name )
+{
+  return freg_masks.at( reg_name ) << 20;
+}
+
+uint32_t frd_mask( const std::string& reg_name )
+{
+  return freg_masks.at( reg_name ) << 7;
 }
 
 uint32_t get_rs1( uint32_t binary )
@@ -183,6 +233,21 @@ std::string get_rs2_id( uint32_t binary )
 std::string get_rd_id( uint32_t binary )
 {
   return "x" + std::to_string( get_rd( binary ) );
+}
+
+std::string get_frs1_id( uint32_t binary )
+{
+  return "f" + std::to_string( get_rs1( binary ) );
+}
+
+std::string get_frs2_id( uint32_t binary )
+{
+  return "f" + std::to_string( get_rs2( binary ) );
+}
+
+std::string get_frd_id( uint32_t binary )
+{
+  return "f" + std::to_string( get_rd( binary ) );
 }
 
 //------------------------------------------------------------------------

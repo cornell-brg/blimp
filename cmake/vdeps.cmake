@@ -20,6 +20,9 @@ function(vdeps DEPENDENCIES)
 
   # Get the file
   unset(FILE_PATH)
+  if("${VDEP_SOURCE}" STREQUAL "")
+    message(FATAL_ERROR "vdeps called with empty SOURCE (called from ${CMAKE_CURRENT_LIST_FILE})")
+  endif()
   find_file(
     FILE_PATH 
     NAMES ${VDEP_SOURCE}
@@ -28,7 +31,7 @@ function(vdeps DEPENDENCIES)
     NO_CACHE
   )
   if(${FILE_PATH} STREQUAL "FILE_PATH-NOTFOUND")
-    message(FATAL_ERROR "Couldn't find file '${FILE_TO_CHECK}' (searched ${VDEP_INCLUDE_DIRS})")
+    message(FATAL_ERROR "Couldn't find file '${VDEP_SOURCE}' (searched ${VDEP_INCLUDE_DIRS})")
   endif()
   file(READ ${FILE_PATH} FILE_CONTENTS)
   string(REPLACE "\n" ";" FILE_CONTENTS ${FILE_CONTENTS})
@@ -37,6 +40,10 @@ function(vdeps DEPENDENCIES)
   foreach(FILE_LINE ${FILE_CONTENTS})
     string(REGEX MATCHALL "^[^\\/]*`include[ \\t\\r\\n\\f]*(\"(.+)\"|'(.+)')[ \\t\\r\\n\\f]*$" INCL_MATCHES ${FILE_LINE})
     if(NOT ${CMAKE_MATCH_2} IN_LIST VDEPENDENCIES)
+      # Skip absolute-path includes that don't exist (e.g., ifdef-guarded NDA vendor files)
+      if(IS_ABSOLUTE "${CMAKE_MATCH_2}" AND NOT EXISTS "${CMAKE_MATCH_2}")
+        continue()
+      endif()
       # Check for memoization
       get_property(MEMOIZED
         DIRECTORY ${CMAKE_CURRENT_LIST_DIR}

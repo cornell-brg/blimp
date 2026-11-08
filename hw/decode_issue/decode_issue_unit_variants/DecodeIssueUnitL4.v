@@ -85,7 +85,7 @@ module DecodeIssueUnitL4 #(
 
   always_ff @( posedge clk ) begin
     if ( rst )
-      F_reg <= '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg <= '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg <= F_reg_next;
   end
@@ -96,7 +96,7 @@ module DecodeIssueUnitL4 #(
     if ( F_xfer )
       F_reg_next = '{ val: 1'b1, inst: F.inst, pc: F.pc, seq_num: F.seq_num };
     else if ( X_xfer )
-      F_reg_next = '{ val: 1'b0, inst: 'x, pc: 'x, seq_num: 'x };
+      F_reg_next = '{ val: 1'b0, inst: '0, pc: '0, seq_num: '0 };
     else
       F_reg_next = F_reg;
   end
@@ -194,7 +194,7 @@ module DecodeIssueUnitL4 #(
     case( decoder_jal )
       2'd1:    jump_target = F_reg.pc + imm;                // JAL
       2'd2:    jump_target = (rdata0 + imm) & 32'hFFFFFFFE; // JALR
-      default: jump_target = 'x;
+      default: jump_target = '0;
     endcase
   end
 

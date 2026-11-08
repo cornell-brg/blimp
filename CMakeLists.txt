@@ -35,6 +35,10 @@ set(V_TEST_FILES
   hw/execute/test/l6/ControlFlowUnitL6_test.v
   hw/execute/test/l7/IterativeMulDivRemL7_test.v
   hw/execute/test/l7/LoadStoreUnitL7_test.v
+  hw/execute/test/l8/CSRL8_test.v
+  hw/execute/test/l8/ALUF_test.v
+  hw/execute/test/l8/FPInstUnit_test.v
+  hw/execute/test/l9/FPUMult_test.v
   hw/fetch/test/FetchUnitL1_test.v
   hw/fetch/test/FetchUnitL2_test.v
   hw/fetch/test/FetchUnitL3_test.v
@@ -48,6 +52,63 @@ set(V_TEST_FILES
   hw/writeback_commit/test/WritebackCommitUnitL2_test.v
   hw/writeback_commit/test/WritebackCommitUnitL3_test.v
   hw/writeback_commit/test/ROB_test.v
+  hw/execute/test/l8/FDiv_test.v
+)
+# ========================================================================
+# CMakeLists.txt
+# ========================================================================
+# A build system for Blimp
+
+SET(CMAKE_CXX_STANDARD_LIBRARIES "")
+
+#-------------------------------------------------------------------------
+# Get all of the source files
+#-------------------------------------------------------------------------
+
+set(V_TEST_FILES
+  fpga/test/CharBuf_test.v
+  fpga/test/CharLUT_test.v
+  hw/common/test/Fifo_test.v
+  hw/common/test/PriorityEncoder_test.v
+  hw/common/test/RRArb_test.v
+  hw/decode_issue/test/DecodeIssueUnitL1_test.v
+  hw/decode_issue/test/DecodeIssueUnitL2_test.v
+  hw/decode_issue/test/DecodeIssueUnitL3_test.v
+  hw/decode_issue/test/DecodeIssueUnitL4_test.v
+  hw/decode_issue/test/DecodeIssueUnitL5_test.v
+  hw/decode_issue/test/ImmGen_test.v
+  hw/decode_issue/test/RegfilePending_test.v
+  hw/decode_issue/test/RenameTable_test.v
+  hw/execute/test/ExQueue_test.v
+  hw/execute/test/l1/ALUL1_test.v
+  hw/execute/test/l1/MultiplierL1_test.v
+  hw/execute/test/l2/PipelinedMultiplierL2_test.v
+  hw/execute/test/l2/IterativeMultiplierL2_test.v
+  hw/execute/test/l3/LoadStoreUnitL3_test.v
+  hw/execute/test/l4/ControlFlowUnitL4_test.v
+  hw/execute/test/l5/ControlFlowUnitL5_test.v
+  hw/execute/test/l6/ALUL6_test.v
+  hw/execute/test/l6/ControlFlowUnitL6_test.v
+  hw/execute/test/l7/IterativeMulDivRemL7_test.v
+  hw/execute/test/l7/LoadStoreUnitL7_test.v
+  hw/execute/test/l8/CSRL8_test.v
+  hw/execute/test/l8/ALUF_test.v
+  hw/execute/test/l8/FPInstUnit_test.v
+  hw/execute/test/l9/FPUMult_test.v
+  hw/fetch/test/FetchUnitL1_test.v
+  hw/fetch/test/FetchUnitL2_test.v
+  hw/fetch/test/FetchUnitL3_test.v
+  hw/fetch/test/SeqNumGenL2_test.v
+  hw/fetch/test/SeqNumGenL3_test.v
+  hw/squash/test/SquashUnitL1_test.v
+  hw/squash/test/SquashUnitL1Chain_test.v
+  hw/util/test/SeqAge_test.v
+  hw/util/test/SeqArb_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL1_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL2_test.v
+  hw/writeback_commit/test/WritebackCommitUnitL3_test.v
+  hw/writeback_commit/test/ROB_test.v
+  hw/execute/test/l8/FDiv_test.v
 )
 
 set(ASM_FILES
@@ -67,7 +128,7 @@ set(FL_PROC_FILES
   fl/fl_vtrace.cpp
   fl/fl_peripherals.cpp
   fl/parse_elf.cpp
-
+  fl/fl_fp_helpers.cpp
   fl/peripherals/FLExit.cpp
   fl/peripherals/FLTerminal.cpp
 )
@@ -127,6 +188,24 @@ set(TRACE 0)
 endif()
 
 #-------------------------------------------------------------------------
+# Waveforms
+#-------------------------------------------------------------------------
+# Disable by default for speed
+
+if(NOT DEFINED WAVES)
+set(WAVES 0)
+endif()
+
+#-------------------------------------------------------------------------
+# Coverage Reporting
+#-------------------------------------------------------------------------
+# Disable by default for speed
+
+if(NOT DEFINED COVERAGE)
+set(COVERAGE 0)
+endif()
+
+#-------------------------------------------------------------------------
 # get_leaf
 #-------------------------------------------------------------------------
 # Gets the leaf file of a path.
@@ -158,8 +237,13 @@ function(version_name VNAME BLIMP_VERSION)
     return()
   endif()
 
-  string(REGEX MATCH "BlimpV([0-9]+)" BLIMP_VERSION ${BLIMP_VERSION})
-  set(${VNAME} "v${CMAKE_MATCH_1}" PARENT_SCOPE)
+  string(REGEX MATCH "BlimpV([0-9]+)(_.+)?" BLIMP_VERSION_MATCH ${BLIMP_VERSION})
+  if(CMAKE_MATCH_2)
+    string(REPLACE "_" "-" SUFFIX "${CMAKE_MATCH_2}")
+    set(${VNAME} "v${CMAKE_MATCH_1}${SUFFIX}" PARENT_SCOPE)
+  else()
+    set(${VNAME} "v${CMAKE_MATCH_1}" PARENT_SCOPE)
+  endif()
 endfunction()
 
 #------------------------------------------------------------------------
@@ -231,32 +315,73 @@ foreach(V_TEST_FILE_REL_PATH ${V_TEST_FILES})
   remove_extension(V_TEST_BIN ${V_TEST_FILE})
 
   add_executable(${V_TEST_BIN} ${V_TEST_FILE_PATH})
-  target_include_directories(${V_TEST_BIN} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_Verilog_DPI_INCLUDES})
+
+  # Add the C++ wrapper separately to avoid Verilator flag inheritance
+  target_sources(${V_TEST_BIN} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
+  )
+  target_include_directories(${V_TEST_BIN} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+    ${CMAKE_Verilog_DPI_INCLUDES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include"   # Added headers
+  )
 
   if(CMAKE_Verilog_COMPILER_ID STREQUAL "Verilator")
-    target_compile_options(${V_TEST_BIN} PRIVATE --timing --quiet-stats)
+    set(V_FLAGS "--timing --quiet-stats --CFLAGS \"-std=c++20 -fcoroutines\"")
     if(TRACE)
-      target_compile_options(${V_TEST_BIN} PRIVATE --trace --trace-structs)
+      set(V_FLAGS "${V_FLAGS} --trace --trace-structs")
+    endif()
+    set_source_files_properties(${V_TEST_FILE_PATH} PROPERTIES COMPILE_FLAGS "${V_FLAGS}")
+  endif()
+
+  if(CMAKE_Verilog_COMPILER_ID STREQUAL "VCS")
+    target_link_options(${V_TEST_BIN} PRIVATE -full64 -xprop=tmerge)
+    # Pass C++ flags through VCS to g++
+    target_link_options(${V_TEST_BIN} PRIVATE "-CFLAGS" "-std=c++20")
+    if(WAVES)
+      target_link_options(${V_TEST_BIN} PRIVATE +vcs+dumpvars+${V_TEST_BIN}.vcd +vcs+vcdpluson +vcs+vcdplusmemon)
+    endif()
+    if(COVERAGE)
+      target_link_options(${V_TEST_BIN} PRIVATE -cm line+cond+tgl+fsm+branch -cm_dir ${V_TEST_BIN}.vdb)
     endif()
   endif()
 
   # Add our main simulation loop and libraries
   target_link_libraries(${V_TEST_BIN} PRIVATE FL_PROC)
+  target_link_libraries(${V_TEST_BIN} PRIVATE 
+  "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/build/Linux-x86_64-GCC/softfloat.a"
+  )
 
   # Track dependencies
   vdeps(TEST_DEPS
     SOURCE ${V_TEST_FILE_REL_PATH}
-    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
   )
-  add_prefix(TEST_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/")
-  set_property(SOURCE ${V_TEST_FILE_PATH} APPEND PROPERTY OBJECT_DEPENDS ${TEST_DEPS})
+  set(TEST_DEPS_ABS "")
+  foreach(DEP ${TEST_DEPS})
+    unset(DEP_PATH)
+    find_file(
+      DEP_PATH
+      NAMES ${DEP}
+      PATHS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
+      NO_DEFAULT_PATH
+      NO_CACHE
+    )
+    if(DEP_PATH)
+      list(APPEND TEST_DEPS_ABS ${DEP_PATH})
+    else()
+      list(APPEND TEST_DEPS_ABS "${CMAKE_CURRENT_SOURCE_DIR}/${DEP}")
+    endif()
+  endforeach()
+  set_property(SOURCE ${V_TEST_FILE_PATH} APPEND PROPERTY OBJECT_DEPENDS ${TEST_DEPS_ABS})
 
   # Add linting
   vlint(${V_TEST_BIN}-lint
     TARGET_NAME ${V_TEST_BIN}
     SOURCES ${V_TEST_FILE_REL_PATH}
-    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
-    DEPENDS ${TEST_DEPS}
+    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
+    DEPENDS ${TEST_DEPS_ABS}
   )
   add_dependencies(${V_TEST_BIN} ${V_TEST_BIN}-lint)
 
@@ -340,15 +465,35 @@ foreach(V_SIM_FILE_REL_PATH ${BLIMP_SIMS})
   set(V_SIM_FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${V_SIM_FILE_REL_PATH}")
   get_leaf(V_SIM_FILE ${V_SIM_FILE_PATH})
   sim_name(V_SIM_BIN ${V_SIM_FILE})
+  string(REGEX REPLACE "\\.v$" "" TOP_MODULE ${V_SIM_FILE})
+  set(EXTRA_VERILATOR_FLAGS --top-module ${TOP_MODULE})
 
-  add_executable(${V_SIM_BIN} ${V_SIM_FILE_PATH} "hw/top/sim/utils/load_elf.cpp")
-  target_include_directories(${V_SIM_BIN} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_Verilog_DPI_INCLUDES})
+  add_executable(${V_SIM_BIN} ${V_SIM_FILE_PATH})
+
+  # Add the C++ utility and wrapper files separately
+  target_sources(${V_SIM_BIN} PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}/hw/top/sim/utils/load_elf.cpp" 
+    "${CMAKE_CURRENT_SOURCE_DIR}/fl/fl_fpadd.cpp"
+  )
+  target_include_directories(${V_SIM_BIN} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_Verilog_DPI_INCLUDES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/source/include"
+  )
+  target_link_libraries(${V_SIM_BIN} PRIVATE 
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/softfloat/build/Linux-x86_64-GCC/softfloat.a"
+  )
 
   if(CMAKE_Verilog_COMPILER_ID STREQUAL "Verilator")
-    set(V_COMPILE_FLAGS "--timing --quiet-stats")
+    set(V_COMPILE_FLAGS "--timing --quiet-stats -I${CMAKE_CURRENT_SOURCE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR}/../ --CFLAGS \"-std=c++20 -fcoroutines\"")
     if(TRACE)
       set(V_COMPILE_FLAGS "${V_COMPILE_FLAGS} --trace --trace-structs")
     endif()
+
+    # specifies top module, need to do this when including files from ip
+    set(V_COMPILE_FLAGS "${V_COMPILE_FLAGS} --top-module ${TOP_MODULE}")
+
     set_source_files_properties(
       ${V_SIM_FILE_PATH}
       PROPERTIES
@@ -362,17 +507,34 @@ foreach(V_SIM_FILE_REL_PATH ${BLIMP_SIMS})
   # Track dependencies
   vdeps(SIM_DEPS
     SOURCE ${V_SIM_FILE_REL_PATH}
-    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
+    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
   )
-  add_prefix(SIM_DEPS "${CMAKE_CURRENT_SOURCE_DIR}/")
-  set_property(SOURCE ${V_SIM_FILE_PATH} APPEND PROPERTY OBJECT_DEPENDS ${SIM_DEPS})
+  set(SIM_DEPS_ABS "")
+  foreach(DEP ${SIM_DEPS})
+    unset(DEP_PATH)
+    find_file(
+      DEP_PATH
+      NAMES ${DEP}
+      PATHS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
+      NO_DEFAULT_PATH
+      NO_CACHE
+    )
+    if(DEP_PATH)
+      list(APPEND SIM_DEPS_ABS ${DEP_PATH})
+    else()
+      message(WARNING "Could not find dependency: ${DEP}")
+      list(APPEND SIM_DEPS_ABS "${CMAKE_CURRENT_SOURCE_DIR}/${DEP}")
+    endif()
+  endforeach()
+  set_property(SOURCE ${V_SIM_FILE_PATH} APPEND PROPERTY OBJECT_DEPENDS ${SIM_DEPS_ABS})
 
   # Add linting
   vlint(${V_SIM_BIN}-lint
     TARGET_NAME ${V_SIM_BIN}
     SOURCES ${V_SIM_FILE_REL_PATH}
-    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}"
-    DEPENDS ${SIM_DEPS}
+    INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/../"
+    DEPENDS ${SIM_DEPS_ABS}
+    VERILATOR_FLAGS ${EXTRA_VERILATOR_FLAGS}
   )
   add_dependencies(${V_SIM_BIN} ${V_SIM_BIN}-lint)
 endforeach(V_SIM_FILE_REL_PATH)

@@ -7,4 +7,5 @@
 lint_off -rule DECLFILENAME
 lint_off -rule GENUNNAMED
 lint_off -rule IMPORTSTAR
+lint_off -rule MULTITOP
 lint_off -rule VARHIDDEN

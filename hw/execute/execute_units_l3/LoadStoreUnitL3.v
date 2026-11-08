@@ -92,15 +92,15 @@ module LoadStoreUnitL3 #(
     if ( rst )
       D_reg <= '{ 
         val:      1'b0, 
-        pc:       'x,
-        seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
-        waddr:    'x,
-        preg:     'x,
-        ppreg:    'x,
-        mem_data: 'x,
-        uop:      'x
+        pc:       '0,
+        seq_num:  '0,
+        op1:      '0, 
+        op2:      '0,
+        waddr:    '0,
+        preg:     '0,
+        ppreg:    '0,
+        mem_data: '0,
+        uop:      '0
       };
     else
       D_reg <= D_reg_next;
@@ -125,15 +125,15 @@ module LoadStoreUnitL3 #(
     else if ( stage2_push )
       D_reg_next = '{ 
         val:      1'b0, 
-        pc:       'x,
-        seq_num:  'x,
-        op1:      'x, 
-        op2:      'x,
-        waddr:    'x,
-        preg:     'x,
-        ppreg:    'x,
-        mem_data: 'x,
-        uop:      'x
+        pc:       '0,
+        seq_num:  '0,
+        op1:      '0, 
+        op2:      '0,
+        waddr:    '0,
+        preg:     '0,
+        ppreg:    '0,
+        mem_data: '0,
+        uop:      '0
       };
     else
       D_reg_next = D_reg;
@@ -209,12 +209,12 @@ module LoadStoreUnitL3 #(
     if ( rst )
       stage2_reg <= '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        preg:    'x,
-        ppreg:   'x,
-        wen:     'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        preg:    '0,
+        ppreg:   '0,
+        wen:     '0
       };
     else
       stage2_reg <= stage2_reg_next;
@@ -228,12 +228,12 @@ module LoadStoreUnitL3 #(
     else if ( W_xfer )
       stage2_reg_next = '{ 
         val:     1'b0, 
-        pc:      'x,
-        seq_num: 'x,
-        waddr:   'x,
-        preg:    'x,
-        ppreg:   'x,
-        wen:     'x
+        pc:      '0,
+        seq_num: '0,
+        waddr:   '0,
+        preg:    '0,
+        ppreg:   '0,
+        wen:     '0
       };
     else
       stage2_reg_next = stage2_reg;

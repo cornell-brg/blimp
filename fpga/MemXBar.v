@@ -41,8 +41,8 @@ module MemXBar #(
   // Servers
   // ---------------------------------------------------------------------
 
-  MemNetReq.client  bram_req,
-  MemNetResp.client bram_resp,
+  MemNetReq.client  mem_req,
+  MemNetResp.client mem_resp,
 
   MemNetReq.client  peripheral_req,
   MemNetResp.client peripheral_resp,
@@ -127,24 +127,24 @@ module MemXBar #(
   // Request Routing
   // ---------------------------------------------------------------------
 
-  MemNetReq #( p_opaq_bits ) bram_route_req[3]();
+  MemNetReq #( p_opaq_bits ) mem_route_req[3]();
   MemNetReq #( p_opaq_bits ) peripheral_route_req[3]();
 
   ReqRouter imem_req_route (
     .req        (imem_req),
-    .memory     (bram_route_req[0]),
+    .memory     (mem_route_req[0]),
     .peripheral (peripheral_route_req[0])
   );
 
   ReqRouter dmem_req_route (
     .req        (dmem_req),
-    .memory     (bram_route_req[1]),
+    .memory     (mem_route_req[1]),
     .peripheral (peripheral_route_req[1])
   );
 
   ReqRouter spi_req_route (
     .req        (spi_req),
-    .memory     (bram_route_req[2]),
+    .memory     (mem_route_req[2]),
     .peripheral (peripheral_route_req[2])
   );
 
@@ -155,11 +155,11 @@ module MemXBar #(
   ReqArbiter #(
     .p_num_arb   (3),
     .p_opaq_bits (p_opaq_bits)
-  ) bram_req_arb (
+  ) mem_req_arb (
     .clk (clk),
     .rst (rst),
-    .arb (bram_route_req),
-    .gnt (bram_req)
+    .arb (mem_route_req),
+    .gnt (mem_req)
   );
 
   ReqArbiter #(
@@ -176,12 +176,12 @@ module MemXBar #(
   // Response Routing
   // ---------------------------------------------------------------------
 
-  MemNetResp #( p_opaq_bits ) bram_route_resp[3]();
+  MemNetResp #( p_opaq_bits ) mem_route_resp[3]();
   MemNetResp #( p_opaq_bits ) peripheral_route_resp[3]();
 
-  RespRouter #( 3 ) bram_resp_route (
-    .resp  (bram_resp),
-    .route (bram_route_resp)
+  RespRouter #( 3 ) mem_resp_route (
+    .resp  (mem_resp),
+    .route (mem_route_resp)
   );
 
   RespRouter #( 3 ) peripheral_resp_route (
@@ -197,17 +197,17 @@ module MemXBar #(
   MemNetResp #( p_opaq_bits ) dmem_route_resp[2]();
   MemNetResp #( p_opaq_bits ) spi_route_resp[2]();
 
-  assign imem_route_resp[0].val = bram_route_resp[0].val;
-  assign bram_route_resp[0].rdy = imem_route_resp[0].rdy;
-  assign imem_route_resp[0].msg = bram_route_resp[0].msg;
+  assign imem_route_resp[0].val = mem_route_resp[0].val;
+  assign mem_route_resp[0].rdy = imem_route_resp[0].rdy;
+  assign imem_route_resp[0].msg = mem_route_resp[0].msg;
 
-  assign dmem_route_resp[0].val = bram_route_resp[1].val;
-  assign bram_route_resp[1].rdy = dmem_route_resp[0].rdy;
-  assign dmem_route_resp[0].msg = bram_route_resp[1].msg;
+  assign dmem_route_resp[0].val = mem_route_resp[1].val;
+  assign mem_route_resp[1].rdy = dmem_route_resp[0].rdy;
+  assign dmem_route_resp[0].msg = mem_route_resp[1].msg;
 
-  assign spi_route_resp[0].val  = bram_route_resp[2].val;
-  assign bram_route_resp[2].rdy = spi_route_resp[0].rdy;
-  assign spi_route_resp[0].msg  = bram_route_resp[2].msg;
+  assign spi_route_resp[0].val  = mem_route_resp[2].val;
+  assign mem_route_resp[2].rdy = spi_route_resp[0].rdy;
+  assign spi_route_resp[0].msg  = mem_route_resp[2].msg;
 
   assign imem_route_resp[1].val       = peripheral_route_resp[0].val;
   assign peripheral_route_resp[0].rdy = imem_route_resp[1].rdy;

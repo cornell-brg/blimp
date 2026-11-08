@@ -53,7 +53,7 @@ module ROB #(
 
   always_ff @( posedge clk ) begin
     if( rst )
-      entries <= '{default: '{msg: 'x, val: 1'b0}};
+      entries <= '{default: t_entry'{msg: 'x, val: 1'b0}};
     else begin
       if( ins_en & !bypass ) begin
         entries[ins_idx] <= '{

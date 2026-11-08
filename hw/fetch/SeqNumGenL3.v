@@ -100,7 +100,7 @@ module SeqNumGenL3 #(
   //----------------------------------------------------------------------
 
   // Can only allocate if we're not about to wrap around
-  assign alloc_val = !( curr_head_ptr + 1 == curr_tail_ptr );
+  assign alloc_val = ( (curr_tail_ptr == 0) ? !(curr_head_ptr == '1) : !(curr_head_ptr + 1 == curr_tail_ptr) );
 
   assign is_alloc = alloc_val & alloc_rdy;
   assign alloc_seq_num = ( squash.val ) ? squash.seq_num + 1
@@ -181,7 +181,16 @@ module SeqNumGenL3 #(
     end
   endgenerate
 
+`ifndef SYNTHESIS
   assign curr_tail_incr = curr_tail_incr_arr.or();
+`else 
+  always_comb begin
+    curr_tail_incr = '0;
+    for (int k = 0; k < p_reclaim_width; k = k + 1) begin
+      curr_tail_incr = curr_tail_incr | curr_tail_incr_arr[k];
+    end
+  end
+`endif // SYNTHESIS
 
   always_ff @( posedge clk ) begin
     if( rst ) begin

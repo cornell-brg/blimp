@@ -13,11 +13,11 @@ task test_case_directed_lb_1_basic();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1, x0, 0x100" );
-  h.asm( 'h204, "lb   x2, 0(x1)"     );
-  h.asm( 'h208, "lb   x3, 1(x1)"     );
-  h.asm( 'h20c, "lb   x4, 2(x1)"     );
-  h.asm( 'h210, "lb   x5, 3(x1)"     );
+  h.asm( 'h000, "addi x1, x0, 0x100" );
+  h.asm( 'h004, "lb   x2, 0(x1)"     );
+  h.asm( 'h008, "lb   x3, 1(x1)"     );
+  h.asm( 'h00c, "lb   x4, 2(x1)"     );
+  h.asm( 'h010, "lb   x5, 3(x1)"     );
 
   // Write h.data into memory
 
@@ -25,11 +25,11 @@ task test_case_directed_lb_1_basic();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h0000_0100, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 2, 'hffff_ffef, 1 ); // lb   x2, 0(x1)
-  h.check_trace( 'h208, 3, 'hffff_ffbe, 1 ); // lb   x3, 1(x1)
-  h.check_trace( 'h20c, 4, 'hffff_ffad, 1 ); // lb   x4, 2(x1)
-  h.check_trace( 'h210, 5, 'hffff_ffde, 1 ); // lb   x5, 2(x1)
+  h.check_trace( 'h000, 1, 'h0000_0100, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 2, 'hffff_ffef, 1 ); // lb   x2, 0(x1)
+  h.check_trace( 'h008, 3, 'hffff_ffbe, 1 ); // lb   x3, 1(x1)
+  h.check_trace( 'h00c, 4, 'hffff_ffad, 1 ); // lb   x4, 2(x1)
+  h.check_trace( 'h010, 5, 'hffff_ffde, 1 ); // lb   x5, 2(x1)
 
   h.t.test_case_end();
 endtask
@@ -45,9 +45,9 @@ task test_case_directed_lb_2_x0();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1, x0, 0x100" );
-  h.asm( 'h204, "lb   x0, 0(x1)"     );
-  h.asm( 'h208, "lb   x0, 0(x0)"     );
+  h.asm( 'h000, "addi x1, x0, 0x100" );
+  h.asm( 'h004, "lb   x0, 0(x1)"     );
+  h.asm( 'h008, "lb   x0, 0(x0)"     );
 
   // Write h.data into memory
 
@@ -55,9 +55,9 @@ task test_case_directed_lb_2_x0();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 'x, 'x,          0 ); // lb   x0, 0(x1)
-  h.check_trace( 'h208, 'x, 'x,          0 ); // lb   x0, 0(x0)
+  h.check_trace( 'h000, 1,  'h0000_0100, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 'x, 'x,          0 ); // lb   x0, 0(x1)
+  h.check_trace( 'h008, 'x, 'x,          0 ); // lb   x0, 0(x0)
 
   h.t.test_case_end();
 endtask
@@ -73,11 +73,11 @@ task test_case_directed_lb_3_offset_pos();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x100" );
-  h.asm( 'h204, "lb   x2,  0(x1)"     );
-  h.asm( 'h208, "lb   x3,  4(x1)"     );
-  h.asm( 'h20c, "lb   x4,  8(x1)"     );
-  h.asm( 'h210, "lb   x5,  12(x1)"    );
+  h.asm( 'h000, "addi x1,  x0, 0x100" );
+  h.asm( 'h004, "lb   x2,  0(x1)"     );
+  h.asm( 'h008, "lb   x3,  4(x1)"     );
+  h.asm( 'h00c, "lb   x4,  8(x1)"     );
+  h.asm( 'h010, "lb   x5,  12(x1)"    );
 
   // Write h.data into memory
 
@@ -88,11 +88,11 @@ task test_case_directed_lb_3_offset_pos();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h0000_0100, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 2, 'h0000_0000, 1 ); // lb   x2, 0(x1)
-  h.check_trace( 'h208, 3, 'h0000_0004, 1 ); // lb   x3, 4(x1)
-  h.check_trace( 'h20c, 4, 'h0000_0008, 1 ); // lb   x4, 8(x1)
-  h.check_trace( 'h210, 5, 'h0000_000c, 1 ); // lb   x5, 12(x1)
+  h.check_trace( 'h000, 1, 'h0000_0100, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 2, 'h0000_0000, 1 ); // lb   x2, 0(x1)
+  h.check_trace( 'h008, 3, 'h0000_0004, 1 ); // lb   x3, 4(x1)
+  h.check_trace( 'h00c, 4, 'h0000_0008, 1 ); // lb   x4, 8(x1)
+  h.check_trace( 'h010, 5, 'h0000_000c, 1 ); // lb   x5, 12(x1)
 
   h.t.test_case_end();
 endtask
@@ -108,11 +108,11 @@ task test_case_directed_lb_4_offset_neg();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x10c" );
-  h.asm( 'h204, "lb   x2,  0(x1)"     );
-  h.asm( 'h208, "lb   x3,  -4(x1)"    );
-  h.asm( 'h20c, "lb   x4,  -8(x1)"    );
-  h.asm( 'h210, "lb   x5,  -12(x1)"   );
+  h.asm( 'h000, "addi x1,  x0, 0x10c" );
+  h.asm( 'h004, "lb   x2,  0(x1)"     );
+  h.asm( 'h008, "lb   x3,  -4(x1)"    );
+  h.asm( 'h00c, "lb   x4,  -8(x1)"    );
+  h.asm( 'h010, "lb   x5,  -12(x1)"   );
 
   // Write h.data into memory
 
@@ -123,11 +123,11 @@ task test_case_directed_lb_4_offset_neg();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h0000_010c, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 2, 'h0000_000c, 1 ); // lb   x2, 0(x1)
-  h.check_trace( 'h208, 3, 'h0000_0008, 1 ); // lb   x3, -4(x1)
-  h.check_trace( 'h20c, 4, 'h0000_0004, 1 ); // lb   x4, -8(x1)
-  h.check_trace( 'h210, 5, 'h0000_0000, 1 ); // lb   x5, -12(x1)
+  h.check_trace( 'h000, 1, 'h0000_010c, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 2, 'h0000_000c, 1 ); // lb   x2, 0(x1)
+  h.check_trace( 'h008, 3, 'h0000_0008, 1 ); // lb   x3, -4(x1)
+  h.check_trace( 'h00c, 4, 'h0000_0004, 1 ); // lb   x4, -8(x1)
+  h.check_trace( 'h010, 5, 'h0000_0000, 1 ); // lb   x5, -12(x1)
 
   h.t.test_case_end();
 endtask
@@ -143,11 +143,11 @@ task test_case_directed_lb_5_sext();
 
   // Write assembly program into memory
 
-  h.asm( 'h200, "addi x1,  x0, 0x10c" );
-  h.asm( 'h204, "lb   x2,  -1(x1)"    );
-  h.asm( 'h208, "lb   x3,  -2(x1)"    );
-  h.asm( 'h20c, "lb   x4,  -3(x1)"    );
-  h.asm( 'h210, "lb   x5,  -4(x1)"    );
+  h.asm( 'h000, "addi x1,  x0, 0x10c" );
+  h.asm( 'h004, "lb   x2,  -1(x1)"    );
+  h.asm( 'h008, "lb   x3,  -2(x1)"    );
+  h.asm( 'h00c, "lb   x4,  -3(x1)"    );
+  h.asm( 'h010, "lb   x5,  -4(x1)"    );
 
   // Write h.data into memory
 
@@ -155,11 +155,11 @@ task test_case_directed_lb_5_sext();
 
   // Check each executed instruction
 
-  h.check_trace( 'h200, 1, 'h0000_010c, 1 ); // addi x1, x0, 0x100
-  h.check_trace( 'h204, 2, 'h0000_0001, 1 ); // lb   x2, -1(x1)
-  h.check_trace( 'h208, 3, 'hffff_ff80, 1 ); // lb   x3, -2(x1)
-  h.check_trace( 'h20c, 4, 'h0000_000f, 1 ); // lb   x4, -3(x1)
-  h.check_trace( 'h210, 5, 'hffff_fff0, 1 ); // lb   x5, -4(x1)
+  h.check_trace( 'h000, 1, 'h0000_010c, 1 ); // addi x1, x0, 0x100
+  h.check_trace( 'h004, 2, 'h0000_0001, 1 ); // lb   x2, -1(x1)
+  h.check_trace( 'h008, 3, 'hffff_ff80, 1 ); // lb   x3, -2(x1)
+  h.check_trace( 'h00c, 4, 'h0000_000f, 1 ); // lb   x4, -3(x1)
+  h.check_trace( 'h010, 5, 'hffff_fff0, 1 ); // lb   x5, -4(x1)
 
   h.t.test_case_end();
 endtask

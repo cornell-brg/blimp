@@ -34,6 +34,7 @@ module ExQueue #(
     logic   [p_seq_num_bits-1:0] seq_num;
     logic [p_phys_addr_bits-1:0] preg;
     logic [p_phys_addr_bits-1:0] ppreg;
+    logic                        is_fp;
   } msg_t;
 
   msg_t in_msg;
@@ -46,6 +47,7 @@ module ExQueue #(
   assign in_msg.seq_num = in.seq_num;
   assign in_msg.preg    = in.preg;
   assign in_msg.ppreg   = in.ppreg;
+  assign in_msg.is_fp   = in.is_fp;
 
   assign out.pc      = out_msg.pc;
   assign out.waddr   = out_msg.waddr;
@@ -54,6 +56,7 @@ module ExQueue #(
   assign out.seq_num = out_msg.seq_num;
   assign out.preg    = out_msg.preg;
   assign out.ppreg   = out_msg.ppreg;
+  assign out.is_fp   = out_msg.is_fp;
 
   //----------------------------------------------------------------------
   // Use a FIFO with bypassing to buffer the stream

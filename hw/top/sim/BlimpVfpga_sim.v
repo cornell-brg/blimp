@@ -120,6 +120,8 @@ module BlimpVfpga_sim;
     .imem (mem_intf[0]),
     .dmem (mem_intf[1]),
     .spi  (spi_intf),
+    .mem_req (bram_req),
+    .mem_resp(bram_resp),
     .*
   );
 
