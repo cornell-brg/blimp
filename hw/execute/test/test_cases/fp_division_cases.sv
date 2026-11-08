@@ -5,6 +5,8 @@
 //
 // NOTE: each test case uses at most 8 transactions (seq_num 0..7) so it
 // fits in the 3-bit seq_num suite (suite_3).
+//
+// NOTE: This file may be obsolute, see fp_div_test_cases.sv for updated test cases
 //========================================================================
 
 `ifndef FDIV_TEST_CASES_SV
