@@ -14,6 +14,8 @@
 // test_case_fdiv_basic
 //----------------------------------------------------------------------
 
+import "DPI-C" function int unsigned sf_fdiv(input int unsigned a, input int unsigned b);
+
 task test_case_fdiv_basic();
   t.test_case_begin("test_case_fdiv_basic");
   if (!t.run_test) return;
@@ -155,6 +157,39 @@ task test_case_fdiv_subnormal();
   t.test_case_end();
 endtask
 
+
+task test_case_fdiv_random();
+  int          i;
+  logic [31:0] x, y, expected;
+  logic        sx, sy;
+  logic [7:0]  ex, ey;
+  logic [31:0] pc;
+  logic [p_seq_num_bits-1:0] seq;
+
+  t.test_case_begin( "test_case_fdiv_random" );
+  if ( !t.run_test ) return;
+
+  for ( i = 0; i < 50; i = i + 1 ) begin
+    sx = 1'($urandom_range(1, 0));
+    sy = 1'($urandom_range(1, 0));
+    ex = 8'($urandom_range(190, 64));
+    ey = 8'($urandom_range(190, 64));
+    x  = {sx, ex, 23'($urandom())};
+    y  = {sy, ey, 23'($urandom())};
+
+    expected = sf_fdiv( x, y );
+
+    pc  = 32'h200 + 32'(i) * 4;
+    seq = p_seq_num_bits'(i);   // wraps naturally for narrow seq widths
+
+    send( pc, seq, x, y, 5'h8, OP_FDIV_S );
+    recv( pc, seq, 5'h8, expected, 1'b1 );
+  end
+
+  t.test_case_end();
+endtask
+
+
 //----------------------------------------------------------------------
 // run_fdiv_test_cases
 //----------------------------------------------------------------------
@@ -162,6 +197,8 @@ endtask
 task run_fdiv_test_cases();
   test_case_fdiv_basic();
   test_case_fdiv_rounding();
+  test_case_fdiv_random();
+
   // test_case_fdiv_edge();
   // test_case_fdiv_subnormal();
 endtask

@@ -5,7 +5,7 @@
 //========================================================================
 
 `include "defs/UArch.v"
-`include "hw/execute/execute_units_l8/FDIV.v"   // TODO: adjust path/name if different
+`include "hw/execute/execute_units_l8/FDiv.v"   // TODO: adjust path/name if different
 `include "hw/execute/test/test_cases/fdiv_intf.sv"
 `include "hw/execute/test/test_cases/fp_division_cov.sv"
 `include "test/fl/TestIstream.v"
@@ -53,7 +53,7 @@ module FDIVTestSuite #(
 
   fdiv_intf fdiv_intf_inst(clk);
 
-  FDIV dut
+  FDiv dut
   (
     .D (D__X_intf),
     .W (X__W_intf),
@@ -64,28 +64,28 @@ module FDIVTestSuite #(
   // TODO: replace each dut.<name> with the real internal signal in FDIV.v
   assign fdiv_intf_inst.reset                      = rst;
 
-  assign fdiv_intf_inst.internal_ground            = dut.guard;
-  assign fdiv_intf_inst.internal_roundb            = dut.roundb;
-  assign fdiv_intf_inst.internal_sticky            = dut.sticky;
-  assign fdiv_intf_inst.internal_last_bit_mantissa = dut.lsb;
-
-  assign fdiv_intf_inst.internal_denorm_one        = dut.is_denorm1;
-  assign fdiv_intf_inst.internal_denorm_two        = dut.is_denorm2;
-  assign fdiv_intf_inst.internal_nan_one           = dut.is_nan1;
-  assign fdiv_intf_inst.internal_nan_two           = dut.is_nan2;
-  assign fdiv_intf_inst.is_inf_one                 = dut.is_inf1;
-  assign fdiv_intf_inst.is_inf_two                 = dut.is_inf2;
-  assign fdiv_intf_inst.zero_one                   = dut.is_zero1;
-  assign fdiv_intf_inst.zero_two                   = dut.is_zero2;
-  assign fdiv_intf_inst.underflow                  = dut.underflow;
-  assign fdiv_intf_inst.overflow                   = dut.overflow;
-
-  assign fdiv_intf_inst.sign_one                   = dut.s1;
-  assign fdiv_intf_inst.sign_two                   = dut.s2;
-  assign fdiv_intf_inst.biased_exponent_one        = dut.e1;
-  assign fdiv_intf_inst.biased_exponent_two        = dut.e2;
-  assign fdiv_intf_inst.mantissa_one               = dut.m1;
-  assign fdiv_intf_inst.mantissa_two               = dut.m2;
+//  assign fdiv_intf_inst.internal_ground            = dut.guard;
+//  assign fdiv_intf_inst.internal_roundb            = dut.roundb;
+//  assign fdiv_intf_inst.internal_sticky            = dut.sticky;
+//  assign fdiv_intf_inst.internal_last_bit_mantissa = dut.lsb;
+//
+//  assign fdiv_intf_inst.internal_denorm_one        = dut.is_denorm1;
+//  assign fdiv_intf_inst.internal_denorm_two        = dut.is_denorm2;
+//  assign fdiv_intf_inst.internal_nan_one           = dut.is_nan1;
+//  assign fdiv_intf_inst.internal_nan_two           = dut.is_nan2;
+//  assign fdiv_intf_inst.is_inf_one                 = dut.is_inf1;
+//  assign fdiv_intf_inst.is_inf_two                 = dut.is_inf2;
+//  assign fdiv_intf_inst.zero_one                   = dut.is_zero1;
+//  assign fdiv_intf_inst.zero_two                   = dut.is_zero2;
+//  assign fdiv_intf_inst.underflow                  = dut.underflow;
+//  assign fdiv_intf_inst.overflow                   = dut.overflow;
+//
+//  assign fdiv_intf_inst.sign_one                   = dut.s1;
+//  assign fdiv_intf_inst.sign_two                   = dut.s2;
+//  assign fdiv_intf_inst.biased_exponent_one        = dut.e1;
+//  assign fdiv_intf_inst.biased_exponent_two        = dut.e2;
+//  assign fdiv_intf_inst.mantissa_one               = dut.m1;
+//  assign fdiv_intf_inst.mantissa_two               = dut.m2;
 
   `ifndef VERILATOR
   fp_division_cov cvg = new(fdiv_intf_inst);
@@ -213,7 +213,7 @@ module FDIVTestSuite #(
   // Include test cases
   //----------------------------------------------------------------------
 
-  `include "hw/execute/test/test_cases/fdiv_test_cases.sv"
+  `include "hw/execute/test/test_cases/fp_div_test_cases.sv"
 
   //----------------------------------------------------------------------
   // run_test_suite

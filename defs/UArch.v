@@ -14,11 +14,7 @@ package UArch;
   // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   // A linearization of opcodes to indicate a specific instruction type
 
-<<<<<<< HEAD
-  parameter num_ops = 42;
-=======
   parameter num_ops = 48;
->>>>>>> origin/blimp-v9-infra/rtl
 
   typedef enum logic [$clog2(num_ops)-1:0] {
     // Arithmetic
